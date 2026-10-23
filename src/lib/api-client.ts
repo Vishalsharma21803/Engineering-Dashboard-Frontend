@@ -5,6 +5,8 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
   ""
 );
 
+export const UNAUTHORIZED_EVENT = "auth:unauthorized";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly errors: ApiFieldError[];
@@ -72,6 +74,14 @@ export async function apiRequest<TResponse>(
 
   if (!response.ok) {
     const errorPayload = payload as ApiErrorPayload | null;
+
+    if (
+      response.status === 401 &&
+      !path.startsWith("/api/auth/") &&
+      typeof window !== "undefined"
+    ) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
 
     throw new ApiError(
       response.status,

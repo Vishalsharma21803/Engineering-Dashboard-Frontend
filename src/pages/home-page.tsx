@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+
+import { buttonClassName } from "@/components/ui/button-styles";
 import {
   Card,
   CardContent,
@@ -10,15 +13,15 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 const modules = [
   {
     title: "Credentials",
-    status: "Next module",
-    statusClass: "bg-indigo-50 text-indigo-700",
+    status: "Available",
+    statusClass: "bg-emerald-50 text-emerald-700",
     description:
-      "Create, update, validate, and delete Azure DevOps PATs from the cockpit.",
+      "Add, validate, update, and delete encrypted Azure DevOps PATs.",
   },
   {
     title: "Azure DevOps",
-    status: "Backend ready",
-    statusClass: "bg-emerald-50 text-emerald-700",
+    status: "Next module",
+    statusClass: "bg-indigo-50 text-indigo-700",
     description:
       "Projects, work items, repositories, pull requests, pipelines, and builds.",
   },
@@ -48,9 +51,49 @@ export function HomePage() {
         </h1>
 
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-          Your session is active. Credential management is the next
-          module to land, followed by the Azure DevOps workspace.
+          Your session is active. Credential management is live.
+          Add an Azure DevOps PAT to validate organization access and
+          prepare for the workspace.
         </p>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            to="/credentials"
+            className={buttonClassName({ size: "md" })}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="size-4"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8 7a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-5.5 8a5.5 5.5 0 0 1 9.58-3.68A4.5 4.5 0 0 0 10 14.5v1a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5V15Zm5.25-8a3 3 0 1 0 6 0 3 3 0 0 0-6 0ZM3 15.5A4.5 4.5 0 0 1 7.5 11h.257a5.49 5.49 0 0 0-1.284 2.65A2.5 2.5 0 0 0 4.5 15.5v.5h4.75a2.5 2.5 0 0 0 .25 1.5H3a.5.5 0 0 1-.5-.5v-1Z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Manage credentials
+          </Link>
+
+          <Link
+            to="/credentials/new"
+            className={buttonClassName({
+              variant: "secondary",
+              size: "md",
+            })}
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="size-4"
+            >
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            Add credential
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

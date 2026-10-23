@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { clearPrivateQueries } from "@/lib/query-client";
 import { loginAccount, registerAccount } from "../api/auth.api";
 import { authKeys } from "../api/auth.keys";
 import type { RegisterInput, User } from "../types/auth.types";
@@ -22,6 +23,7 @@ export function useRegister() {
     },
     onSuccess: (user) => {
       if (user) {
+        clearPrivateQueries(queryClient);
         queryClient.setQueryData(authKeys.me, user);
       }
     },

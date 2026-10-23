@@ -1,5 +1,3 @@
-import { useNavigate } from "react-router-dom";
-
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "../hooks/use-auth";
@@ -19,18 +17,13 @@ function getInitials(name: string): string {
 export function UserMenu() {
   const { user } = useAuth();
   const logout = useLogout();
-  const navigate = useNavigate();
 
   if (!user) {
     return null;
   }
 
   function handleLogout() {
-    logout.mutate(undefined, {
-      onSuccess: () => {
-        navigate("/login", { replace: true });
-      },
-    });
+    logout.mutate();
   }
 
   return (

@@ -5,19 +5,19 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api-client";
+import { applyApiError } from "@/lib/form-errors";
 import { cn } from "@/utils/cn";
 import { FormError } from "../components/form-error";
-import { FormField } from "../components/form-field";
-import { PasswordInput } from "../components/password-input";
 import { useRegister } from "../hooks/use-register";
 import {
   registerFormSchema,
   type RegisterFormValues,
 } from "../schemas/auth.schema";
-import { applyApiError } from "../utils/apply-api-error";
 
 export function RegisterPage() {
   const [formError, setFormError] = useState<string | null>(null);

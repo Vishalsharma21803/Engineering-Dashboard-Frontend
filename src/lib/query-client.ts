@@ -12,3 +12,9 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export function clearPrivateQueries(client: QueryClient): void {
+  client.removeQueries({
+    predicate: (query) => query.queryKey[0] !== "auth",
+  });
+}

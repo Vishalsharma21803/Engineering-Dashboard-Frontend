@@ -5,24 +5,22 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
+import { applyApiError } from "@/lib/form-errors";
 import { cn } from "@/utils/cn";
 import { FormError } from "../components/form-error";
-import { FormField } from "../components/form-field";
 import { FormNotice } from "../components/form-notice";
-import { PasswordInput } from "../components/password-input";
 import { useLogin } from "../hooks/use-login";
 import {
   loginFormSchema,
   type LoginFormValues,
 } from "../schemas/auth.schema";
-import { applyApiError } from "../utils/apply-api-error";
+import { getPostLoginRedirect } from "../utils/redirect-path";
 
 interface LoginLocationState {
-  from?: {
-    pathname?: string;
-  };
   registered?: boolean;
   email?: string;
 }
@@ -33,14 +31,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as LoginLocationState | null;
-  const requestedPath = locationState?.from?.pathname;
-  const redirectTo =
-    requestedPath &&
-    requestedPath.startsWith("/") &&
-    !requestedPath.startsWith("//") &&
-    requestedPath !== "/login"
-      ? requestedPath
-      : "/";
+  const redirectTo = getPostLoginRedirect(location.state);
 
   const {
     register,
