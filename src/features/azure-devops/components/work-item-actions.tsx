@@ -63,20 +63,21 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
     );
   }
 
+  const changedFields: Record<string, number> = {};
+
+  for (const key of supportedFields) {
+    const raw = fields[key]?.trim() ?? "";
+
+    if (raw !== "" && Number.isFinite(Number(raw)) && Number(raw) !== workItem[key]) {
+      changedFields[key] = Number(raw);
+    }
+  }
+
+  const changedCount = Object.keys(changedFields).length;
+
   function submitFields(event: FormEvent) {
     event.preventDefault();
-    const params: Record<string, number> = {};
-
-    for (const key of supportedFields) {
-      const raw = fields[key]?.trim() ?? "";
-      const current = workItem[key];
-
-      if (raw !== "" && Number(raw) !== current && Number.isFinite(Number(raw))) {
-        params[key] = Number(raw);
-      }
-    }
-
-    onPropose({ credentialId, kind: "WORK_ITEM_UPDATE_FIELDS", target, params });
+    onPropose({ credentialId, kind: "WORK_ITEM_UPDATE_FIELDS", target, params: changedFields });
   }
 
   const transitions = workItem.allowedStates.filter((candidate) => candidate.name !== workItem.state);
@@ -127,9 +128,12 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
                 </div>
               ))}
             </div>
-            <Button type="submit" size="sm" disabled={isProposing}>
-              Review changes…
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button type="submit" size="sm" disabled={isProposing || changedCount === 0}>
+                Review {changedCount > 0 ? `${changedCount} change${changedCount > 1 ? "s" : ""}` : "changes"}…
+              </Button>
+              {changedCount === 0 ? <span className="text-xs text-slate-500">Edit a value to enable.</span> : null}
+            </div>
           </form>
         </ActionBlock>
       ) : null}
@@ -216,7 +220,6 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
         <ActionBlock title="Close after merge" hint="Allowed once every linked pull request has been completed.">
           <Button
             size="sm"
-            variant="secondary"
             disabled={isProposing}
             onClick={() => onPropose({ credentialId, kind: "WORK_ITEM_CLOSE_AFTER_MERGE", target, params: {} })}
           >

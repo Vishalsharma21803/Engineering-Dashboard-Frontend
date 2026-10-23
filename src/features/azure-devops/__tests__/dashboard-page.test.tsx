@@ -34,7 +34,8 @@ describe("DashboardPage", () => {
     const calls = setup();
 
     expect(await screen.findByText("#103 Crash on save")).toBeInTheDocument();
-    expect(screen.getByText("#102 Fix flaky test")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "#102 Fix flaky test" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByTitle("Task")).toHaveTextContent("Task");
     expect(screen.getByText("No estimate")).toBeInTheDocument();
     expect(screen.getByText(/does not grant access to pipelines/)).toBeInTheDocument();
     expect(await screen.findByText("Build (Read): missing")).toBeInTheDocument();
@@ -47,7 +48,7 @@ describe("DashboardPage", () => {
   it("proposes a recommended action and opens review without executing it", async () => {
     const calls = setup();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Review: Close after merge" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Close after merge…" }));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(pendingAction.summary)).toBeInTheDocument();

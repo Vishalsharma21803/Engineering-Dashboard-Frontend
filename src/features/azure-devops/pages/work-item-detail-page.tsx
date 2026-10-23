@@ -1,9 +1,17 @@
 import { Link, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { buttonClassName } from "@/components/ui/button-styles";
 import { ActionReviewDialog } from "../components/action-review-dialog";
-import { EmptyState, ErrorCard, SectionCard, SectionView, SkeletonRows } from "../components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows } from "../components/feedback";
 import { StatusBadge } from "../components/status-badge";
+import {
+  PriorityBadge,
+  WorkItemStateBadge,
+  WorkItemTypeBadge,
+} from "../components/work-item-badges";
+import { workItemTypeStyle } from "../utils/work-item-types";
+import { cn } from "@/utils/cn";
 import { WorkItemActions } from "../components/work-item-actions";
 import { useActionReview } from "../hooks/use-action-review";
 import { useWorkItem } from "../hooks/use-work-item";
@@ -35,18 +43,26 @@ export function WorkItemDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <p className="text-sm text-slate-500">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 pl-6 shadow-sm">
+        <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", workItemTypeStyle(workItem.type).bar)} />
+        <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
+          <Link to={base} className="hover:text-indigo-600">
+            My work
+          </Link>
+          {" / "}
           <Link to={`${base}/projects/${encodeURIComponent(workItem.projectName)}`} className="hover:text-indigo-600">
             {workItem.projectName}
-          </Link>{" "}
-          · {workItem.type} · changed {formatRelative(workItem.changedDate)}
-        </p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-          #{workItem.id} {workItem.title}
+          </Link>
+          {" / "}#{workItem.id}
+        </nav>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+          <span className="text-slate-400">#{workItem.id}</span> {workItem.title}
         </h2>
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          <StatusBadge tone="info">{workItem.state}</StatusBadge>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <WorkItemTypeBadge type={workItem.type} />
+          <WorkItemStateBadge state={workItem.state} category={workItem.stateCategory} />
+          <PriorityBadge priority={workItem.priority} />
+          <span className="text-xs text-slate-500">changed {formatRelative(workItem.changedDate)}</span>
           {workItem.blocked ? <StatusBadge tone="danger">Blocked</StatusBadge> : null}
           {workItem.tags.map((tag) => (
             <StatusBadge key={tag} tone="neutral" dot={false}>
@@ -69,12 +85,6 @@ export function WorkItemDetailPage() {
         <Field label="Iteration" value={workItem.iterationPath} />
       </dl>
 
-      {review.proposeError ? (
-        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
-          {review.proposeError}
-        </p>
-      ) : null}
-
       <SectionCard title="SOP compliance" description="Checked against the team's default SOP rules.">
         {workItem.compliance.violations.length === 0 ? (
           <p className="text-sm text-emerald-700">No SOP gaps found.</p>
@@ -89,7 +99,6 @@ export function WorkItemDetailPage() {
                 {violation.suggestedAction && !violation.suggestedAction.requiresInput ? (
                   <Button
                     size="sm"
-                    variant="secondary"
                     disabled={review.isProposing}
                     onClick={() =>
                       review.propose({
@@ -104,7 +113,9 @@ export function WorkItemDetailPage() {
                     Review: {actionKindLabel(violation.suggestedAction.kind)}
                   </Button>
                 ) : violation.suggestedAction ? (
-                  <span className="text-xs text-slate-500">Use “{actionKindLabel(violation.suggestedAction.kind)}” below</span>
+                  <a href="#propose-change" className={buttonClassName({ size: "sm", variant: "secondary" })}>
+                    {actionKindLabel(violation.suggestedAction.kind)} ↓
+                  </a>
                 ) : null}
               </li>
             ))}
@@ -117,14 +128,16 @@ export function WorkItemDetailPage() {
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Propose a change" description="Nothing is written to Azure DevOps until you approve it in the review dialog.">
-        <WorkItemActions
-          credentialId={credentialId}
-          workItem={workItem}
-          isProposing={review.isProposing}
-          onPropose={review.propose}
-        />
-      </SectionCard>
+      <div id="propose-change" className="scroll-mt-24">
+        <SectionCard title="Propose a change" description="Nothing is written to Azure DevOps until you approve it in the review dialog.">
+          <WorkItemActions
+            credentialId={credentialId}
+            workItem={workItem}
+            isProposing={review.isProposing}
+            onPropose={review.propose}
+          />
+        </SectionCard>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <SectionCard title="Description">
@@ -213,6 +226,7 @@ export function WorkItemDetailPage() {
       </div>
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />
+      <ErrorToast message={review.proposeError} onDismiss={review.clearProposeError} />
     </div>
   );
 }

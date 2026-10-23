@@ -46,7 +46,7 @@ export function BuildTimeline({ credentialId, projectId, build, isProposing, onR
                 <span className="text-sm font-medium text-slate-900">{stage.name}</span>
               </div>
               {retryable ? (
-                <Button size="sm" variant="secondary" disabled={isProposing} onClick={() => onRetryStage(stage.identifier ?? "")}>
+                <Button size="sm" disabled={isProposing} onClick={() => onRetryStage(stage.identifier ?? "")}>
                   Retry stage…
                 </Button>
               ) : null}

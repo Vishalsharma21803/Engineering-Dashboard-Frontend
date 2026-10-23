@@ -1,11 +1,22 @@
+import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+
+import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { DeploymentsPanel } from "../components/deployments-panel";
-import { EmptyState, ErrorCard, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
 import { PipelinesPanel } from "../components/pipelines-panel";
+import { PullRequestList } from "../components/pull-request-list";
+import { WorkItemTable } from "../components/work-item-table";
 import { useActionReview } from "../hooks/use-action-review";
-import { useProjectOverview, useRepositories } from "../hooks/use-projects";
+import {
+  useCapabilities,
+  useProjectOverview,
+  useProjectPullRequests,
+  useProjectWorkItems,
+  useRepositories,
+} from "../hooks/use-projects";
 import type { Section } from "../types/azure.types";
 import { formatDateTime } from "../utils/format";
 
@@ -34,6 +45,66 @@ function RepositoriesList({ credentialId, projectId }: { credentialId: string; p
         </li>
       ))}
     </ul>
+  );
+}
+
+function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; projectId: string }) {
+  const [state, setState] = useState<"open" | "all">("open");
+  const { data: workItems, isLoading, error, refetch } = useProjectWorkItems(credentialId, projectId, state);
+  const identity = useCapabilities(credentialId).data?.identity ?? null;
+
+  return (
+    <SectionCard
+      title="Team work items"
+      description="Everyone's work items in this project, most recently changed first (up to 200)."
+      actions={
+        <div role="group" aria-label="State" className="inline-flex rounded-lg border border-slate-200 p-0.5">
+          {(["open", "all"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={state === value}
+              onClick={() => setState(value)}
+              className={cn(
+                "rounded-md px-3 py-1 text-xs font-medium transition",
+                state === value ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-950"
+              )}
+            >
+              {value === "open" ? "Open" : "Last 90 days"}
+            </button>
+          ))}
+        </div>
+      }
+    >
+      {isLoading ? (
+        <SkeletonRows rows={4} />
+      ) : error || !workItems ? (
+        <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />
+      ) : (
+        <WorkItemTable credentialId={credentialId} workItems={workItems} mode="team" myId={identity?.id ?? null} />
+      )}
+    </SectionCard>
+  );
+}
+
+function ProjectPullRequests({ credentialId, projectId }: { credentialId: string; projectId: string }) {
+  const { data: pullRequests, isLoading, error, refetch } = useProjectPullRequests(credentialId, projectId);
+
+  return (
+    <SectionCard title="Active pull requests" description="Every open pull request in this project.">
+      {isLoading ? (
+        <SkeletonRows rows={3} />
+      ) : error || !pullRequests ? (
+        <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />
+      ) : (
+        <PullRequestList
+          credentialId={credentialId}
+          pullRequests={pullRequests}
+          emptyMessage="No active pull requests in this project."
+          scope="team"
+        />
+      )}
+    </SectionCard>
   );
 }
 
@@ -69,8 +140,8 @@ export function ProjectOverviewPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="My open items" value={countValue(project.counts.myOpenWorkItems)} />
-        <StatTile label="Active PRs" value={countValue(project.counts.activePullRequests)} />
+        <StatTile label="My open items" value={countValue(project.counts.myOpenWorkItems)} hint="assigned to you" />
+        <StatTile label="Active PRs" value={countValue(project.counts.activePullRequests)} hint="whole project" />
         <StatTile label="Failing pipelines" value={countValue(project.counts.failingPipelines)} />
         <StatTile label="Repositories" value={countValue(project.counts.repositories)} />
         <StatTile
@@ -84,11 +155,9 @@ export function ProjectOverviewPage() {
         />
       </div>
 
-      {review.proposeError ? (
-        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
-          {review.proposeError}
-        </p>
-      ) : null}
+      <ProjectWorkItems credentialId={credentialId} projectId={project.id} />
+
+      <ProjectPullRequests credentialId={credentialId} projectId={project.id} />
 
       <SectionCard title="Pipeline health" description="Expand a pipeline for recent runs, failed stages and errors.">
         <PipelinesPanel
@@ -126,6 +195,7 @@ export function ProjectOverviewPage() {
       </div>
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />
+      <ErrorToast message={review.proposeError} onDismiss={review.clearProposeError} />
     </div>
   );
 }

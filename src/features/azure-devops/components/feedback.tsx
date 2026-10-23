@@ -127,3 +127,31 @@ export function StatTile({ label, value, hint }: { label: string; value: ReactNo
     </div>
   );
 }
+
+/** Proposal errors float above the page so they are seen wherever the button was clicked. */
+export function ErrorToast({ message, onDismiss }: { message: string | null; onDismiss: () => void }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-rose-200 bg-white p-4 text-sm shadow-xl sm:left-auto sm:right-6 sm:mx-0"
+    >
+      <span aria-hidden="true" className="mt-0.5 size-2.5 shrink-0 rounded-full bg-rose-500" />
+      <div className="flex-1">
+        <p className="font-semibold text-slate-950">Could not prepare the change</p>
+        <p className="mt-0.5 text-slate-600">{message}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="rounded-md px-1.5 text-lg leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      >
+        ×
+      </button>
+    </div>
+  );
+}

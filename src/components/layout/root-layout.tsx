@@ -15,8 +15,8 @@ const navLinkClassName = ({
   cn(
     "rounded-lg px-3 py-2 text-sm font-medium transition",
     isActive
-      ? "bg-slate-100 text-slate-950"
-      : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
+      ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200"
+      : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
   );
 
 export function RootLayout() {
@@ -81,6 +81,22 @@ export function RootLayout() {
             </div>
           )}
         </div>
+        {!isLoading && user ? (
+          <nav
+            aria-label="Primary mobile"
+            className="flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 md:hidden"
+          >
+            <NavLink to="/" end className={navLinkClassName}>
+              Overview
+            </NavLink>
+            <NavLink to="/azure" className={navLinkClassName}>
+              Azure DevOps
+            </NavLink>
+            <NavLink to="/credentials" className={navLinkClassName}>
+              Credentials
+            </NavLink>
+          </nav>
+        ) : null}
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:px-8">

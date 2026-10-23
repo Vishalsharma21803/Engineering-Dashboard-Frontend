@@ -41,7 +41,16 @@ export function RunRow({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <button type="button" onClick={onToggle} className="flex min-w-0 items-center gap-2 text-left" aria-expanded={expanded}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex min-w-0 items-center gap-2 rounded-md text-left hover:text-indigo-600"
+        aria-expanded={expanded}
+        title={expanded ? "Hide stages" : "Show stages and errors"}
+      >
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={`size-3.5 shrink-0 text-slate-400 transition ${expanded ? "rotate-90" : ""}`}>
+          <path d="M7.5 5 13 10l-5.5 5V5Z" />
+        </svg>
         <StatusBadge tone={buildTone(run.status, run.result)}>{buildLabel(run.status, run.result)}</StatusBadge>
         <span className="truncate text-sm text-slate-800">
           #{run.buildNumber} · {stripRef(run.sourceBranch)} · {run.requestedFor?.displayName ?? "unknown"} ·{" "}
@@ -83,7 +92,7 @@ function PipelineRuns({
                 running ? (
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant="danger"
                     disabled={isProposing}
                     onClick={() =>
                       onPropose({ credentialId, kind: "BUILD_CANCEL", target: { projectId, buildId: run.id }, params: {} })
@@ -151,8 +160,24 @@ export function PipelinesPanel(props: PipelinesPanelProps) {
               aria-expanded={open === pipeline.id}
               onClick={() => setExpanded(open === pipeline.id ? -1 : pipeline.id)}
             >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+                className={`size-4 text-slate-400 transition ${open === pipeline.id ? "rotate-90" : ""}`}
+              >
+                <path d="M7.5 5 13 10l-5.5 5V5Z" />
+              </svg>
               <StatusBadge tone={HEALTH_TONES[pipeline.health]}>{pipeline.health}</StatusBadge>
               <span className="font-medium text-slate-950">{pipeline.name}</span>
+              {pipeline.health === "running" && pipeline.latestCompletedBuild ? (
+                <StatusBadge
+                  tone={buildTone("completed", pipeline.latestCompletedBuild.result)}
+                  title="Result of the last completed run"
+                >
+                  last: {pipeline.latestCompletedBuild.result ?? "completed"}
+                </StatusBadge>
+              ) : null}
               <span className="text-xs text-slate-500">
                 last run {formatRelative(pipeline.latestBuild?.queueTime)}
               </span>

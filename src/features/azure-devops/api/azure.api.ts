@@ -9,8 +9,10 @@ import type {
   ProjectOverview,
   ProjectSummary,
   PullRequestDetail,
+  PullRequestSummary,
   RepositorySummary,
   WorkItemDetail,
+  WorkItemSummary,
 } from "../types/azure.types";
 
 /** All Azure DevOps data comes from the backend; the browser never calls Azure. */
@@ -65,6 +67,26 @@ export async function getProjectOverview(credentialId: string, projectId: string
     azurePath(credentialId, `/projects/${segment(projectId)}`)
   );
   return response.project;
+}
+
+/** Every assignee's work items in one project (project overview). */
+export async function listProjectWorkItems(
+  credentialId: string,
+  projectId: string,
+  state: "open" | "all"
+) {
+  const response = await apiRequest<{ workItems: WorkItemSummary[] }>(
+    azurePath(credentialId, "/work-items", { projectId, state, assignee: "any" })
+  );
+  return response.workItems;
+}
+
+/** Every active pull request in one project (project overview). */
+export async function listProjectPullRequests(credentialId: string, projectId: string) {
+  const response = await apiRequest<{ pullRequests: PullRequestSummary[] }>(
+    azurePath(credentialId, "/pull-requests", { projectId, role: "everyone" })
+  );
+  return response.pullRequests;
 }
 
 export async function getWorkItem(credentialId: string, projectId: string, workItemId: number) {

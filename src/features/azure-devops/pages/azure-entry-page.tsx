@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
 import { getCredentialDisplayName } from "@/features/credentials/utils/credential-display";
 import { ErrorCard, SkeletonRows } from "../components/feedback";
+import { getLastCredential } from "../utils/last-project";
 
 /** Picks the organization (credential) to open; skips the choice when there is one. */
 export function AzureEntryPage() {
@@ -26,8 +27,13 @@ export function AzureEntryPage() {
     );
   }
 
-  if (credentials.length === 1 && credentials[0]) {
-    return <Navigate to={`/azure/${encodeURIComponent(credentials[0].id)}`} replace />;
+  const lastCredential = getLastCredential();
+  const remembered = credentials.find((credential) => credential.id === lastCredential);
+  const only = credentials.length === 1 ? credentials[0] : undefined;
+  const target = remembered ?? only;
+
+  if (target) {
+    return <Navigate to={`/azure/${encodeURIComponent(target.id)}`} replace />;
   }
 
   return (

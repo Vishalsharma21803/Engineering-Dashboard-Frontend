@@ -11,6 +11,7 @@ import { ActionsPage } from "@/features/azure-devops/pages/actions-page";
 import { AzureEntryPage } from "@/features/azure-devops/pages/azure-entry-page";
 import { DashboardPage } from "@/features/azure-devops/pages/dashboard-page";
 import { ProjectOverviewPage } from "@/features/azure-devops/pages/project-overview-page";
+import { ProjectsPage } from "@/features/azure-devops/pages/projects-page";
 import { PullRequestDetailPage } from "@/features/azure-devops/pages/pull-request-detail-page";
 import { WorkItemDetailPage } from "@/features/azure-devops/pages/work-item-detail-page";
 import { CreateCredentialPage } from "@/features/credentials/pages/create-credential-page";
@@ -73,6 +74,10 @@ export const router = createBrowserRouter([
                 element: <DashboardPage />,
               },
               {
+                path: "projects",
+                element: <ProjectsPage />,
+              },
+              {
                 path: "projects/:projectId",
                 element: <ProjectOverviewPage />,
               },
@@ -83,6 +88,10 @@ export const router = createBrowserRouter([
               {
                 path: "projects/:projectId/repos/:repositoryId/pull-requests/:pullRequestId",
                 element: <PullRequestDetailPage />,
+              },
+              {
+                path: "actions",
+                element: <ActionsPage embedded />,
               },
             ],
           },
