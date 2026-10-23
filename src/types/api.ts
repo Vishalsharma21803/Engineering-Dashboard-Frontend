@@ -6,4 +6,5 @@ export interface ApiFieldError {
 export interface ApiErrorPayload {
   message: string;
   errors?: ApiFieldError[];
+  reason?: string;
 }

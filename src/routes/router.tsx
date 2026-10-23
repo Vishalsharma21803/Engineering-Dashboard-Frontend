@@ -6,6 +6,13 @@ import { GuestRoute } from "@/features/auth/components/guest-route";
 import { ProtectedRoute } from "@/features/auth/components/protected-route";
 import { LoginPage } from "@/features/auth/pages/login-page";
 import { RegisterPage } from "@/features/auth/pages/register-page";
+import { AzureLayout } from "@/features/azure-devops/components/azure-layout";
+import { ActionsPage } from "@/features/azure-devops/pages/actions-page";
+import { AzureEntryPage } from "@/features/azure-devops/pages/azure-entry-page";
+import { DashboardPage } from "@/features/azure-devops/pages/dashboard-page";
+import { ProjectOverviewPage } from "@/features/azure-devops/pages/project-overview-page";
+import { PullRequestDetailPage } from "@/features/azure-devops/pages/pull-request-detail-page";
+import { WorkItemDetailPage } from "@/features/azure-devops/pages/work-item-detail-page";
 import { CreateCredentialPage } from "@/features/credentials/pages/create-credential-page";
 import { CredentialsPage } from "@/features/credentials/pages/credentials-page";
 import { EditCredentialPage } from "@/features/credentials/pages/edit-credential-page";
@@ -52,6 +59,36 @@ export const router = createBrowserRouter([
           {
             path: "credentials/:id/edit",
             element: <EditCredentialPage />,
+          },
+          {
+            path: "azure",
+            element: <AzureEntryPage />,
+          },
+          {
+            path: "azure/:credentialId",
+            element: <AzureLayout />,
+            children: [
+              {
+                index: true,
+                element: <DashboardPage />,
+              },
+              {
+                path: "projects/:projectId",
+                element: <ProjectOverviewPage />,
+              },
+              {
+                path: "projects/:projectId/work-items/:workItemId",
+                element: <WorkItemDetailPage />,
+              },
+              {
+                path: "projects/:projectId/repos/:repositoryId/pull-requests/:pullRequestId",
+                element: <PullRequestDetailPage />,
+              },
+            ],
+          },
+          {
+            path: "actions",
+            element: <ActionsPage />,
           },
         ],
       },

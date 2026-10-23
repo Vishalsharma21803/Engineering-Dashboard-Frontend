@@ -20,6 +20,8 @@ npm run build      # typecheck and build production bundle
 npm run preview    # preview production build
 npm run lint       # run oxlint
 npm run typecheck  # run TypeScript project build
+npm test           # unit tests (Vitest + Testing Library)
+npm run test:e2e   # full stack in Chromium against a fake Azure DevOps org
 ```
 
 ## API proxy

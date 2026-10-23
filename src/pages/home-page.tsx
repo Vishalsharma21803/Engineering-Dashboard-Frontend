@@ -20,8 +20,8 @@ const modules = [
   },
   {
     title: "Azure DevOps",
-    status: "Next module",
-    statusClass: "bg-indigo-50 text-indigo-700",
+    status: "Available",
+    statusClass: "bg-emerald-50 text-emerald-700",
     description:
       "Projects, work items, repositories, pull requests, pipelines, and builds.",
   },

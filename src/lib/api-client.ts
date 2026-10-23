@@ -10,16 +10,22 @@ export const UNAUTHORIZED_EVENT = "auth:unauthorized";
 export class ApiError extends Error {
   readonly status: number;
   readonly errors: ApiFieldError[];
+  readonly reason: string | null;
+  readonly payload: unknown;
 
   constructor(
     status: number,
     message: string,
-    errors: ApiFieldError[] = []
+    errors: ApiFieldError[] = [],
+    reason: string | null = null,
+    payload: unknown = null
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.errors = errors;
+    this.reason = reason;
+    this.payload = payload;
   }
 }
 
@@ -86,7 +92,9 @@ export async function apiRequest<TResponse>(
     throw new ApiError(
       response.status,
       errorPayload?.message ?? "Request failed",
-      errorPayload?.errors ?? []
+      errorPayload?.errors ?? [],
+      errorPayload?.reason ?? null,
+      payload
     );
   }
 
