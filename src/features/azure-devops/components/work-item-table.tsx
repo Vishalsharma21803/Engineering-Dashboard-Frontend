@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { cn } from "@/utils/cn";
+import type { DashboardTriage } from "../hooks/use-triage";
 import type { ComplianceResult, WorkItemSummary } from "../types/azure.types";
 import { formatValue } from "../utils/format";
 import { RULE_LABELS, SEVERITY_TONES } from "../utils/labels";
+import { UNTRIAGED, isHidden, workItemKey } from "../utils/triage";
 import {
   EMPTY_WORK_ITEM_FILTERS,
   matchesWorkItem,
@@ -14,6 +16,7 @@ import {
 import { EmptyState } from "./feedback";
 import { FilterBar, type FilterDefinition } from "./filter-bar";
 import { StatusBadge } from "./status-badge";
+import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
 import {
   PriorityBadge,
   WorkItemStateBadge,
@@ -32,6 +35,8 @@ interface WorkItemTableProps {
   compliance?: Map<number, ComplianceResult>;
   /** Signed-in Azure DevOps identity, used by the team "Mine" filter. */
   myId?: string | null;
+  /** Dashboard snooze / acknowledge / abandon state; omitted for team lists. */
+  triage?: DashboardTriage;
 }
 
 function initials(name: string): string {
@@ -73,8 +78,10 @@ export function WorkItemTable({
   mode = "mine",
   compliance = new Map(),
   myId = null,
+  triage,
 }: WorkItemTableProps) {
   const [filters, setFilters] = useState<WorkItemFilters>(EMPTY_WORK_ITEM_FILTERS);
+  const [showHiddenChoice, setShowHidden] = useState(false);
   const team = mode === "team";
   const options = useMemo(
     () => workItemFilterOptions(workItems, compliance, myId),
@@ -89,7 +96,17 @@ export function WorkItemTable({
     );
   }
 
-  const visible = workItems.filter((item) => matchesWorkItem(item, filters, compliance, myId));
+  const resolved = new Map(
+    workItems.map((item) => [
+      item.id,
+      triage ? triage.resolve(workItemKey(item.id), item.projectName) : UNTRIAGED,
+    ])
+  );
+  const hiddenOf = (item: WorkItemSummary) => isHidden((resolved.get(item.id) ?? UNTRIAGED).state);
+  const hiddenCount = workItems.filter(hiddenOf).length;
+  const showHidden = showHiddenChoice && hiddenCount > 0;
+  const pool = workItems.filter((item) => hiddenOf(item) === showHidden);
+  const visible = pool.filter((item) => matchesWorkItem(item, filters, compliance, myId));
   const set = (key: keyof WorkItemFilters) => (value: string) => setFilters({ ...filters, [key]: value });
 
   const definitions: FilterDefinition[] = [
@@ -107,9 +124,14 @@ export function WorkItemTable({
         search={{ value: filters.search, onChange: set("search"), placeholder: "Search ID, title or tag" }}
         filters={definitions}
         shown={visible.length}
-        total={workItems.length}
+        total={pool.length}
         onClear={() => setFilters(EMPTY_WORK_ITEM_FILTERS)}
       />
+      {hiddenCount > 0 ? (
+        <div className="flex justify-end">
+          <HiddenToggle count={hiddenCount} shown={showHidden} onToggle={() => setShowHidden(!showHidden)} />
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
@@ -123,64 +145,94 @@ export function WorkItemTable({
                 Est · Done · Left
               </th>
               <th className="px-3 py-2 font-medium">{team ? "Assigned to" : "SOP compliance"}</th>
+              {triage ? (
+                <th className="w-12 px-3 py-2 font-medium">
+                  <span className="sr-only">Triage</span>
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {visible.map((item) => (
-              <tr key={item.id} className="group align-top transition hover:bg-slate-50">
-                <td className="relative py-3 pl-4 pr-3">
-                  <span aria-hidden="true" className={cn("absolute inset-y-2 left-0 w-1 rounded-full", workItemTypeStyle(item.type).bar)} />
-                  <Link
-                    to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(item.projectName)}/work-items/${item.id}`}
-                    className="font-medium text-slate-950 group-hover:text-indigo-600"
-                  >
-                    <span className="text-slate-500">#{item.id}</span> {item.title}
-                  </Link>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
-                    {item.projectName}
-                    {item.iterationPath ? <span>· {item.iterationPath.split("\\").at(-1)}</span> : null}
-                    {item.blocked ? <StatusBadge tone="danger">Blocked</StatusBadge> : null}
-                  </p>
-                </td>
-                <td className="px-3 py-3">
-                  <WorkItemTypeBadge type={item.type} compact />
-                </td>
-                <td className="px-3 py-3">
-                  <WorkItemStateBadge state={item.state} category={item.stateCategory} />
-                </td>
-                <td className="px-3 py-3">
-                  <PriorityBadge priority={item.priority} />
-                </td>
-                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-700">
-                  {formatValue(item.originalEstimate ?? item.storyPoints ?? item.effort)} · {formatValue(item.completedWork)} ·{" "}
-                  {formatValue(item.remainingWork)}
-                </td>
-                <td className="px-3 py-3">
-                  {team ? (
-                    item.assignedTo ? (
-                      <span className="inline-flex items-center gap-2 text-sm text-slate-700">
-                        <span
-                          className={cn(
-                            "flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
-                            item.assignedTo.id === myId ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700"
-                          )}
-                        >
-                          {initials(item.assignedTo.displayName)}
+            {visible.map((item) => {
+              const triaged = resolved.get(item.id) ?? UNTRIAGED;
+
+              return (
+                <tr
+                  key={item.id}
+                  className={cn("group align-top transition hover:bg-slate-50", triaged.state !== "active" && "opacity-75")}
+                >
+                  <td className="relative py-3 pl-4 pr-3">
+                    <span aria-hidden="true" className={cn("absolute inset-y-2 left-0 w-1 rounded-full", workItemTypeStyle(item.type).bar)} />
+                    <Link
+                      to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(item.projectName)}/work-items/${item.id}`}
+                      className="font-medium text-slate-950 group-hover:text-indigo-600"
+                    >
+                      <span className="text-slate-500">#{item.id}</span> {item.title}
+                    </Link>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                      {item.projectName}
+                      {item.iterationPath ? <span>· {item.iterationPath.split("\\").at(-1)}</span> : null}
+                      {item.blocked ? <StatusBadge tone="danger">Blocked</StatusBadge> : null}
+                      <TriageBadge resolved={triaged} />
+                    </p>
+                  </td>
+                  <td className="px-3 py-3">
+                    <WorkItemTypeBadge type={item.type} compact />
+                  </td>
+                  <td className="px-3 py-3">
+                    <WorkItemStateBadge state={item.state} category={item.stateCategory} />
+                  </td>
+                  <td className="px-3 py-3">
+                    <PriorityBadge priority={item.priority} />
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-700">
+                    {formatValue(item.originalEstimate ?? item.storyPoints ?? item.effort)} · {formatValue(item.completedWork)} ·{" "}
+                    {formatValue(item.remainingWork)}
+                  </td>
+                  <td className="px-3 py-3">
+                    {team ? (
+                      item.assignedTo ? (
+                        <span className="inline-flex items-center gap-2 text-sm text-slate-700">
+                          <span
+                            className={cn(
+                              "flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                              item.assignedTo.id === myId ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700"
+                            )}
+                          >
+                            {initials(item.assignedTo.displayName)}
+                          </span>
+                          {item.assignedTo.id === myId ? "You" : item.assignedTo.displayName}
                         </span>
-                        {item.assignedTo.id === myId ? "You" : item.assignedTo.displayName}
-                      </span>
+                      ) : (
+                        <span className="text-xs italic text-slate-400">Unassigned</span>
+                      )
                     ) : (
-                      <span className="text-xs italic text-slate-400">Unassigned</span>
-                    )
-                  ) : (
-                    <ComplianceBadges result={compliance.get(item.id)} />
-                  )}
-                </td>
-              </tr>
-            ))}
+                      <ComplianceBadges result={compliance.get(item.id)} />
+                    )}
+                  </td>
+                  {triage ? (
+                    <td className="px-3 py-3 text-right">
+                      <TriageMenu
+                        triage={triage}
+                        itemKey={workItemKey(item.id)}
+                        projectName={item.projectName}
+                        label={`#${item.id} ${item.title}`}
+                        resolved={triaged}
+                      />
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
-        {visible.length === 0 ? <EmptyState className="mt-3">No work items match these filters.</EmptyState> : null}
+        {visible.length === 0 ? (
+          <EmptyState className="mt-3">
+            {pool.length === 0 && !showHidden
+              ? "All your open work items are snoozed or abandoned."
+              : "No work items match these filters."}
+          </EmptyState>
+        ) : null}
       </div>
     </div>
   );

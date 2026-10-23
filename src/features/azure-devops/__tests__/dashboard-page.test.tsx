@@ -12,6 +12,7 @@ function setup() {
   const calls = mockBackend([
     { path: `${base}/dashboard`, body: { dashboard } },
     { path: "/api/actions", body: { actions: [] } },
+    { path: "/api/triage", body: { marks: [] } },
     {
       path: `${base}/capabilities`,
       body: {

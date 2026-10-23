@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/utils/cn";
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
 import { FilterBar } from "../components/filter-bar";
@@ -9,13 +10,31 @@ import { PullRequestList } from "../components/pull-request-list";
 import { RecommendationList } from "../components/recommendation-list";
 import { ScopesCard } from "../components/scopes-card";
 import { StatusBadge } from "../components/status-badge";
+import { HiddenToggle, TriageBadge, TriageMenu } from "../components/triage-menu";
 import { WorkItemTable } from "../components/work-item-table";
 import { useActionReview } from "../hooks/use-action-review";
 import { useActions } from "../hooks/use-actions";
 import { useDashboard } from "../hooks/use-dashboard";
-import type { ComplianceResult } from "../types/azure.types";
-import { formatRelative, stripRef } from "../utils/format";
+import { useDashboardTriage } from "../hooks/use-triage";
+import type { ComplianceResult, Dashboard } from "../types/azure.types";
+import { formatDateTime, formatRelative, stripRef } from "../utils/format";
 import { buildLabel, buildTone } from "../utils/labels";
+import { isHidden, pipelineKey, pullRequestKey, workItemKey } from "../utils/triage";
+
+/** Original-case project names, since project triage keys are lower-cased. */
+function projectNames(dashboard: Dashboard): Map<string, string> {
+  const names = [
+    ...(dashboard.sections.workItems.data ?? []).map((item) => item.projectName),
+    ...(dashboard.sections.pullRequests.data ?? []).map((pr) => pr.projectName),
+    ...(dashboard.sections.pipelines.data ?? []).map((build) => build.projectName ?? ""),
+    ...dashboard.recommendations.map((item) => item.target.projectName),
+  ].filter(Boolean);
+
+  return new Map(names.map((name) => [name.toLowerCase(), name]));
+}
+
+const hiddenHint = (count: number, base?: string) =>
+  count > 0 ? [base, `${count} hidden`].filter(Boolean).join(" · ") : base;
 
 export function DashboardPage() {
   const { credentialId = "" } = useParams();
@@ -24,7 +43,9 @@ export function DashboardPage() {
   const { data: dashboard, isLoading, error, refetch, refresh, isRefreshing } = useDashboard(credentialId, projectId);
   const pendingActions = useActions("PENDING");
   const [runFilter, setRunFilter] = useState("");
+  const [showHiddenRuns, setShowHiddenRuns] = useState(false);
   const review = useActionReview();
+  const triage = useDashboardTriage(credentialId, dashboard);
 
   const compliance = useMemo(
     () =>
@@ -45,7 +66,7 @@ export function DashboardPage() {
     return kinds;
   }, [dashboard]);
 
-  if (isLoading) {
+  if (isLoading || triage.isLoading) {
     return <SkeletonRows rows={6} />;
   }
 
@@ -53,14 +74,26 @@ export function DashboardPage() {
     return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
   }
 
-  const violations = (dashboard.sections.compliance.data ?? []).reduce(
-    (total, result) => total + result.violations.length,
-    0
+  // Counts leave out snoozed and abandoned items; acknowledged ones are still on the list.
+  const hidden = (itemKey: string | null, projectName: string | null) =>
+    isHidden(triage.resolve(itemKey, projectName).state);
+  const openWorkItems = (dashboard.sections.workItems.data ?? []).filter(
+    (item) => !hidden(workItemKey(item.id), item.projectName)
   );
-  const failedBuilds = (dashboard.sections.pipelines.data ?? []).filter(
+  const hiddenWorkItems = (dashboard.sections.workItems.data?.length ?? 0) - openWorkItems.length;
+  const violations = (dashboard.sections.compliance.data ?? [])
+    .filter((result) => !hidden(workItemKey(result.workItemId), result.projectName))
+    .reduce((total, result) => total + result.violations.length, 0);
+  const activePullRequests = (dashboard.sections.pullRequests.data ?? []).filter(
+    (pr) => !hidden(pullRequestKey(pr.repositoryId, pr.pullRequestId), pr.projectName)
+  );
+  const hiddenPullRequests = (dashboard.sections.pullRequests.data?.length ?? 0) - activePullRequests.length;
+  const failed = (dashboard.sections.pipelines.data ?? []).filter(
     (build) => build.status === "completed" && build.result === "failed"
-  ).length;
+  );
+  const failedBuilds = failed.filter((build) => !hidden(pipelineKey(build), build.projectName)).length;
   const pending = pendingActions.data?.length ?? 0;
+  const names = projectNames(dashboard);
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,6 +123,46 @@ export function DashboardPage() {
         </Button>
       </div>
 
+      {triage.loadError ? (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          Your snoozed, acknowledged and abandoned marks could not be loaded, so everything is shown. Reload to try again.
+        </p>
+      ) : null}
+
+      {triage.projectMarks.length > 0 ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
+          <p className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Triaged projects</p>
+          <ul className="flex flex-wrap gap-2">
+            {triage.projectMarks.map((mark) => {
+              const name = names.get(mark.itemKey.slice("project:".length)) ?? mark.itemKey.slice("project:".length);
+              const status =
+                mark.status === "SNOOZED"
+                  ? `snoozed until ${formatDateTime(mark.snoozedUntil)}`
+                  : mark.status === "ACKNOWLEDGED"
+                    ? "acknowledged"
+                    : "abandoned";
+
+              return (
+                <li key={mark.id} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-1 text-xs text-slate-700">
+                  <span>
+                    <span className="font-medium text-slate-900">{name}</span> · {status}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => triage.clear(mark)}
+                    disabled={!triage.ready || triage.isSaving}
+                    aria-label={`Restore project ${name}`}
+                    className="rounded-full bg-white px-2 py-0.5 font-medium text-indigo-600 ring-1 ring-slate-200 transition hover:text-indigo-800 disabled:opacity-50"
+                  >
+                    Restore
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       {dashboard.projectsTruncated ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           Only the first 30 projects are scanned. Choose a project above to narrow the view.
@@ -97,10 +170,22 @@ export function DashboardPage() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="Open work items" value={dashboard.sections.workItems.data?.length ?? "—"} />
+        <StatTile
+          label="Open work items"
+          value={dashboard.sections.workItems.data ? openWorkItems.length : "—"}
+          hint={hiddenHint(hiddenWorkItems)}
+        />
         <StatTile label="SOP gaps" value={dashboard.sections.compliance.status === "ok" ? violations : "—"} />
-        <StatTile label="Active PRs" value={dashboard.sections.pullRequests.data?.length ?? "—"} />
-        <StatTile label="Failing pipelines" value={dashboard.sections.pipelines.status === "ok" ? failedBuilds : "—"} hint="latest run per branch" />
+        <StatTile
+          label="Active PRs"
+          value={dashboard.sections.pullRequests.data ? activePullRequests.length : "—"}
+          hint={hiddenHint(hiddenPullRequests)}
+        />
+        <StatTile
+          label="Failing pipelines"
+          value={dashboard.sections.pipelines.status === "ok" ? failedBuilds : "—"}
+          hint={hiddenHint(failed.length - failedBuilds, "latest run per branch")}
+        />
         <Link to={`/azure/${encodeURIComponent(credentialId)}/actions`} className="block rounded-xl transition hover:-translate-y-0.5 hover:shadow-md">
           <StatTile label="Awaiting approval" value={pending} hint="proposed changes" />
         </Link>
@@ -116,19 +201,24 @@ export function DashboardPage() {
           workItems={workItemKinds}
           isProposing={review.isProposing}
           onPropose={(input) => review.propose(input)}
+          triage={triage}
         />
       </SectionCard>
 
       <SectionCard title="My work items" description="Assigned to you, with SOP compliance indicators.">
         <SectionView section={dashboard.sections.workItems} label="work items">
-          {(workItems) => <WorkItemTable credentialId={credentialId} workItems={workItems} compliance={compliance} />}
+          {(workItems) => (
+            <WorkItemTable credentialId={credentialId} workItems={workItems} compliance={compliance} triage={triage} />
+          )}
         </SectionView>
       </SectionCard>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard title="Pull requests & reviews">
           <SectionView section={dashboard.sections.pullRequests} label="pull requests">
-            {(pullRequests) => <PullRequestList credentialId={credentialId} pullRequests={pullRequests} />}
+            {(pullRequests) => (
+              <PullRequestList credentialId={credentialId} pullRequests={pullRequests} triage={triage} />
+            )}
           </SectionView>
         </SectionCard>
 
@@ -136,8 +226,12 @@ export function DashboardPage() {
           <SectionView section={dashboard.sections.pipelines} label="pipelines">
             {(builds) => {
               const label = (build: (typeof builds)[number]) => buildLabel(build.status, build.result);
-              const results = [...new Set(builds.map(label))];
-              const visibleBuilds = runFilter ? builds.filter((build) => label(build) === runFilter) : builds;
+              const triageOf = (build: (typeof builds)[number]) => triage.resolve(pipelineKey(build), build.projectName);
+              const hiddenRuns = builds.filter((build) => isHidden(triageOf(build).state)).length;
+              const showHidden = showHiddenRuns && hiddenRuns > 0;
+              const pool = builds.filter((build) => isHidden(triageOf(build).state) === showHidden);
+              const results = [...new Set(pool.map(label))];
+              const visibleBuilds = runFilter ? pool.filter((build) => label(build) === runFilter) : pool;
 
               return builds.length === 0 ? (
                 <EmptyState>No pipeline runs requested by you in the last week.</EmptyState>
@@ -153,19 +247,34 @@ export function DashboardPage() {
                           options: results.map((value) => ({
                             value,
                             label: value,
-                            count: builds.filter((build) => label(build) === value).length,
+                            count: pool.filter((build) => label(build) === value).length,
                           })),
                           onChange: setRunFilter,
                         },
                       ]}
                       shown={visibleBuilds.length}
-                      total={builds.length}
+                      total={pool.length}
                       onClear={() => setRunFilter("")}
                     />
                   ) : null}
+                  {hiddenRuns > 0 ? (
+                    <div className="flex justify-end">
+                      <HiddenToggle count={hiddenRuns} shown={showHidden} onToggle={() => setShowHiddenRuns(!showHidden)} />
+                    </div>
+                  ) : null}
+                  {visibleBuilds.length === 0 ? (
+                    <EmptyState>
+                      {pool.length === 0 && !showHidden
+                        ? "All your recent pipeline runs are snoozed or abandoned."
+                        : "No pipeline runs match this filter."}
+                    </EmptyState>
+                  ) : null}
                   <ul className="divide-y divide-slate-100">
                     {visibleBuilds.map((build) => (
-                      <li key={build.id} className="flex items-center justify-between gap-2 py-2.5">
+                      <li
+                        key={build.id}
+                        className={cn("flex items-center justify-between gap-2 py-2.5", triageOf(build).state !== "active" && "opacity-75")}
+                      >
                         <Link
                           to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(build.projectName ?? "")}?build=${build.id}`}
                           className="min-w-0 truncate text-sm text-slate-800 hover:text-indigo-600"
@@ -173,7 +282,17 @@ export function DashboardPage() {
                           <span className="font-medium">{build.definitionName}</span> #{build.buildNumber} · {stripRef(build.sourceBranch)} ·{" "}
                           {formatRelative(build.queueTime)}
                         </Link>
-                        <StatusBadge tone={buildTone(build.status, build.result)}>{buildLabel(build.status, build.result)}</StatusBadge>
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          <TriageBadge resolved={triageOf(build)} />
+                          <StatusBadge tone={buildTone(build.status, build.result)}>{buildLabel(build.status, build.result)}</StatusBadge>
+                          <TriageMenu
+                            triage={triage}
+                            itemKey={pipelineKey(build)}
+                            projectName={build.projectName}
+                            label={`${build.definitionName} on ${stripRef(build.sourceBranch)}`}
+                            resolved={triageOf(build)}
+                          />
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -187,7 +306,13 @@ export function DashboardPage() {
       <ScopesCard credentialId={credentialId} />
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />
-      <ErrorToast message={review.proposeError} onDismiss={review.clearProposeError} />
+      <ErrorToast
+        message={review.proposeError ?? triage.saveError}
+        onDismiss={() => {
+          review.clearProposeError();
+          triage.clearSaveError();
+        }}
+      />
     </div>
   );
 }

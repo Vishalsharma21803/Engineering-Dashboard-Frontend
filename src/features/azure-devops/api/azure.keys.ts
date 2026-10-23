@@ -26,6 +26,11 @@ export const azureKeys = {
     ["azure", credentialId, "repositories", projectId] as const,
 };
 
+export const triageKeys = {
+  all: ["triage"] as const,
+  list: (credentialId: string) => ["triage", credentialId] as const,
+};
+
 export const actionKeys = {
   all: ["actions"] as const,
   list: (status: string | undefined) => ["actions", "list", status ?? "all"] as const,

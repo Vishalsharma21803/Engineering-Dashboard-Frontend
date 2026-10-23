@@ -4,11 +4,15 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { cn } from "@/utils/cn";
+import type { DashboardTriage } from "../hooks/use-triage";
 import type { ActionKind, ProposeActionInput } from "../types/action.types";
 import type { Recommendation } from "../types/azure.types";
+import type { ResolvedTriage } from "../types/triage.types";
 import { CATEGORY_LABELS, actionKindLabel } from "../utils/labels";
+import { UNTRIAGED, isHidden } from "../utils/triage";
 import { EmptyState } from "./feedback";
 import { StatusBadge } from "./status-badge";
+import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
 import { PriorityBadge, WorkItemTypeBadge } from "./work-item-badges";
 import { workItemTypeStyle } from "../utils/work-item-types";
 
@@ -19,6 +23,13 @@ interface RecommendationListProps {
   workItems: Map<number, { type: string; priority: number | null }>;
   isProposing: boolean;
   onPropose: (input: ProposeActionInput) => void;
+  triage?: DashboardTriage;
+}
+
+interface Entry {
+  recommendation: Recommendation;
+  itemKey: string | null;
+  resolved: ResolvedTriage;
 }
 
 const PRIORITY_REASON = /^Priority \d$/;
@@ -56,140 +67,207 @@ export function RecommendationList({
   workItems,
   isProposing,
   onPropose,
+  triage,
 }: RecommendationListProps) {
   const [category, setCategory] = useState<Recommendation["category"] | "">("");
+  const [showHiddenChoice, setShowHidden] = useState(false);
 
   if (recommendations.length === 0) {
     return <EmptyState>Nothing needs your attention right now.</EmptyState>;
   }
 
+  const entries: Entry[] = recommendations.map((recommendation) => {
+    const itemKey = triage?.keyFor(recommendation) ?? null;
+    return {
+      recommendation,
+      itemKey,
+      resolved: triage ? triage.resolve(itemKey, recommendation.target.projectName) : UNTRIAGED,
+    };
+  });
+  const hiddenCount = entries.filter((entry) => isHidden(entry.resolved.state)).length;
+  // Fall back to the normal list once the last hidden item is restored.
+  const showHidden = showHiddenChoice && hiddenCount > 0;
+  const pool = entries.filter((entry) => isHidden(entry.resolved.state) === showHidden);
+
   const categories = (Object.keys(CATEGORY_LABELS) as Array<Recommendation["category"]>)
-    .map((value) => ({ value, count: recommendations.filter((item) => item.category === value).length }))
+    .map((value) => ({ value, count: pool.filter((entry) => entry.recommendation.category === value).length }))
     .filter((entry) => entry.count > 0);
-  const visible = category ? recommendations.filter((item) => item.category === category) : recommendations;
+  const visible = category ? pool.filter((entry) => entry.recommendation.category === category) : pool;
+  const active = visible.filter((entry) => entry.resolved.state === "active");
+  const acknowledged = visible.filter((entry) => entry.resolved.state === "acknowledged");
+
+  function renderItem({ recommendation, itemKey, resolved }: Entry, index: number | null) {
+    const category = CATEGORY_LABELS[recommendation.category];
+    const suggestion = recommendation.suggestedAction;
+    const workItem =
+      recommendation.target.type === "workItem" ? workItems.get(recommendation.target.id) : undefined;
+    const reasons = recommendation.reasons.filter((reason) => !PRIORITY_REASON.test(reason));
+    const path = targetPath(credentialId, recommendation);
+    const muted = resolved.state !== "active";
+
+    return (
+      <li
+        key={recommendation.id}
+        className={cn(
+          "relative flex flex-col gap-3 overflow-hidden rounded-lg border border-slate-200 py-3 pl-5 pr-4 transition hover:border-slate-300 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between",
+          muted ? "bg-slate-50" : "bg-white"
+        )}
+      >
+        <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1", muted ? "bg-slate-200" : CATEGORY_BARS[recommendation.category])} />
+
+        <div className={cn("flex min-w-0 gap-3", muted && "opacity-75")}>
+          <span
+            className={cn(
+              "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+              index === null ? "bg-slate-200 text-slate-500" : "bg-slate-900 text-white"
+            )}
+          >
+            {index === null ? "–" : index + 1}
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusBadge tone={category.tone}>{category.label}</StatusBadge>
+              {workItem ? (
+                <WorkItemTypeBadge type={workItem.type} compact />
+              ) : recommendation.target.type !== "workItem" ? (
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset",
+                    TARGET_BADGES[recommendation.target.type].className
+                  )}
+                >
+                  {TARGET_BADGES[recommendation.target.type].label}
+                </span>
+              ) : null}
+              {workItem && workItem.priority !== null ? <PriorityBadge priority={workItem.priority} /> : null}
+              <TriageBadge resolved={resolved} />
+            </div>
+            <Link to={path} className="mt-1 block font-medium text-slate-950 hover:text-indigo-600">
+              {recommendation.title}
+            </Link>
+            {reasons.length > 0 ? (
+              <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
+                {reasons.map((reason) => (
+                  <li key={reason} className="flex gap-1.5">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "mt-1.5 size-1 shrink-0 rounded-full",
+                        workItem ? workItemTypeStyle(workItem.type).bar : "bg-slate-400"
+                      )}
+                    />
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-9 sm:pl-4">
+          {suggestion && !suggestion.requiresInput ? (
+            <Button
+              size="sm"
+              disabled={isProposing}
+              onClick={() =>
+                onPropose({
+                  credentialId,
+                  kind: suggestion.kind as ActionKind,
+                  source: "RECOMMENDATION",
+                  target: suggestion.target,
+                  params: suggestion.params,
+                })
+              }
+            >
+              {actionKindLabel(suggestion.kind)}…
+            </Button>
+          ) : suggestion ? (
+            <Link to={path} className={buttonClassName({ size: "sm" })}>
+              {actionKindLabel(suggestion.kind)}…
+            </Link>
+          ) : null}
+          <Link to={path} className={buttonClassName({ size: "sm", variant: "secondary" })}>
+            Open
+          </Link>
+          {triage ? (
+            <TriageMenu
+              triage={triage}
+              itemKey={itemKey}
+              projectName={recommendation.target.projectName}
+              label={recommendation.title}
+              resolved={resolved}
+            />
+          ) : null}
+          <span
+            className="hidden w-8 text-right text-xs tabular-nums text-slate-400 sm:inline"
+            title="Priority score"
+          >
+            {recommendation.score}
+          </span>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <div className="space-y-3">
-      {categories.length > 1 ? (
-        <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-1.5">
-          {[{ value: "" as const, count: recommendations.length }, ...categories].map((entry) => (
-            <button
-              key={entry.value || "all"}
-              type="button"
-              aria-pressed={category === entry.value}
-              onClick={() => setCategory(entry.value)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
-                category === entry.value
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
-              )}
-            >
-              {entry.value ? (
-                <span aria-hidden="true" className={cn("size-2 rounded-full", CATEGORY_BARS[entry.value])} />
-              ) : null}
-              {entry.value ? CATEGORY_LABELS[entry.value].label : "All"}
-              <span className={category === entry.value ? "text-white/70" : "text-slate-400"}>{entry.count}</span>
-            </button>
-          ))}
+      {categories.length > 1 || hiddenCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {categories.length > 1 ? (
+            <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-1.5">
+              {[{ value: "" as const, count: pool.length }, ...categories].map((entry) => (
+                <button
+                  key={entry.value || "all"}
+                  type="button"
+                  aria-pressed={category === entry.value}
+                  onClick={() => setCategory(entry.value)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
+                    category === entry.value
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  )}
+                >
+                  {entry.value ? (
+                    <span aria-hidden="true" className={cn("size-2 rounded-full", CATEGORY_BARS[entry.value])} />
+                  ) : null}
+                  {entry.value ? CATEGORY_LABELS[entry.value].label : "All"}
+                  <span className={category === entry.value ? "text-white/70" : "text-slate-400"}>{entry.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          <HiddenToggle count={hiddenCount} shown={showHidden} onToggle={() => setShowHidden(!showHidden)} />
         </div>
       ) : null}
 
-      <ol className="space-y-2">
-        {visible.map((recommendation, index) => {
-          const category = CATEGORY_LABELS[recommendation.category];
-          const suggestion = recommendation.suggestedAction;
-          const workItem =
-            recommendation.target.type === "workItem" ? workItems.get(recommendation.target.id) : undefined;
-          const reasons = recommendation.reasons.filter((reason) => !PRIORITY_REASON.test(reason));
-          const path = targetPath(credentialId, recommendation);
+      {showHidden ? (
+        <ol aria-label="Snoozed and abandoned" className="space-y-2">
+          {visible.map((entry) => renderItem(entry, null))}
+        </ol>
+      ) : (
+        <>
+          {active.length > 0 ? (
+            <ol className="space-y-2">{active.map((entry, index) => renderItem(entry, index))}</ol>
+          ) : (
+            <EmptyState>
+              Nothing needs your attention right now
+              {acknowledged.length > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
+            </EmptyState>
+          )}
 
-          return (
-            <li
-              key={recommendation.id}
-              className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-slate-200 bg-white py-3 pl-5 pr-4 transition hover:border-slate-300 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
-            >
-              <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1", CATEGORY_BARS[recommendation.category])} />
-
-              <div className="flex min-w-0 gap-3">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <StatusBadge tone={category.tone}>{category.label}</StatusBadge>
-                    {workItem ? (
-                      <WorkItemTypeBadge type={workItem.type} compact />
-                    ) : recommendation.target.type !== "workItem" ? (
-                      <span
-                        className={cn(
-                          "inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset",
-                          TARGET_BADGES[recommendation.target.type].className
-                        )}
-                      >
-                        {TARGET_BADGES[recommendation.target.type].label}
-                      </span>
-                    ) : null}
-                    {workItem && workItem.priority !== null ? <PriorityBadge priority={workItem.priority} /> : null}
-                  </div>
-                  <Link to={path} className="mt-1 block font-medium text-slate-950 hover:text-indigo-600">
-                    {recommendation.title}
-                  </Link>
-                  {reasons.length > 0 ? (
-                    <ul className="mt-1 space-y-0.5 text-xs text-slate-600">
-                      {reasons.map((reason) => (
-                        <li key={reason} className="flex gap-1.5">
-                          <span
-                            aria-hidden="true"
-                            className={cn(
-                              "mt-1.5 size-1 shrink-0 rounded-full",
-                              workItem ? workItemTypeStyle(workItem.type).bar : "bg-slate-400"
-                            )}
-                          />
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="flex shrink-0 flex-wrap items-center gap-2 pl-9 sm:pl-4">
-                {suggestion && !suggestion.requiresInput ? (
-                  <Button
-                    size="sm"
-                    disabled={isProposing}
-                    onClick={() =>
-                      onPropose({
-                        credentialId,
-                        kind: suggestion.kind as ActionKind,
-                        source: "RECOMMENDATION",
-                        target: suggestion.target,
-                        params: suggestion.params,
-                      })
-                    }
-                  >
-                    {actionKindLabel(suggestion.kind)}…
-                  </Button>
-                ) : suggestion ? (
-                  <Link to={path} className={buttonClassName({ size: "sm" })}>
-                    {actionKindLabel(suggestion.kind)}…
-                  </Link>
-                ) : null}
-                <Link to={path} className={buttonClassName({ size: "sm", variant: "secondary" })}>
-                  Open
-                </Link>
-                <span
-                  className="hidden w-8 text-right text-xs tabular-nums text-slate-400 sm:inline"
-                  title="Priority score"
-                >
-                  {recommendation.score}
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+          {acknowledged.length > 0 ? (
+            <section aria-label="Acknowledged" className="space-y-2 pt-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Acknowledged · {acknowledged.length}
+              </h3>
+              <ol className="space-y-2">{acknowledged.map((entry) => renderItem(entry, null))}</ol>
+            </section>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

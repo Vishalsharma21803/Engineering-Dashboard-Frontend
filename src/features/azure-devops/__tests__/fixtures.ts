@@ -99,6 +99,7 @@ export const dashboard: Dashboard = {
       category: "SOP",
       title: "#103 Crash on save",
       reasons: ["All linked pull requests merged more than 24h ago but the ticket is still open"],
+      signals: ["SOP:NOT_CLOSED_AFTER_MERGE"],
       target: { type: "workItem", projectName: "Alpha", id: 103, webUrl: null },
       suggestedAction: {
         kind: "WORK_ITEM_CLOSE_AFTER_MERGE",

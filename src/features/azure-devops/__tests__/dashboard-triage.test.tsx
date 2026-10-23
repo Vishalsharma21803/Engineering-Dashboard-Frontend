@@ -1,0 +1,166 @@
+import { screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import { renderWithProviders } from "@/test/render";
+import { DashboardPage } from "../pages/dashboard-page";
+import type { TriageMark } from "../types/triage.types";
+import { CREDENTIAL_ID, dashboard } from "./fixtures";
+
+const base = `/api/azure/${CREDENTIAL_ID}`;
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+let nextId = 0;
+
+function mark(itemKey: string, status: TriageMark["status"], extra: Partial<TriageMark> = {}): TriageMark {
+  return {
+    id: `00000000-0000-4000-8000-${String(++nextId).padStart(12, "0")}`,
+    credentialId: CREDENTIAL_ID,
+    itemKey,
+    status,
+    snoozedUntil: status === "SNOOZED" ? new Date(Date.now() + 86_400_000).toISOString() : null,
+    signals: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...extra,
+  };
+}
+
+/** Backend stub with a stateful /api/triage, so refetches after a change see it. */
+function setup(initial: TriageMark[] = []) {
+  let marks = [...initial];
+  const writes: Array<{ method: string; url: string; body: unknown }> = [];
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      const path = url.split("?")[0] ?? url;
+
+      if (method !== "GET") writes.push({ method, url, body });
+
+      if (path === `${base}/dashboard`) return json({ dashboard });
+      if (path === "/api/actions") return json({ actions: [] });
+      if (path === "/api/triage" && method === "GET") return json({ marks });
+      if (path === "/api/triage" && method === "PUT") {
+        const saved = mark(body.itemKey, body.status, { signals: body.signals, snoozedUntil: body.snoozedUntil ?? null });
+        marks = [saved, ...marks.filter((item) => item.itemKey !== body.itemKey)];
+        return json({ message: "Triage saved", mark: saved });
+      }
+      if (path.startsWith("/api/triage/") && method === "DELETE") {
+        marks = marks.filter((item) => !path.endsWith(item.id));
+        return json({ message: "Triage cleared" });
+      }
+      if (path === `${base}/capabilities`) return json({ message: "not needed" }, 404);
+
+      return json({ message: `No mock for ${method} ${url}` }, 500);
+    })
+  );
+
+  renderWithProviders(<DashboardPage />, { path: "/azure/:credentialId", route: `/azure/${CREDENTIAL_ID}` });
+  return writes;
+}
+
+const prioritized = () => screen.getByText("Prioritized actions").closest("div")!.parentElement!.parentElement!;
+
+describe("dashboard triage", () => {
+  it("abandons a prioritized item in Cockpit only and lets it be restored", async () => {
+    const writes = setup();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Triage #103 Crash on save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Abandon · hide until restored" }));
+
+    await waitFor(() => expect(screen.queryByRole("link", { name: "#103 Crash on save" })).not.toBeInTheDocument());
+    expect(writes).toEqual([
+      {
+        method: "PUT",
+        url: "/api/triage",
+        body: {
+          credentialId: CREDENTIAL_ID,
+          itemKey: "wi:103",
+          status: "ABANDONED",
+          signals: ["SOP:NOT_CLOSED_AFTER_MERGE"],
+        },
+      },
+    ]);
+    expect(writes.some((write) => write.url.startsWith("/api/azure") || write.url.startsWith("/api/actions"))).toBe(false);
+
+    await userEvent.click(within(prioritized()).getByRole("button", { name: "Show snoozed & abandoned (1)" }));
+    expect(within(prioritized()).getByText("Abandoned")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Triage #103 Crash on save" }));
+    await userEvent.click(screen.getByRole("button", { name: "Restore to my list" }));
+
+    await waitFor(() => expect(writes.at(-1)?.method).toBe("DELETE"));
+    // The last hidden item came back, so the list returns to the normal view by itself.
+    expect(await screen.findByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    expect(within(prioritized()).queryByRole("button", { name: /snoozed & abandoned/ })).not.toBeInTheDocument();
+  });
+
+  it("snoozes with an end date and hides the item from counts", async () => {
+    const writes = setup();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Triage #102 Fix flaky test" }));
+    await userEvent.click(screen.getByRole("button", { name: "Snooze · tomorrow" }));
+
+    await waitFor(() => expect(screen.getByText("All your open work items are snoozed or abandoned.")).toBeInTheDocument());
+    const put = writes.find((write) => write.method === "PUT")?.body as { snoozedUntil: string } | undefined;
+    expect(put).toMatchObject({ itemKey: "wi:102", status: "SNOOZED" });
+    expect(Date.parse(put?.snoozedUntil ?? "")).toBeGreaterThan(Date.now());
+
+    const openTile = screen.getByText("Open work items").parentElement!;
+    expect(openTile).toHaveTextContent("0");
+    expect(openTile).toHaveTextContent("1 hidden");
+  });
+
+  it("keeps acknowledged items visible but resurfaces them when a new problem appears", async () => {
+    setup([mark("wi:103", "ACKNOWLEDGED", { signals: [] })]);
+
+    const link = await screen.findByRole("link", { name: "#103 Crash on save" });
+    expect(within(link.closest("li")!).getByText("New since acknowledged")).toBeInTheDocument();
+  });
+
+  it("groups acknowledged items below active ones", async () => {
+    setup([mark("wi:103", "ACKNOWLEDGED", { signals: ["SOP:NOT_CLOSED_AFTER_MERGE"] })]);
+
+    const acknowledged = await screen.findByRole("region", { name: "Acknowledged" });
+    expect(within(acknowledged).getByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    expect(within(acknowledged).getByText("Acknowledged")).toBeInTheDocument();
+  });
+
+  it("hides a whole abandoned project and restores it from the project strip", async () => {
+    const projectMark = mark("project:alpha", "ABANDONED");
+    const writes = setup([projectMark]);
+
+    expect(await screen.findByText("All your open work items are snoozed or abandoned.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "#103 Crash on save" })).not.toBeInTheDocument();
+    expect(screen.getByText("Triaged projects").parentElement).toHaveTextContent("Alpha · abandoned");
+
+    await userEvent.click(screen.getByRole("button", { name: "Restore project Alpha" }));
+
+    expect(await screen.findByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    expect(writes).toEqual([{ method: "DELETE", url: `/api/triage/${projectMark.id}`, body: null }]);
+  });
+
+  it("shows everything with a warning when marks cannot be loaded", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input).split("?")[0];
+        if (path === `${base}/dashboard`) return json({ dashboard });
+        if (path === "/api/actions") return json({ actions: [] });
+        return json({ message: "Credential not found" }, 404);
+      })
+    );
+    renderWithProviders(<DashboardPage />, { path: "/azure/:credentialId", route: `/azure/${CREDENTIAL_ID}` });
+
+    expect(await screen.findByText(/could not be loaded, so everything is shown/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Triage #103 Crash on save" })).toBeDisabled();
+  });
+});
