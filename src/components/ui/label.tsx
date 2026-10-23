@@ -1,11 +1,11 @@
-import type { LabelHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 import { cn } from "@/utils/cn";
 
 export function Label({
   className,
   ...props
-}: LabelHTMLAttributes<HTMLLabelElement>) {
+}: ComponentPropsWithRef<"label">) {
   return (
     <label
       className={cn(

@@ -45,7 +45,7 @@ src/
     layout/         route layouts
     ui/             shared Tailwind primitives
   features/
-    auth/           auth api, components, hooks, pages, schemas, types
+    auth/           api, components, context, hooks, pages, schemas, types, utils
     credentials/    credential api, components, hooks, pages, schemas, types
   lib/
     api-client.ts   fetch wrapper, typed errors, JSON handling
@@ -62,4 +62,14 @@ Feature code stays inside its feature folder. Shared code goes in
 
 ## Current state
 
-Frontend foundation only. Authentication pages and credential pages are next.
+Authentication is integrated:
+
+- Registration with automatic sign-in
+- Login and logout
+- Session restoration through `GET /api/auth/me`
+- httpOnly cookie session through the Vite proxy
+- Auth context backed by TanStack Query
+- Protected app routes and guest-only auth routes
+- Session-aware header
+
+Credential management pages are next.

@@ -5,48 +5,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
-const foundations = [
-  {
-    label: "React",
-    value: "19",
-  },
-  {
-    label: "TypeScript",
-    value: "Strict",
-  },
-  {
-    label: "Vite",
-    value: "8",
-  },
-  {
-    label: "Tailwind CSS",
-    value: "v4",
-  },
-  {
-    label: "Router",
-    value: "React Router v7",
-  },
-  {
-    label: "Server state",
-    value: "TanStack Query",
-  },
-];
-
-const nextSteps = [
-  {
-    title: "Authentication",
-    status: "Next up",
-    statusClass: "bg-indigo-50 text-indigo-700",
-    description:
-      "Login and registration pages, session context, and protected routes.",
-  },
+const modules = [
   {
     title: "Credentials",
-    status: "Backend ready",
-    statusClass: "bg-emerald-50 text-emerald-700",
+    status: "Next module",
+    statusClass: "bg-indigo-50 text-indigo-700",
     description:
-      "Create, list, update, validate, and delete Azure DevOps PATs.",
+      "Create, update, validate, and delete Azure DevOps PATs from the cockpit.",
   },
   {
     title: "Azure DevOps",
@@ -55,40 +22,52 @@ const nextSteps = [
     description:
       "Projects, work items, repositories, pull requests, pipelines, and builds.",
   },
+  {
+    title: "Insights",
+    status: "Planned",
+    statusClass: "bg-slate-100 text-slate-600",
+    description:
+      "Delivery visibility across teams, repositories, and build health.",
+  },
 ];
 
 export function HomePage() {
+  const { user } = useAuth();
+  const firstName = user?.name.split(/\s+/).filter(Boolean)[0] ?? "there";
+
   return (
     <section className="flex w-full flex-col gap-10">
       <div className="max-w-3xl">
-        <span className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-          Frontend initialized
+        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+          <span className="size-1.5 rounded-full bg-emerald-500" />
+          Authenticated
         </span>
 
         <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-          One cockpit for your Azure DevOps work.
+          Welcome back, {firstName}.
         </h1>
 
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-          A modular React workspace for authentication, Azure DevOps
-          credentials, projects, work items, repositories, pull requests,
-          and pipelines.
+          Your session is active. Credential management is the next
+          module to land, followed by the Azure DevOps workspace.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {nextSteps.map((item) => (
-          <Card key={item.title}>
+        {modules.map((module) => (
+          <Card key={module.title}>
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
-                <CardTitle>{item.title}</CardTitle>
+                <CardTitle>{module.title}</CardTitle>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${item.statusClass}`}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${module.statusClass}`}
                 >
-                  {item.status}
+                  {module.status}
                 </span>
               </div>
-              <CardDescription>{item.description}</CardDescription>
+              <CardDescription>
+                {module.description}
+              </CardDescription>
             </CardHeader>
           </Card>
         ))}
@@ -96,32 +75,42 @@ export function HomePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Frontend foundation</CardTitle>
+          <CardTitle>Signed-in session</CardTitle>
           <CardDescription>
-            Feature-based structure under{" "}
-            <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">
-              src/features
-            </code>
-            , shared UI primitives, an API client, and a configured query
-            cache.
+            Your session is backed by an httpOnly JWT cookie and
+            restored automatically on refresh.
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {foundations.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-lg border border-slate-100 bg-slate-50 p-3"
-              >
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  {item.label}
-                </dt>
-                <dd className="mt-1 text-sm font-semibold text-slate-900">
-                  {item.value}
-                </dd>
-              </div>
-            ))}
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Name
+              </dt>
+              <dd className="mt-1 truncate text-sm font-semibold text-slate-900">
+                {user?.name ?? "Unknown"}
+              </dd>
+            </div>
+
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Email
+              </dt>
+              <dd className="mt-1 truncate text-sm font-semibold text-slate-900">
+                {user?.email ?? "Unknown"}
+              </dd>
+            </div>
+
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Session
+              </dt>
+              <dd className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                Active
+              </dd>
+            </div>
           </dl>
         </CardContent>
       </Card>

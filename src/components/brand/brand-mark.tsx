@@ -2,14 +2,21 @@ import { cn } from "@/utils/cn";
 
 interface BrandMarkProps {
   className?: string;
+  inverted?: boolean;
 }
 
-export function BrandMark({ className }: BrandMarkProps) {
+export function BrandMark({
+  className,
+  inverted = false,
+}: BrandMarkProps) {
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white shadow-sm",
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-xl shadow-sm",
+        inverted
+          ? "bg-white text-slate-950"
+          : "bg-slate-950 text-white",
         className
       )}
     >
