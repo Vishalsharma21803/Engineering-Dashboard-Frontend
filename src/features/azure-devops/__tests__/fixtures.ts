@@ -85,6 +85,7 @@ export const dashboard: Dashboard = {
           state: "Active",
           stateCategory: "InProgress",
           configured: true,
+          sopProject: "checked",
           rulebook: { defaultVersion: 0, personalVersion: 0 },
           passedRules: [],
           pendingRules: [],

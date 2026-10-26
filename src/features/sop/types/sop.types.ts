@@ -135,3 +135,52 @@ export interface SopReport {
     violations: Array<{ ruleId: string; ruleTitle: string; severity: "high" | "medium" | "low"; message: string }>;
   }>;
 }
+
+export const SOP_STAGE_OPTIONS = ["ready", "estimation", "active", "review", "testing", "qa", "uat", "done"] as const;
+export type SopStageName = (typeof SOP_STAGE_OPTIONS)[number];
+
+/** A project's SOP set-up (shared; anyone may change it). */
+export interface ProjectSettings {
+  stageSource: "state" | "board_column";
+  stages: Partial<Record<SopStageName, string[]>>;
+  roles: { tl: string[]; qa: string[]; po: string[] };
+  fields: { category: string | null; targetCompletion: string | null };
+  categories: Record<string, string>;
+  workItemTypes: Record<string, string[]>;
+  tagVocabulary: string[];
+  branchPattern: string | null;
+  prTargetBranch: string | null;
+  timeZone: string;
+}
+
+export interface ProjectSetUp {
+  projectName: string;
+  settings: ProjectSettings;
+  createdBy: string | null;
+  updatedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Whether SOP checks run on this project for the signed-in user. */
+  checkedForMe: boolean;
+}
+
+export interface AzureSopProject {
+  id: string;
+  name: string;
+  setUp: boolean;
+  checkedForMe: boolean;
+}
+
+export interface ProjectSuggestion {
+  projectName: string;
+  states: Array<{ name: string; category: string; types: string[] }>;
+  fieldCandidates: { category: string[]; targetCompletion: string[] };
+  settings: ProjectSettings;
+  setUp: boolean;
+}
+
+export interface ProjectChange {
+  kind: "CREATED" | "UPDATED" | "REMOVED" | "IMPORTED";
+  changedBy: string;
+  createdAt: string;
+}

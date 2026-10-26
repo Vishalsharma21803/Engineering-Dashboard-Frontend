@@ -50,7 +50,7 @@ test("an SOP owner saves a new default version with a note", async ({ page }) =>
   await expect(editor).toHaveValue(/id: STR-01/);
   const content = await editor.inputValue();
   await editor.fill(content.replace("title: Title is a short phrase", "title: Title is short"));
-  await expect(page.getByText(/✓ Valid · \d+ rules · 2 projects/)).toBeVisible();
+  await expect(page.getByText(/✓ Valid · \d+ rules/)).toBeVisible();
 
   await page.getByLabel("Change note").fill("Shorter STR-01 title");
   await page.getByRole("button", { name: "Save as new version" }).click();
@@ -118,7 +118,46 @@ test("the team SOP report uses the default rules for everyone in the project", a
   await page.getByRole("button", { name: "Build report" }).click();
 
   const byRule = page.getByRole("table", { name: "Gaps by rule" });
-  await expect(byRule.getByRole("row", { name: /T-01 Estimate exists 4 5/ })).toBeVisible({ timeout: 30_000 });
+  // #106 is still New, so only the 4 started tickets are checked.
+  await expect(byRule.getByRole("row", { name: /T-01 Estimate exists 3 4/ })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("table", { name: "Gaps by person" }).getByRole("row", { name: /Reviewer Two 1 1 2/ })).toBeVisible();
   await expect(page.getByText("Tickets checked").locator("..")).toContainText("5");
+});
+
+test("projects are set up from Azure and each developer chooses theirs; new tickets are not flagged", async ({ page, request }) => {
+  await request.post(`${BACKEND}/__e2e/rulebook`);
+  await register(page, "projects@example.com");
+  await page.goto("/credentials/new");
+  await page.getByLabel("Organization URL").fill("https://dev.azure.com/fake-org");
+  await page.getByLabel("Personal access token").fill("fake-pat-token-0123456789abcdefghij");
+  await page.getByRole("button", { name: "Save credential" }).click();
+  await expect(page).toHaveURL("/credentials");
+
+  // New ticket #106 has no estimate but is not flagged; active #102 is.
+  await page.goto("/azure");
+  const table = page.getByRole("table");
+  await expect(table.getByRole("row", { name: /#102 Fix flaky test/ })).toContainText("T-01");
+  await expect(table.getByRole("row", { name: /#106 Waiting on vendor/ })).toContainText("SOP OK");
+
+  await page.goto("/sop-rules?tab=projects");
+  const projects = page.getByRole("table", { name: "SOP projects" });
+  await expect(projects.getByRole("row", { name: /Alpha/ })).toContainText("Set up");
+
+  // Set Beta up from its Azure states.
+  await projects.getByRole("row", { name: /Beta/ }).getByRole("button", { name: "Set up" }).click();
+  const form = page.getByRole("form", { name: "Set up Beta" });
+  await expect(form.getByLabel("Stage for Active")).toHaveValue("active");
+  await form.getByLabel("Team time zone").fill("Asia/Kolkata");
+  await form.getByRole("button", { name: "Set up project" }).click();
+  await expect(projects.getByRole("row", { name: /Beta/ })).toContainText("Set up");
+
+  // Switch Alpha off for me: My work shows it as off instead of checking it.
+  await projects.getByRole("checkbox", { name: "Check Alpha for me" }).uncheck();
+  await expect(projects.getByRole("checkbox", { name: "Check Alpha for me" })).not.toBeChecked();
+  await page.goto("/azure");
+  await expect(page.getByRole("table").getByRole("row", { name: /#102 Fix flaky test/ })).toContainText("SOP off");
+
+  const response = await request.get(`${BACKEND}/__e2e/requests`);
+  const { requests } = (await response.json()) as { requests: Array<{ isWrite: boolean }> };
+  expect(requests.filter((entry) => entry.isWrite)).toEqual([]);
 });

@@ -18,7 +18,7 @@ const REASONS: Record<string, string> = {
   AI_BAD_OUTPUT: "The model's answer was unusable. It will be retried on the next refresh.",
   AI_FREE_TIER_BLOCKED:
     "OpenCode allows its free models only inside the OpenCode app (from other apps it always answers \"free usage limit reached\"). Choose a paid OpenCode model (needs credit or OpenCode Go), Claude, or OpenRouter on the Credentials page.",
-  PROJECT_NOT_CONFIGURED: "This project is not in the SOP rulebook.",
+  PROJECT_NOT_CONFIGURED: "This project is not set up for SOP checks, or you switched it off (SOP rules → Projects).",
   CREDENTIAL_NOT_FOUND: "The Azure DevOps connection was removed.",
 };
 

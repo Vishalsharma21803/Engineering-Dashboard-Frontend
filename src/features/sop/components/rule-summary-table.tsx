@@ -8,7 +8,8 @@ const SEVERITY_TONE: Record<RuleSeverity, "danger" | "warning" | "neutral"> = {
 };
 
 const WHEN_LABELS: Record<string, string> = {
-  "before-active": "Before work starts",
+  "at-estimation": "Once estimated",
+  "before-active": "Once work starts",
   "at-review": "At Review",
   "at-testing": "At Testing",
   "at-qa": "At QA",

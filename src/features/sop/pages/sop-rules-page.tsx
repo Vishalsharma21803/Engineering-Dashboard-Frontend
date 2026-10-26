@@ -1,15 +1,27 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ErrorCard } from "@/features/azure-devops/components/feedback";
 import { cn } from "@/utils/cn";
+import { ProjectsTab } from "../components/projects-tab";
 import { RuleSummaryTable } from "../components/rule-summary-table";
 import { RulebookEditor } from "../components/rulebook-editor";
 import { useEffectiveRules, useRulebook } from "../hooks/use-sop";
 import type { RulebookScope } from "../types/sop.types";
 
-type Tab = RulebookScope | "effective";
+type Tab = RulebookScope | "effective" | "projects";
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "projects", label: "Projects" },
+  { id: "personal", label: "My rules" },
+  { id: "default", label: "Default rules" },
+  { id: "effective", label: "Rules that apply to me" },
+];
+
+function isTab(value: string | null): value is Tab {
+  return TABS.some((tab) => tab.id === value);
+}
 
 const PERSONAL_PLACEHOLDER = `Your rules change only your own checks. Examples:
 
@@ -86,9 +98,9 @@ function EffectiveTab() {
         </ul>
       ) : null}
       <p className="text-sm text-slate-600">
-        Configured projects:{" "}
-        {effective.data.projects.length ? effective.data.projects.map((project) => project.project).join(", ") : "none"}
-        . Projects without facts in the default rules are not checked.
+        Projects checked for you:{" "}
+        {effective.data.projects.length ? effective.data.projects.map((project) => project.project).join(", ") : "none"}. Set projects
+        up and choose yours on the Projects tab.
       </p>
       <RuleSummaryTable cards={effective.data.cards} />
     </div>
@@ -97,14 +109,13 @@ function EffectiveTab() {
 
 export function SopRulesPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>("personal");
+  // The tab lives in the URL (?tab=projects) so other pages can link to it; anything unknown is "My rules".
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("tab");
+  const tab: Tab = isTab(requested) ? requested : "personal";
+  const setTab = (next: Tab) => setSearchParams(next === "personal" ? {} : { tab: next }, { replace: true });
   const isOwner = user?.isSopAdmin ?? false;
 
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: "personal", label: "My rules" },
-    { id: "default", label: "Default rules" },
-    { id: "effective", label: "Rules that apply to me" },
-  ];
 
   return (
     <section className="flex w-full flex-col gap-6">
@@ -118,7 +129,7 @@ export function SopRulesPage() {
       </div>
 
       <div role="tablist" className="flex gap-1 border-b border-slate-200">
-        {tabs.map((item) => (
+        {TABS.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -135,6 +146,7 @@ export function SopRulesPage() {
         ))}
       </div>
 
+      {tab === "projects" ? <ProjectsTab /> : null}
       {tab === "personal" ? <EditorTab scope="personal" canSave /> : null}
       {tab === "default" ? (
         <EditorTab

@@ -77,9 +77,9 @@ export function SopReportCard({ credentialId, projectId }: { credentialId: strin
         </p>
       ) : !report.data.configured ? (
         <p className="text-sm text-slate-600">
-          {report.data.projectName} is not in the default SOP rulebook yet.{" "}
-          <Link to="/sop-rules" className="font-medium text-indigo-700 hover:underline">
-            SOP rules
+          {report.data.projectName} is not set up for SOP checks yet.{" "}
+          <Link to="/sop-rules?tab=projects" className="font-medium text-indigo-700 hover:underline">
+            Set it up
           </Link>
         </p>
       ) : (

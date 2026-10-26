@@ -23,9 +23,11 @@ export function SopResultPanel({ result, renderAction, ai }: SopResultPanelProps
   if (!result.configured) {
     return (
       <p className="text-sm text-slate-600">
-        {result.projectName} is not in the SOP rulebook yet, so this ticket is not checked.{" "}
-        <Link to="/sop-rules" className="font-medium text-indigo-700 hover:underline">
-          SOP rules
+        {result.sopProject === "switched-off"
+          ? `You switched SOP checks off for ${result.projectName}, so this ticket is not checked.`
+          : `${result.projectName} is not set up for SOP checks yet, so this ticket is not checked.`}{" "}
+        <Link to="/sop-rules?tab=projects" className="font-medium text-indigo-700 hover:underline">
+          {result.sopProject === "switched-off" ? "Your SOP projects" : "Set it up"}
         </Link>
       </p>
     );

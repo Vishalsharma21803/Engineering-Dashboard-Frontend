@@ -1,6 +1,11 @@
 import { apiRequest } from "@/lib/api-client";
 import type {
   AiCheck,
+  AzureSopProject,
+  ProjectChange,
+  ProjectSettings,
+  ProjectSetUp,
+  ProjectSuggestion,
   EffectiveRules,
   EnqueueAiResult,
   RulebookContent,
@@ -72,4 +77,43 @@ export async function getSopReport(credentialId: string, projectId: string, page
       `/api/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(projectId)}/sop-report?${query.toString()}`
     )
   ).report;
+}
+
+/* Projects: anyone may set one up; each user chooses which are checked for them. */
+
+export async function listSopProjects() {
+  return (await apiRequest<{ projects: ProjectSetUp[] }>("/api/sop/projects")).projects;
+}
+
+export async function listAzureProjectsForSop(credentialId: string) {
+  return (await apiRequest<{ projects: AzureSopProject[] }>(`/api/sop/azure-projects/${encodeURIComponent(credentialId)}`)).projects;
+}
+
+export async function getProjectSuggestion(credentialId: string, projectId: string) {
+  return (
+    await apiRequest<{ suggestion: ProjectSuggestion }>(
+      `/api/sop/azure-projects/${encodeURIComponent(credentialId)}/${encodeURIComponent(projectId)}/suggestion`
+    )
+  ).suggestion;
+}
+
+export async function saveProjectSetUp(projectName: string, settings: ProjectSettings) {
+  return (
+    await apiRequest<{ project: Omit<ProjectSetUp, "checkedForMe"> }>(`/api/sop/projects/${encodeURIComponent(projectName)}`, {
+      method: "PUT",
+      body: { settings },
+    })
+  ).project;
+}
+
+export async function removeProjectSetUp(projectName: string) {
+  await apiRequest(`/api/sop/projects/${encodeURIComponent(projectName)}`, { method: "DELETE" });
+}
+
+export async function listProjectChanges(projectName: string) {
+  return (await apiRequest<{ changes: ProjectChange[] }>(`/api/sop/projects/${encodeURIComponent(projectName)}/history`)).changes;
+}
+
+export async function setProjectChecked(projectName: string, checked: boolean) {
+  await apiRequest(`/api/sop/projects/${encodeURIComponent(projectName)}/checked`, { method: "PUT", body: { checked } });
 }

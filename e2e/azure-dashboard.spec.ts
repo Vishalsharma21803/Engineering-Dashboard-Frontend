@@ -60,8 +60,8 @@ test("discovers projects, prioritizes work and never writes without approval", a
   await expect(page.getByRole("link", { name: "alpha-ci #2026.501 failed" })).toBeVisible();
   await expect(page.locator("ol").getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
   await expect(page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
-  // SOP rulebook rule T-01 (estimate) fails for #102, #103 and #106.
-  await expect(page.getByRole("table").getByText("T-01")).toHaveCount(3);
+  // SOP rule T-01 (estimate) fails for the started tickets #102 and #103; #106 is still New, so it is not flagged.
+  await expect(page.getByRole("table").getByText("T-01")).toHaveCount(2);
   await expect(page.getByRole("link", { name: "!1 Login flow", exact: true })).toBeVisible();
   await expect(page.getByText("2 unresolved", { exact: true })).toBeVisible();
 
@@ -232,10 +232,10 @@ test("keeps the selected project across tabs and filters lists", async ({ page }
   await expect(table.getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
   await expect(table.getByRole("link", { name: "#102 Fix flaky test" })).toHaveCount(0);
   await page.getByRole("button", { name: "Clear filters" }).first().click();
-  await page.getByLabel("SOP").selectOption({ label: "SOP: T-01 · Estimate exists (3)" });
+  await page.getByLabel("SOP").selectOption({ label: "SOP: T-01 · Estimate exists (2)" });
   await expect(table.getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
   await expect(table.getByRole("link", { name: "#101 Implement login" })).toHaveCount(0);
-  await expect(table.getByRole("row")).toHaveCount(4);
+  await expect(table.getByRole("row")).toHaveCount(3);
 
   await page.getByRole("group", { name: "Filter by category" }).getByRole("button", { name: /Failed pipeline/ }).click();
   await expect(page.getByRole("link", { name: "alpha-ci #2026.501 failed" })).toBeVisible();

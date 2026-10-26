@@ -213,7 +213,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
         ) : problems.length === 0 && validation ? (
           <span className="text-sm font-medium text-emerald-700">
             ✓ Valid · {validation.summary.cards.length} rules
-            {scope === "default" ? ` · ${validation.summary.projects.length} projects` : ` · ${validation.summary.overrides.length} overrides`}
+            {scope === "default" ? "" : ` · ${validation.summary.overrides.length} overrides`}
           </span>
         ) : problems.length > 0 ? (
           <span className="text-sm font-medium text-rose-600">{problems.length} problem(s) to fix before saving</span>

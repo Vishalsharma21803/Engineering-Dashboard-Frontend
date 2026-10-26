@@ -78,8 +78,15 @@ export function ComplianceBadges({ result, ai }: { result: ComplianceResult | un
 
   if (!result.configured) {
     return (
-      <StatusBadge tone="neutral" title={`${result.projectName} is not in the SOP rulebook, so it is not checked.`}>
-        Not set up
+      <StatusBadge
+        tone="neutral"
+        title={
+          result.sopProject === "switched-off"
+            ? `You switched SOP checks off for ${result.projectName} (SOP rules → Projects).`
+            : `${result.projectName} is not set up for SOP checks (SOP rules → Projects).`
+        }
+      >
+        {result.sopProject === "switched-off" ? "SOP off" : "Not set up"}
       </StatusBadge>
     );
   }
