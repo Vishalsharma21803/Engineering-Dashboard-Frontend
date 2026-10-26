@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SopReportCard } from "@/features/sop/components/sop-report-card";
+import { usePageParam } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
@@ -9,13 +10,12 @@ import { DeploymentsPanel } from "../components/deployments-panel";
 import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
 import { PipelinesPanel } from "../components/pipelines-panel";
 import { PullRequestList } from "../components/pull-request-list";
-import { WorkItemTable } from "../components/work-item-table";
+import { TeamWorkTable } from "../components/work-item-table";
 import { useActionReview } from "../hooks/use-action-review";
 import {
   useCapabilities,
   useProjectOverview,
   useProjectPullRequests,
-  useProjectWorkItems,
   useRepositories,
 } from "../hooks/use-projects";
 import type { Section } from "../types/azure.types";
@@ -51,13 +51,13 @@ function RepositoriesList({ credentialId, projectId }: { credentialId: string; p
 
 function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; projectId: string }) {
   const [state, setState] = useState<"open" | "all">("open");
-  const { data: workItems, isLoading, error, refetch } = useProjectWorkItems(credentialId, projectId, state);
+  const { setPage } = usePageParam("page");
   const identity = useCapabilities(credentialId).data?.identity ?? null;
 
   return (
     <SectionCard
       title="Team work items"
-      description="Everyone's work items in this project, most recently changed first (up to 200)."
+      description="Everyone's work items in this project, most recently changed first (up to 200, 10 per page)."
       actions={
         <div role="group" aria-label="State" className="inline-flex rounded-lg border border-slate-200 p-0.5">
           {(["open", "all"] as const).map((value) => (
@@ -65,7 +65,10 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
               key={value}
               type="button"
               aria-pressed={state === value}
-              onClick={() => setState(value)}
+              onClick={() => {
+                setState(value);
+                setPage(1, { replace: true });
+              }}
               className={cn(
                 "rounded-md px-3 py-1 text-xs font-medium transition",
                 state === value ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-950"
@@ -77,13 +80,7 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
         </div>
       }
     >
-      {isLoading ? (
-        <SkeletonRows rows={4} />
-      ) : error || !workItems ? (
-        <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />
-      ) : (
-        <WorkItemTable credentialId={credentialId} workItems={workItems} mode="team" myId={identity?.id ?? null} />
-      )}
+      <TeamWorkTable credentialId={credentialId} projectId={projectId} scope={state} myId={identity?.id ?? null} />
     </SectionCard>
   );
 }

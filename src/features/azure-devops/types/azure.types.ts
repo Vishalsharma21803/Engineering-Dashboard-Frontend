@@ -429,3 +429,39 @@ export interface Dashboard {
   };
   recommendations: Recommendation[];
 }
+
+/** One page of a server-paged list (10 rows; the server clamps the page). */
+export interface Page<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface FacetOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface WorkItemListFilters {
+  search: string;
+  type: string;
+  stateCategory: string;
+  priority: string;
+  sop: string;
+  assignee: string;
+}
+
+export interface MyWorkPage extends Page<{ workItem: WorkItemSummary; compliance: ComplianceResult | null }> {
+  poolTotal: number;
+  hiddenCount: number;
+  showingHidden: boolean;
+  facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; sop: FacetOption[] };
+}
+
+export interface TeamWorkPage extends Page<WorkItemSummary> {
+  poolTotal: number;
+  facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; assignees: FacetOption[] };
+}

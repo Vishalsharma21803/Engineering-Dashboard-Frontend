@@ -64,10 +64,12 @@ export async function listAiChecks(credentialId: string, workItemIds: number[]) 
 }
 
 /** Team report for one project: default rules, code rules, whole team. */
-export async function getSopReport(credentialId: string, projectId: string) {
+/** The report with its tickets-with-gaps list paged (10 per page). `refresh` rebuilds it on the server. */
+export async function getSopReport(credentialId: string, projectId: string, page: number, refresh = false) {
+  const query = new URLSearchParams({ page: String(page), ...(refresh ? { refresh: "1" } : {}) });
   return (
     await apiRequest<{ report: SopReport }>(
-      `/api/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(projectId)}/sop-report`
+      `/api/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(projectId)}/sop-report?${query.toString()}`
     )
   ).report;
 }

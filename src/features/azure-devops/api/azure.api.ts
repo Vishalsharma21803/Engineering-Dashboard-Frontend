@@ -11,8 +11,10 @@ import type {
   PullRequestDetail,
   PullRequestSummary,
   RepositorySummary,
+  MyWorkPage,
+  TeamWorkPage,
   WorkItemDetail,
-  WorkItemSummary,
+  WorkItemListFilters,
 } from "../types/azure.types";
 
 /** All Azure DevOps data comes from the backend; the browser never calls Azure. */
@@ -70,17 +72,6 @@ export async function getProjectOverview(credentialId: string, projectId: string
 }
 
 /** Every assignee's work items in one project (project overview). */
-export async function listProjectWorkItems(
-  credentialId: string,
-  projectId: string,
-  state: "open" | "all"
-) {
-  const response = await apiRequest<{ workItems: WorkItemSummary[] }>(
-    azurePath(credentialId, "/work-items", { projectId, state, assignee: "any" })
-  );
-  return response.workItems;
-}
-
 /** Every active pull request in one project (project overview). */
 export async function listProjectPullRequests(credentialId: string, projectId: string) {
   const response = await apiRequest<{ pullRequests: PullRequestSummary[] }>(
@@ -146,3 +137,32 @@ export async function listRepositories(credentialId: string, projectId: string) 
   return response.repositories;
 }
 
+
+/** My work tickets: filtered and paged by the server. */
+export async function getMyWorkPage(
+  credentialId: string,
+  input: { projectId: string | undefined; page: number; hidden: boolean; filters: WorkItemListFilters }
+) {
+  const { assignee: _assignee, ...filters } = input.filters;
+  const response = await apiRequest<{ myWork: MyWorkPage }>(
+    azurePath(credentialId, "/my-work", { projectId: input.projectId, page: input.page, hidden: input.hidden, ...nonEmpty(filters) })
+  );
+  return response.myWork;
+}
+
+/** Everyone's tickets in one project: filtered and paged by the server. */
+export async function getTeamWorkPage(
+  credentialId: string,
+  projectId: string,
+  input: { scope: "open" | "all"; page: number; filters: WorkItemListFilters }
+) {
+  const { sop: _sop, ...filters } = input.filters;
+  const response = await apiRequest<{ teamWork: TeamWorkPage }>(
+    azurePath(credentialId, `/projects/${segment(projectId)}/team-work-items`, { scope: input.scope, page: input.page, ...nonEmpty(filters) })
+  );
+  return response.teamWork;
+}
+
+function nonEmpty(values: Record<string, string>): Query {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value.trim() !== ""));
+}

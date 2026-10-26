@@ -4,13 +4,40 @@ import { describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/test/render";
 import { DashboardPage } from "../pages/dashboard-page";
+import type { MyWorkPage } from "../types/azure.types";
 import type { TriageMark } from "../types/triage.types";
+import { buildSignalIndex, isHidden, resolveTriage, workItemKey } from "../utils/triage";
 import { CREDENTIAL_ID, dashboard } from "./fixtures";
 
 const base = `/api/azure/${CREDENTIAL_ID}`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+/** What the server's /my-work answers for these marks (it applies the same triage rules). */
+function myWorkFor(marks: TriageMark[], hidden: boolean): MyWorkPage {
+  const byKey = new Map(marks.map((item) => [item.itemKey, item]));
+  const signals = buildSignalIndex(dashboard.recommendations, dashboard.sections.pipelines.data ?? []);
+  const items = dashboard.sections.workItems.data ?? [];
+  const isHiddenItem = (id: number, projectName: string) =>
+    isHidden(resolveTriage(byKey, workItemKey(id), projectName, signals.get(workItemKey(id))?.signals ?? []).state);
+  const hiddenCount = items.filter((item) => isHiddenItem(item.id, item.projectName)).length;
+  const showing = hidden && hiddenCount > 0;
+  const pool = items.filter((item) => isHiddenItem(item.id, item.projectName) === showing);
+  const compliance = new Map((dashboard.sections.compliance.data ?? []).map((result) => [result.workItemId, result]));
+
+  return {
+    items: pool.map((workItem) => ({ workItem, compliance: compliance.get(workItem.id) ?? null })),
+    page: 1,
+    pageSize: 10,
+    total: pool.length,
+    totalPages: 1,
+    poolTotal: pool.length,
+    hiddenCount,
+    showingHidden: showing,
+    facets: { types: [], states: [], priorities: [], sop: [] },
+  };
 }
 
 let nextId = 0;
@@ -45,6 +72,7 @@ function setup(initial: TriageMark[] = []) {
       if (method !== "GET") writes.push({ method, url, body });
 
       if (path === `${base}/dashboard`) return json({ dashboard });
+      if (path === `${base}/my-work`) return json({ myWork: myWorkFor(marks, new URL(url, "http://x").searchParams.get("hidden") === "1") });
       if (path === "/api/actions") return json({ actions: [] });
       if (path === "/api/triage" && method === "GET") return json({ marks });
       if (path === "/api/triage" && method === "PUT") {
@@ -153,6 +181,7 @@ describe("dashboard triage", () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const path = String(input).split("?")[0];
         if (path === `${base}/dashboard`) return json({ dashboard });
+        if (path === `${base}/my-work`) return json({ myWork: myWorkFor([], false) });
         if (path === "/api/actions") return json({ actions: [] });
         return json({ message: "Credential not found" }, 404);
       })

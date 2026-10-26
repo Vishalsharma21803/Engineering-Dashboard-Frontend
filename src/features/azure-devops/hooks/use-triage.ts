@@ -20,6 +20,8 @@ export type TriageTarget = { itemKey: string } | { projectName: string };
 export interface DashboardTriage {
   /** Controls are disabled until marks load, and stay disabled if loading failed. */
   ready: boolean;
+  /** Changes whenever marks change (also optimistically), so server-filtered lists can refresh. */
+  version: number;
   isLoading: boolean;
   loadError: unknown;
   isSaving: boolean;
@@ -151,6 +153,7 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
 
   return {
     ready: query.isSuccess,
+    version: query.dataUpdatedAt,
     isLoading: query.isLoading,
     loadError: query.error,
     isSaving: upsert.isPending || remove.isPending,

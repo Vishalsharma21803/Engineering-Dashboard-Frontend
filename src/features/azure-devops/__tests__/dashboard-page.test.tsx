@@ -11,6 +11,25 @@ const base = `/api/azure/${CREDENTIAL_ID}`;
 function setup() {
   const calls = mockBackend([
     { path: `${base}/dashboard`, body: { dashboard } },
+    {
+      path: `${base}/my-work`,
+      body: {
+        myWork: {
+          items: (dashboard.sections.workItems.data ?? []).map((workItem) => ({
+            workItem,
+            compliance: dashboard.sections.compliance.data?.find((result) => result.workItemId === workItem.id) ?? null,
+          })),
+          page: 1,
+          pageSize: 10,
+          total: dashboard.sections.workItems.data?.length ?? 0,
+          totalPages: 1,
+          poolTotal: dashboard.sections.workItems.data?.length ?? 0,
+          hiddenCount: 0,
+          showingHidden: false,
+          facets: { types: [], states: [], priorities: [], sop: [] },
+        },
+      },
+    },
     { path: "/api/actions", body: { actions: [] } },
     { path: "/api/triage", body: { marks: [] } },
     {
@@ -35,7 +54,7 @@ describe("DashboardPage", () => {
     const calls = setup();
 
     expect(await screen.findByText("#103 Crash on save")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "#102 Fix flaky test" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "#102 Fix flaky test" })).toBeInTheDocument();
     expect(within(screen.getByRole("table")).getByTitle("Task")).toHaveTextContent("Task");
     expect(screen.getByTitle("Estimate exists: No original estimate (hours).")).toHaveTextContent("STR-05");
     expect(screen.getByText(/does not grant access to pipelines/)).toBeInTheDocument();

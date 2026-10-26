@@ -13,7 +13,7 @@ import { RecommendationList } from "../components/recommendation-list";
 import { ScopesCard } from "../components/scopes-card";
 import { StatusBadge } from "../components/status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "../components/triage-menu";
-import { WorkItemTable } from "../components/work-item-table";
+import { MyWorkTable } from "../components/work-item-table";
 import { useActionReview } from "../hooks/use-action-review";
 import { useActions } from "../hooks/use-actions";
 import { useDashboard } from "../hooks/use-dashboard";
@@ -211,10 +211,16 @@ export function DashboardPage() {
         />
       </SectionCard>
 
-      <SectionCard title="My work items" description="Assigned to you, with SOP compliance indicators.">
+      <SectionCard title="My work items" description="Assigned to you, with SOP compliance indicators. 10 per page.">
         <SectionView section={dashboard.sections.workItems} label="work items">
-          {(workItems) => (
-            <WorkItemTable credentialId={credentialId} workItems={workItems} compliance={compliance} aiChecks={ai.checks} triage={triage} />
+          {() => (
+            <MyWorkTable
+              credentialId={credentialId}
+              projectId={projectId}
+              dashboardToken={dashboard.generatedAt}
+              aiChecks={ai.checks}
+              triage={triage}
+            />
           )}
         </SectionView>
       </SectionCard>

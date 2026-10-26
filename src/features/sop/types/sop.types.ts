@@ -1,5 +1,5 @@
 import type { AiProvider } from "@/features/ai/types/ai.types";
-import type { ComplianceResult, IdentityRef } from "@/features/azure-devops/types/azure.types";
+import type { ComplianceResult, IdentityRef, Page } from "@/features/azure-devops/types/azure.types";
 
 export type RuleChecker = "code" | "ai";
 export type RuleSeverity = "fail" | "warn" | "off";
@@ -125,7 +125,8 @@ export interface SopReport {
   compliantShare: number | null;
   byRule: Array<{ ruleId: string; ruleTitle: string; severity: "high" | "medium"; failing: number; checked: number }>;
   byPerson: Array<{ assignee: IdentityRef | null; items: number; itemsWithGaps: number; gaps: number }>;
-  items: Array<{
+  /** Tickets with gaps, 10 per page (the totals above cover all of them). */
+  items: Page<{
     workItemId: number;
     title: string;
     type: string;

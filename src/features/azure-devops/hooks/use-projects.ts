@@ -4,7 +4,6 @@ import {
   getCapabilities,
   getProjectOverview,
   listProjectPullRequests,
-  listProjectWorkItems,
   listProjects,
   listRepositories,
 } from "../api/azure.api";
@@ -24,14 +23,6 @@ export function useProjectOverview(credentialId: string, projectId: string) {
   return useQuery({
     queryKey: azureKeys.project(credentialId, projectId),
     queryFn: () => getProjectOverview(credentialId, projectId),
-    retry: retryUnlessClientError,
-  });
-}
-
-export function useProjectWorkItems(credentialId: string, projectId: string, state: "open" | "all") {
-  return useQuery({
-    queryKey: azureKeys.projectWorkItems(credentialId, projectId, state),
-    queryFn: () => listProjectWorkItems(credentialId, projectId, state),
     retry: retryUnlessClientError,
   });
 }

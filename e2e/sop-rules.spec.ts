@@ -111,7 +111,10 @@ test("the team SOP report uses the default rules for everyone in the project", a
 
   await page.goto("/azure");
   await page.getByRole("link", { name: "Project overview" }).click();
+  // Wait for the tab to open before choosing the project, or a slow run can still be on My work.
+  await expect(page).toHaveURL(/\/projects\//);
   await page.getByLabel("Project").selectOption({ label: "Alpha" });
+  await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Build report" }).click();
 
   const byRule = page.getByRole("table", { name: "Gaps by rule" });
