@@ -91,6 +91,7 @@ export const dashboard: Dashboard = {
           pendingRules: [],
           skippedRules: [],
           aiRules: [],
+          notices: [],
           violations: [
             {
               ruleId: "STR-05",

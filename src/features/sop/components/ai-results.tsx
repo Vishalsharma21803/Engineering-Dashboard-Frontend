@@ -83,7 +83,9 @@ function Verdict({ result, onUseFix, isProposing }: { result: AiRuleResult; onUs
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge tone={tone}>{result.ruleId}</StatusBadge>
         <span className="text-sm font-medium text-slate-900">{result.ruleTitle}</span>
-        <span className="text-xs uppercase tracking-wide text-slate-500">{result.verdict}</span>
+        <span className="text-xs uppercase tracking-wide text-slate-500">
+          {result.verdict === "fail" && result.severity === "low" ? "notice" : result.verdict}
+        </span>
       </div>
       <p className="text-sm text-slate-700">{result.reason}</p>
       {result.quotes.length > 0 ? (

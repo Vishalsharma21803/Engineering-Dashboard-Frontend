@@ -1,9 +1,10 @@
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { CardSummary, RuleSeverity } from "../types/sop.types";
 
-const SEVERITY_TONE: Record<RuleSeverity, "danger" | "warning" | "neutral"> = {
+const SEVERITY_TONE: Record<RuleSeverity, "danger" | "warning" | "info" | "neutral"> = {
   fail: "danger",
   warn: "warning",
+  notice: "info",
   off: "neutral",
 };
 

@@ -94,6 +94,7 @@ export function ComplianceBadges({ result, ai }: { result: ComplianceResult | un
   if (result.violations.length === 0) {
     const notes = [
       `${result.passedRules.length} rule(s) passed`,
+      result.notices.length ? `notices: ${result.notices.map((notice) => notice.ruleId).join(", ")}` : null,
       result.pendingRules.length ? `${result.pendingRules.length} still open` : null,
       result.skippedRules.length ? `skipped: ${result.skippedRules.map((rule) => rule.ruleId).join(", ")}` : null,
     ].filter(Boolean);

@@ -26,15 +26,15 @@ test("a developer tunes their own rules; the default rules stay read-only", asyn
   await expect(page.getByText(/no default rule/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save as new version" })).toBeDisabled();
 
-  await editor.fill("---\nid: DEV-01\nseverity: off\n---\n");
+  await editor.fill("---\nid: DEV-02\nseverity: off\n---\n");
   await expect(page.getByText(/✓ Valid · 0 rules · 1 overrides/)).toBeVisible();
   await page.getByRole("button", { name: "Save as new version" }).click();
   await expect(page.getByText("Active version")).toContainText("1");
 
   await page.getByRole("tab", { name: "Rules that apply to me" }).click();
-  const dev01 = page.getByRole("row", { name: /DEV-01/ });
-  await expect(dev01).toContainText("yours");
-  await expect(dev01).toContainText("off");
+  const dev02 = page.getByRole("row", { name: /DEV-02/ });
+  await expect(dev02).toContainText("yours");
+  await expect(dev02).toContainText("off");
 
   await page.getByRole("tab", { name: "Default rules" }).click();
   await expect(page.getByText("Only SOP owners can change the default rules.", { exact: false })).toBeVisible();
@@ -47,15 +47,15 @@ test("an SOP owner saves a new default version with a note", async ({ page }) =>
   await page.getByRole("tab", { name: "Default rules" }).click();
 
   const editor = page.getByLabel("Default rulebook");
-  await expect(editor).toHaveValue(/id: STR-01/);
+  await expect(editor).toHaveValue(/id: STR-03/);
   const content = await editor.inputValue();
-  await editor.fill(content.replace("title: Title is a short phrase", "title: Title is short"));
+  await editor.fill(content.replace("title: Priority is set", "title: Priority set"));
   await expect(page.getByText(/✓ Valid · \d+ rules/)).toBeVisible();
 
-  await page.getByLabel("Change note").fill("Shorter STR-01 title");
+  await page.getByLabel("Change note").fill("Shorter STR-03 title");
   await page.getByRole("button", { name: "Save as new version" }).click();
   await expect(page.getByText(/Active version/)).toContainText("1");
-  await expect(page.locator("#versions-default option", { hasText: "Shorter STR-01 title" })).toHaveCount(1);
+  await expect(page.locator("#versions-default option", { hasText: "Shorter STR-03 title" })).toHaveCount(1);
 });
 
 test("rules are tried on a real ticket and shown on the work item page", async ({ page, request }) => {

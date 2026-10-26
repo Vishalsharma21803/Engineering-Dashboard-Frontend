@@ -26,7 +26,7 @@ function isTab(value: string | null): value is Tab {
 const PERSONAL_PLACEHOLDER = `Your rules change only your own checks. Examples:
 
 ---
-id: DEV-01
+id: DEV-02
 severity: off
 ---
 

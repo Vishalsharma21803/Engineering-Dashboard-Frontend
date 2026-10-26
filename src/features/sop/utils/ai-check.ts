@@ -45,7 +45,7 @@ export const FIX_TARGET_LABELS: Record<AiFixTarget, string> = {
   tags: "Add tags",
 };
 
-/** AI "fail" verdicts as violations, so badges, filters and counts treat them like code rules. */
+/** AI "fail" verdicts as violations (notice rules: notices), so badges, filters and counts treat them like code rules. */
 export function aiViolations(check: AiCheck | undefined): ComplianceViolation[] {
   return (check?.results ?? [])
     .filter((result) => result.verdict === "fail")
@@ -71,7 +71,16 @@ export function withAiViolations(
   return new Map(
     [...compliance].map(([id, result]) => {
       const extra = aiViolations(checks.get(id));
-      return [id, extra.length ? { ...result, violations: [...result.violations, ...extra] } : result];
+      return [
+        id,
+        extra.length
+          ? {
+              ...result,
+              violations: [...result.violations, ...extra.filter((finding) => finding.severity !== "low")],
+              notices: [...result.notices, ...extra.filter((finding) => finding.severity === "low")],
+            }
+          : result,
+      ];
     })
   );
 }

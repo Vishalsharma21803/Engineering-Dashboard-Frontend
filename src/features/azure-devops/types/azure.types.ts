@@ -361,7 +361,7 @@ export interface ComplianceViolation {
   ruleId: ComplianceRuleId;
   ruleTitle: string;
   checker: "code" | "ai";
-  /** "fail" rules are high, "warn" rules medium. */
+  /** "fail" rules are high, "warn" rules medium, "notice" rules low. */
   severity: Severity;
   message: string;
   evidence: string[];
@@ -386,7 +386,10 @@ export interface ComplianceResult {
   sopProject: "checked" | "not-set-up" | "switched-off";
   /** -1 marks an unsaved draft (rule testing). */
   rulebook: { defaultVersion: number; personalVersion: number };
+  /** SOP gaps: counted in badges, filters and reports. */
   violations: ComplianceViolation[];
+  /** Shown on the ticket only; never counted as gaps. */
+  notices: ComplianceViolation[];
   passedRules: ComplianceRuleRef[];
   pendingRules: Array<ComplianceRuleRef & { message: string }>;
   skippedRules: Array<ComplianceRuleRef & { reason: string }>;

@@ -2,7 +2,7 @@ import type { AiProvider } from "@/features/ai/types/ai.types";
 import type { ComplianceResult, IdentityRef, Page } from "@/features/azure-devops/types/azure.types";
 
 export type RuleChecker = "code" | "ai";
-export type RuleSeverity = "fail" | "warn" | "off";
+export type RuleSeverity = "fail" | "warn" | "notice" | "off";
 
 export interface RulebookContent {
   version: number;
@@ -79,7 +79,8 @@ export type AiFixTarget = "comment" | "description" | "acceptance_criteria" | "t
 export interface AiRuleResult {
   ruleId: string;
   ruleTitle: string;
-  severity: "high" | "medium";
+  /** "low" for notice rules: shown, never counted as a gap. */
+  severity: "high" | "medium" | "low";
   verdict: "pass" | "fail" | "unsure";
   reason: string;
   /** What to do, for the developer; never posted. Missing on checks made before this field existed. */

@@ -165,13 +165,22 @@ describe("AiResults drafts", () => {
 
 describe("withAiViolations", () => {
   it("adds AI failures to the code results as violations", () => {
-    const result = { workItemId: 7, violations: [{ ruleId: "STR-05" }] } as unknown as ComplianceResult;
+    const result = { workItemId: 7, violations: [{ ruleId: "STR-05" }], notices: [] } as unknown as ComplianceResult;
     const merged = withAiViolations(new Map([[7, result]]), new Map([[7, check]]));
 
     expect(merged.get(7)?.violations).toEqual([
       { ruleId: "STR-05" },
       expect.objectContaining({ ruleId: "STR-06", checker: "ai", severity: "high", message: "No benefit is stated.", evidence: ["As a manager I want a summary"] }),
     ]);
+  });
+
+  it("adds AI failures of notice rules as notices, not gaps", () => {
+    const result = { workItemId: 7, violations: [], notices: [] } as unknown as ComplianceResult;
+    const notice = { ...check, results: (check.results ?? []).map((item) => ({ ...item, severity: "low" as const })) };
+    const merged = withAiViolations(new Map([[7, result]]), new Map([[7, notice]]));
+
+    expect(merged.get(7)?.violations).toEqual([]);
+    expect(merged.get(7)?.notices).toEqual([expect.objectContaining({ ruleId: "STR-06", checker: "ai", severity: "low" })]);
   });
 });
 

@@ -18,7 +18,7 @@ function versionLabel(version: number): string {
   return version === -1 ? "draft" : `v${version}`;
 }
 
-/** One ticket's SOP result: gaps first, then what is still open, skipped or left to AI. */
+/** One ticket's SOP result: gaps first, then notices, what is still open, skipped or left to AI. */
 export function SopResultPanel({ result, renderAction, ai }: SopResultPanelProps) {
   if (!result.configured) {
     return (
@@ -63,6 +63,21 @@ export function SopResultPanel({ result, renderAction, ai }: SopResultPanelProps
           ))}
         </ul>
       )}
+
+      {result.notices.length > 0 ? (
+        <div className="text-sm text-slate-700">
+          <p className="font-medium">Notices (not counted as gaps)</p>
+          <ul className="mt-1 space-y-1 text-slate-600">
+            {result.notices.map((notice) => (
+              <li key={`${notice.checker}:${notice.ruleId}`}>
+                <StatusBadge tone={SEVERITY_TONES[notice.severity]}>{notice.ruleId}</StatusBadge>{" "}
+                <span className="font-medium text-slate-800">{notice.ruleTitle}</span>: {notice.message}
+                {notice.evidence.length > 0 ? <span className="text-xs text-slate-500"> ({notice.evidence.join("; ")})</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {result.pendingRules.length > 0 ? (
         <div className="text-sm text-slate-700">
