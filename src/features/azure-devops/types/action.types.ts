@@ -4,9 +4,15 @@ export type ActionKind =
   | "WORK_ITEM_TRANSITION_STATE"
   | "WORK_ITEM_LINK_PR"
   | "WORK_ITEM_CLOSE_AFTER_MERGE"
+  | "WORK_ITEM_EDIT_TEXT"
+  | "WORK_ITEM_SET_CATEGORY"
+  | "WORK_ITEM_ADD_TAGS"
   | "PIPELINE_QUEUE_RUN"
   | "BUILD_RETRY_STAGE"
   | "BUILD_CANCEL";
+
+/** AI_SUGGESTION = a fix drafted by the user's AI SOP check. */
+export type ActionSource = "RECOMMENDATION" | "USER" | "AI_SUGGESTION";
 
 export type ActionStatus =
   | "PENDING"
@@ -34,7 +40,7 @@ export interface ProposedAction {
   organizationUrl: string;
   projectId: string;
   kind: ActionKind;
-  source: "RECOMMENDATION" | "USER";
+  source: ActionSource;
   target: Record<string, string | number>;
   params: Record<string, unknown>;
   preview: PreviewChange[];
@@ -55,7 +61,7 @@ export interface ProposedAction {
 export interface ProposeActionInput {
   credentialId: string;
   kind: ActionKind;
-  source?: "RECOMMENDATION" | "USER";
+  source?: ActionSource;
   target: Record<string, string | number>;
   params: Record<string, unknown>;
 }

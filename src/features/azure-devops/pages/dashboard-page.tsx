@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
+import { withAiViolations } from "@/features/sop/utils/ai-check";
 import { cn } from "@/utils/cn";
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
@@ -47,13 +49,17 @@ export function DashboardPage() {
   const review = useActionReview();
   const triage = useDashboardTriage(credentialId, dashboard);
 
-  const compliance = useMemo(
+  const codeCompliance = useMemo(
     () =>
       new Map<number, ComplianceResult>(
         (dashboard?.sections.compliance.data ?? []).map((result) => [result.workItemId, result])
       ),
     [dashboard]
   );
+  // AI checks run for the open tickets on My work; each load or refresh re-checks only changed tickets.
+  const openIds = useMemo(() => (dashboard?.sections.workItems.data ?? []).map((item) => item.id), [dashboard]);
+  const ai = useSopAiChecks(credentialId, openIds, dashboard?.generatedAt ?? null);
+  const compliance = useMemo(() => withAiViolations(codeCompliance, ai.checks), [codeCompliance, ai.checks]);
 
   const workItemKinds = useMemo(() => {
     const kinds = new Map<number, { type: string; priority: number | null }>();
@@ -81,7 +87,7 @@ export function DashboardPage() {
     (item) => !hidden(workItemKey(item.id), item.projectName)
   );
   const hiddenWorkItems = (dashboard.sections.workItems.data?.length ?? 0) - openWorkItems.length;
-  const violations = (dashboard.sections.compliance.data ?? [])
+  const violations = [...compliance.values()]
     .filter((result) => !hidden(workItemKey(result.workItemId), result.projectName))
     .reduce((total, result) => total + result.violations.length, 0);
   const activePullRequests = (dashboard.sections.pullRequests.data ?? []).filter(
@@ -208,7 +214,7 @@ export function DashboardPage() {
       <SectionCard title="My work items" description="Assigned to you, with SOP compliance indicators.">
         <SectionView section={dashboard.sections.workItems} label="work items">
           {(workItems) => (
-            <WorkItemTable credentialId={credentialId} workItems={workItems} compliance={compliance} triage={triage} />
+            <WorkItemTable credentialId={credentialId} workItems={workItems} compliance={compliance} aiChecks={ai.checks} triage={triage} />
           )}
         </SectionView>
       </SectionCard>

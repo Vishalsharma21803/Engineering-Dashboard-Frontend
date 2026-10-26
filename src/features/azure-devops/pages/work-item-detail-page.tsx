@@ -17,7 +17,10 @@ import { useActionReview } from "../hooks/use-action-review";
 import { useWorkItem } from "../hooks/use-work-item";
 import type { ActionKind } from "../types/action.types";
 import { formatDateTime, formatRelative, formatValue } from "../utils/format";
-import { RULE_LABELS, SEVERITY_TONES, actionKindLabel } from "../utils/labels";
+import { SopResultPanel } from "@/features/sop/components/sop-result-panel";
+import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
+import { fixToAction } from "@/features/sop/utils/ai-check";
+import { actionKindLabel } from "../utils/labels";
 
 function Field({ label, value }: { label: string; value: string | number | null }) {
   return (
@@ -33,6 +36,8 @@ export function WorkItemDetailPage() {
   const id = Number(workItemId);
   const { data: workItem, isLoading, error, refetch } = useWorkItem(credentialId, projectId, id);
   const review = useActionReview();
+  // Viewing a ticket checks it with AI if it changed since its last check.
+  const ai = useSopAiChecks(credentialId, workItem ? [workItem.id] : [], workItem ? `${workItem.id}:${workItem.rev}` : null);
 
   if (isLoading) return <SkeletonRows rows={5} />;
   if (error || !workItem) {
@@ -85,18 +90,27 @@ export function WorkItemDetailPage() {
         <Field label="Iteration" value={workItem.iterationPath} />
       </dl>
 
-      <SectionCard title="SOP compliance" description="Checked against the team's default SOP rules.">
-        {workItem.compliance.violations.length === 0 ? (
-          <p className="text-sm text-emerald-700">No SOP gaps found.</p>
-        ) : (
-          <ul className="space-y-2">
-            {workItem.compliance.violations.map((violation) => (
-              <li key={violation.ruleId} className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-2">
-                  <StatusBadge tone={SEVERITY_TONES[violation.severity]}>{RULE_LABELS[violation.ruleId]}</StatusBadge>
-                  <span className="text-sm text-slate-700">{violation.message}</span>
-                </div>
-                {violation.suggestedAction && !violation.suggestedAction.requiresInput ? (
+      <SectionCard title="SOP compliance" description="Checked against your SOP rules (the default rules plus your own changes).">
+        <SopResultPanel
+          result={workItem.compliance}
+          ai={{
+            configured: ai.configured,
+            check: ai.checks.get(workItem.id),
+            onRecheck: () => ai.recheck([workItem.id]),
+            isRechecking: ai.isRechecking,
+            currentProvider: ai.currentProvider,
+            enqueueError: ai.enqueueError,
+            isProposing: review.isProposing,
+            onUseFix: (_result, fix) =>
+              review.propose({
+                credentialId,
+                source: "AI_SUGGESTION",
+                target: { projectId: workItem.projectName, workItemId: workItem.id },
+                ...fixToAction(fix),
+              }),
+          }}
+          renderAction={(violation) =>
+                violation.suggestedAction && !violation.suggestedAction.requiresInput ? (
                   <Button
                     size="sm"
                     disabled={review.isProposing}
@@ -116,16 +130,9 @@ export function WorkItemDetailPage() {
                   <a href="#propose-change" className={buttonClassName({ size: "sm", variant: "secondary" })}>
                     {actionKindLabel(violation.suggestedAction.kind)} ↓
                   </a>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        {workItem.compliance.skippedRules.length > 0 ? (
-          <p className="mt-2 text-xs text-slate-500">
-            Not checked (data unavailable): {workItem.compliance.skippedRules.map((rule) => RULE_LABELS[rule]).join(", ")}
-          </p>
-        ) : null}
+                ) : null
+          }
+        />
       </SectionCard>
 
       <div id="propose-change" className="scroll-mt-24">

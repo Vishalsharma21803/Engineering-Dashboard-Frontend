@@ -1,6 +1,5 @@
 import type { ActionKind, ActionStatus } from "../types/action.types";
 import type {
-  ComplianceRuleId,
   PullRequestReviewer,
   RecommendationCategory,
   Severity,
@@ -14,6 +13,9 @@ export const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   WORK_ITEM_TRANSITION_STATE: "Change state",
   WORK_ITEM_LINK_PR: "Link pull request",
   WORK_ITEM_CLOSE_AFTER_MERGE: "Close after merge",
+  WORK_ITEM_EDIT_TEXT: "Replace text",
+  WORK_ITEM_SET_CATEGORY: "Set category",
+  WORK_ITEM_ADD_TAGS: "Add tags",
   PIPELINE_QUEUE_RUN: "Queue pipeline run",
   BUILD_RETRY_STAGE: "Retry failed stage",
   BUILD_CANCEL: "Cancel run",
@@ -31,17 +33,6 @@ export const ACTION_STATUS_TONES: Record<ActionStatus, Tone> = {
   FAILED: "danger",
   REJECTED: "neutral",
   EXPIRED: "neutral",
-};
-
-export const RULE_LABELS: Record<ComplianceRuleId, string> = {
-  MISSING_APPROACH: "No approach",
-  MISSING_COMMENT: "No recent comment",
-  MISSING_ESTIMATE: "No estimate",
-  MISSING_WORK_LOG: "Work log stale",
-  MISSING_PR_LINK: "No PR linked",
-  NOT_CLOSED_AFTER_MERGE: "Close after merge",
-  CLOSED_WITH_OPEN_PR: "Closed with open PR",
-  REMAINING_NOT_ZERO_ON_CLOSE: "Remaining work left",
 };
 
 export const SEVERITY_TONES: Record<Severity, Tone> = {

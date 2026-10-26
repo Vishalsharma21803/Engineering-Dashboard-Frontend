@@ -45,6 +45,9 @@ export function RootLayout() {
                 <NavLink to="/azure" className={navLinkClassName}>
                   Azure DevOps
                 </NavLink>
+                <NavLink to="/sop-rules" className={navLinkClassName}>
+                  SOP rules
+                </NavLink>
                 <NavLink
                   to="/credentials"
                   className={navLinkClassName}
@@ -91,6 +94,9 @@ export function RootLayout() {
             </NavLink>
             <NavLink to="/azure" className={navLinkClassName}>
               Azure DevOps
+            </NavLink>
+            <NavLink to="/sop-rules" className={navLinkClassName}>
+              SOP rules
             </NavLink>
             <NavLink to="/credentials" className={navLinkClassName}>
               Credentials

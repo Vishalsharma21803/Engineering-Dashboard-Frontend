@@ -5,7 +5,10 @@ import { cn } from "@/utils/cn";
 import type { DashboardTriage } from "../hooks/use-triage";
 import type { ComplianceResult, WorkItemSummary } from "../types/azure.types";
 import { formatValue } from "../utils/format";
-import { RULE_LABELS, SEVERITY_TONES } from "../utils/labels";
+import { isAiCheckBusy, isAiCheckPaused } from "@/features/sop/hooks/use-sop-ai";
+import type { AiCheck } from "@/features/sop/types/sop.types";
+import { describeAiCheckReason, describeAiPause } from "@/features/sop/utils/ai-check";
+import { SEVERITY_TONES } from "../utils/labels";
 import { UNTRIAGED, isHidden, workItemKey } from "../utils/triage";
 import {
   EMPTY_WORK_ITEM_FILTERS,
@@ -33,6 +36,8 @@ interface WorkItemTableProps {
    */
   mode?: "mine" | "team";
   compliance?: Map<number, ComplianceResult>;
+  /** AI check status per ticket (My work only). */
+  aiChecks?: Map<number, AiCheck>;
   /** Signed-in Azure DevOps identity, used by the team "Mine" filter. */
   myId?: string | null;
   /** Dashboard snooze / acknowledge / abandon state; omitted for team lists. */
@@ -48,26 +53,77 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-export function ComplianceBadges({ result }: { result: ComplianceResult | undefined }) {
+function AiStatusBadge({ check }: { check: AiCheck | undefined }) {
+  if (check && isAiCheckPaused(check)) {
+    return (
+      <StatusBadge tone="warning" title={`${describeAiPause(check)}${check.errorDetail ? ` Provider said: ${check.errorDetail}` : ""}`}>
+        AI paused
+      </StatusBadge>
+    );
+  }
+
+  if (isAiCheckBusy(check)) {
+    return (
+      <StatusBadge tone="info" title="AI check running">
+        AI…
+      </StatusBadge>
+    );
+  }
+
+  if (check?.status === "FAILED" || check?.status === "SKIPPED") {
+    return (
+      <StatusBadge tone="neutral" title={`AI check: ${describeAiCheckReason(check.errorReason)}`}>
+        AI ✕
+      </StatusBadge>
+    );
+  }
+
+  return null;
+}
+
+export function ComplianceBadges({ result, ai }: { result: ComplianceResult | undefined; ai?: AiCheck | undefined }) {
   if (!result) {
     return <span className="text-xs text-slate-400">—</span>;
   }
 
-  if (result.violations.length === 0) {
+  if (!result.configured) {
     return (
-      <StatusBadge tone="success" title={result.skippedRules.length ? `Skipped: ${result.skippedRules.join(", ")}` : undefined}>
-        SOP OK
+      <StatusBadge tone="neutral" title={`${result.projectName} is not in the SOP rulebook, so it is not checked.`}>
+        Not set up
       </StatusBadge>
+    );
+  }
+
+  if (result.violations.length === 0) {
+    const notes = [
+      `${result.passedRules.length} rule(s) passed`,
+      result.pendingRules.length ? `${result.pendingRules.length} still open` : null,
+      result.skippedRules.length ? `skipped: ${result.skippedRules.map((rule) => rule.ruleId).join(", ")}` : null,
+    ].filter(Boolean);
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        <StatusBadge tone="success" title={notes.join("; ")}>
+          SOP OK
+        </StatusBadge>
+        <AiStatusBadge check={ai} />
+      </div>
     );
   }
 
   return (
     <div className="flex flex-wrap gap-1">
       {result.violations.map((violation) => (
-        <StatusBadge key={violation.ruleId} tone={SEVERITY_TONES[violation.severity]} title={violation.message}>
-          {RULE_LABELS[violation.ruleId]}
+        <StatusBadge
+          key={`${violation.checker}:${violation.ruleId}`}
+          tone={SEVERITY_TONES[violation.severity]}
+          title={`${violation.checker === "ai" ? "AI: " : ""}${violation.ruleTitle}: ${violation.message}`}
+        >
+          {violation.ruleId}
+          {violation.checker === "ai" ? " · AI" : ""}
         </StatusBadge>
       ))}
+      <AiStatusBadge check={ai} />
     </div>
   );
 }
@@ -77,6 +133,7 @@ export function WorkItemTable({
   workItems,
   mode = "mine",
   compliance = new Map(),
+  aiChecks,
   myId = null,
   triage,
 }: WorkItemTableProps) {
@@ -207,7 +264,7 @@ export function WorkItemTable({
                         <span className="text-xs italic text-slate-400">Unassigned</span>
                       )
                     ) : (
-                      <ComplianceBadges result={compliance.get(item.id)} />
+                      <ComplianceBadges result={compliance.get(item.id)} ai={aiChecks?.get(item.id)} />
                     )}
                   </td>
                   {triage ? (

@@ -27,6 +27,7 @@ export default defineConfig({
       env: {
         E2E_PORT: String(BACKEND_PORT),
         E2E_FRONTEND_ORIGIN: `http://localhost:${FRONTEND_PORT}`,
+        SOP_ADMIN_EMAILS: "owner@example.com",
       },
     },
     {

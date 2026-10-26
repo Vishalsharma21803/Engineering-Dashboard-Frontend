@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
+import { SopReportCard } from "@/features/sop/components/sop-report-card";
 import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
@@ -156,6 +157,8 @@ export function ProjectOverviewPage() {
       </div>
 
       <ProjectWorkItems credentialId={credentialId} projectId={project.id} />
+
+      <SopReportCard credentialId={credentialId} projectId={project.id} />
 
       <ProjectPullRequests credentialId={credentialId} projectId={project.id} />
 

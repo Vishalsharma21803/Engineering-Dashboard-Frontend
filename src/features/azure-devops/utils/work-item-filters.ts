@@ -1,6 +1,5 @@
 import type { ComplianceResult, StateCategory, WorkItemSummary } from "../types/azure.types";
 import type { FilterOption } from "../components/filter-bar";
-import { RULE_LABELS } from "./labels";
 
 export interface WorkItemFilters {
   search: string;
@@ -56,9 +55,10 @@ export function matchesWorkItem(
   if (filters.priority && String(item.priority ?? "none") !== filters.priority) return false;
 
   if (filters.sop) {
-    const violations = compliance.get(item.id)?.violations ?? [];
+    const result = compliance.get(item.id);
+    const violations = result?.violations ?? [];
     if (filters.sop === "gaps" && violations.length === 0) return false;
-    if (filters.sop === "ok" && violations.length > 0) return false;
+    if (filters.sop === "ok" && (violations.length > 0 || !result?.configured)) return false;
     if (filters.sop !== "gaps" && filters.sop !== "ok" && !violations.some((violation) => violation.ruleId === filters.sop)) {
       return false;
     }
@@ -95,19 +95,20 @@ export function workItemFilterOptions(
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([value, count]) => ({ value, label: value === "none" ? "None" : `P${value}`, count }));
 
-  const ruleCounts = countBy(
-    items.flatMap((item) => compliance.get(item.id)?.violations ?? []),
-    (violation) => violation.ruleId
-  );
+  const violations = items.flatMap((item) => compliance.get(item.id)?.violations ?? []);
+  const ruleTitles = new Map(violations.map((violation) => [violation.ruleId, violation.ruleTitle]));
+  const ruleCounts = countBy(violations, (violation) => violation.ruleId);
   const withGaps = items.filter((item) => (compliance.get(item.id)?.violations.length ?? 0) > 0).length;
+  const compliant = items.filter((item) => {
+    const result = compliance.get(item.id);
+    return result?.configured && result.violations.length === 0;
+  }).length;
   const sop: FilterOption[] = [
     { value: "gaps", label: "Any gap", count: withGaps },
-    { value: "ok", label: "Compliant", count: items.length - withGaps },
-    ...[...ruleCounts].map(([value, count]) => ({
-      value,
-      label: RULE_LABELS[value as keyof typeof RULE_LABELS] ?? value,
-      count,
-    })),
+    { value: "ok", label: "Compliant", count: compliant },
+    ...[...ruleCounts]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([value, count]) => ({ value, label: `${value} · ${ruleTitles.get(value) ?? ""}`, count })),
   ];
 
   const people = new Map<string, { name: string; count: number }>();

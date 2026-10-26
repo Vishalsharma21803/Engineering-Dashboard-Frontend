@@ -14,6 +14,7 @@ import { ProjectOverviewPage } from "@/features/azure-devops/pages/project-overv
 import { ProjectsPage } from "@/features/azure-devops/pages/projects-page";
 import { PullRequestDetailPage } from "@/features/azure-devops/pages/pull-request-detail-page";
 import { WorkItemDetailPage } from "@/features/azure-devops/pages/work-item-detail-page";
+import { SopRulesPage } from "@/features/sop/pages/sop-rules-page";
 import { CreateCredentialPage } from "@/features/credentials/pages/create-credential-page";
 import { CredentialsPage } from "@/features/credentials/pages/credentials-page";
 import { EditCredentialPage } from "@/features/credentials/pages/edit-credential-page";
@@ -64,6 +65,10 @@ export const router = createBrowserRouter([
           {
             path: "azure",
             element: <AzureEntryPage />,
+          },
+          {
+            path: "sop-rules",
+            element: <SopRulesPage />,
           },
           {
             path: "azure/:credentialId",

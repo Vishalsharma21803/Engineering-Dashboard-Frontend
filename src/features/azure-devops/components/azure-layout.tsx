@@ -64,8 +64,15 @@ export function AzureLayout() {
     const listTab = onMyWork || onApprovals;
 
     if (listTab && urlProject === null && savedIsValid && savedProject) {
-      // Re-apply the remembered project when a tab is opened without one.
-      navigate(withProject(location.pathname, savedProject), { replace: true });
+      // Re-apply the remembered project when a tab is opened without one, unless the
+      // user picked a project (or "All") since this render: their choice wins.
+      const chosenMeanwhile =
+        new URLSearchParams(window.location.search).has("project") ||
+        getSelectedProject(credentialId) !== savedProject;
+
+      if (!chosenMeanwhile) {
+        navigate(withProject(location.pathname, savedProject), { replace: true });
+      }
       return;
     }
 
@@ -73,6 +80,7 @@ export function AzureLayout() {
       saveSelectedProject(credentialId, urlProject);
     }
   }, [credentialId, urlProject, savedProject, savedIsValid, onMyWork, onApprovals, onOverview, location.pathname, navigate]);
+
   const credential = credentials.data?.find((candidate) => candidate.id === credentialId);
   const project = projects.data?.projects.find(
     (candidate) => candidate.id === selectedProject || candidate.name === selectedProject

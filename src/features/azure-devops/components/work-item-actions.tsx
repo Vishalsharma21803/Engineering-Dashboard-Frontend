@@ -82,13 +82,14 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
 
   const transitions = workItem.allowedStates.filter((candidate) => candidate.name !== workItem.state);
   const canCloseAfterMerge =
+    workItem.closeAfterMergeAllowed &&
     workItem.links.pullRequests.length > 0 &&
     workItem.stateCategory !== "Completed" &&
     workItem.stateCategory !== "Removed";
 
   return (
     <div className="grid gap-3 lg:grid-cols-2">
-      <ActionBlock title="Add comment" hint='Progress update or approach. Start with "Approach:" to document the approach.'>
+      <ActionBlock title="Add comment" hint="Progress update, or the reason for a state, estimate or due date change.">
         <form onSubmit={submitComment} className="space-y-2">
           <Label htmlFor="action-comment" className="sr-only">
             Comment

@@ -37,7 +37,7 @@ describe("DashboardPage", () => {
     expect(await screen.findByText("#103 Crash on save")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "#102 Fix flaky test" })).toBeInTheDocument();
     expect(within(screen.getByRole("table")).getByTitle("Task")).toHaveTextContent("Task");
-    expect(screen.getByText("No estimate")).toBeInTheDocument();
+    expect(screen.getByTitle("Estimate exists: No original estimate (hours).")).toHaveTextContent("STR-05");
     expect(screen.getByText(/does not grant access to pipelines/)).toBeInTheDocument();
     expect(await screen.findByText("Build (Read): missing")).toBeInTheDocument();
 

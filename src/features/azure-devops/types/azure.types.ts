@@ -158,6 +158,8 @@ export interface WorkItemDetail extends WorkItemSummary {
   allowedStates: Array<{ name: string; category: StateCategory }>;
   supportedFields: SupportedWorkFields;
   compliance: ComplianceResult;
+  /** False when the project's SOP has a Testing stage after merge. */
+  closeAfterMergeAllowed: boolean;
 }
 
 export interface SupportedWorkFields {
@@ -342,15 +344,8 @@ export interface CommitSummary {
   webUrl: string | null;
 }
 
-export type ComplianceRuleId =
-  | "MISSING_APPROACH"
-  | "MISSING_COMMENT"
-  | "MISSING_ESTIMATE"
-  | "MISSING_WORK_LOG"
-  | "MISSING_PR_LINK"
-  | "NOT_CLOSED_AFTER_MERGE"
-  | "CLOSED_WITH_OPEN_PR"
-  | "REMAINING_NOT_ZERO_ON_CLOSE";
+/** A rule card id from the SOP rulebook, e.g. "STR-05". */
+export type ComplianceRuleId = string;
 
 export type Severity = "high" | "medium" | "low";
 
@@ -364,9 +359,18 @@ export interface SuggestedAction {
 
 export interface ComplianceViolation {
   ruleId: ComplianceRuleId;
+  ruleTitle: string;
+  checker: "code" | "ai";
+  /** "fail" rules are high, "warn" rules medium. */
   severity: Severity;
   message: string;
+  evidence: string[];
   suggestedAction: SuggestedAction | null;
+}
+
+export interface ComplianceRuleRef {
+  ruleId: ComplianceRuleId;
+  ruleTitle: string;
 }
 
 export interface ComplianceResult {
@@ -376,8 +380,15 @@ export interface ComplianceResult {
   type: string;
   state: string;
   stateCategory: StateCategory;
+  /** False when the SOP rulebook has no facts for this project. */
+  configured: boolean;
+  /** -1 marks an unsaved draft (rule testing). */
+  rulebook: { defaultVersion: number; personalVersion: number };
   violations: ComplianceViolation[];
-  skippedRules: ComplianceRuleId[];
+  passedRules: ComplianceRuleRef[];
+  pendingRules: Array<ComplianceRuleRef & { message: string }>;
+  skippedRules: Array<ComplianceRuleRef & { reason: string }>;
+  aiRules: ComplianceRuleRef[];
 }
 
 export type RecommendationCategory =

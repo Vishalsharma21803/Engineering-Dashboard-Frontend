@@ -3,6 +3,8 @@ export interface User {
   name: string;
   email: string;
   createdAt?: string;
+  /** Set by the server (SOP_ADMIN_EMAILS); controls owner-only settings. */
+  isSopAdmin?: boolean;
 }
 
 export interface AuthResponse {

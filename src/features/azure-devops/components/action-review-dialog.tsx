@@ -137,7 +137,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
               {current.preview.map((change) => (
                 <tr key={change.field}>
                   <td className="px-3 py-2 font-medium text-slate-700">{change.field}</td>
-                  <td className="px-3 py-2 text-slate-500">{formatValue(change.before)}</td>
+                  <td className="whitespace-pre-wrap px-3 py-2 text-slate-500">{formatValue(change.before)}</td>
                   <td className="whitespace-pre-wrap px-3 py-2 font-medium text-slate-950">
                     {formatValue(change.after)}
                   </td>

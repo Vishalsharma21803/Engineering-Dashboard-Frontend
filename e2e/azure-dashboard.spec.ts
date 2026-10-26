@@ -43,6 +43,7 @@ async function signUpWithCredential(page: Page) {
 
 test.beforeEach(async ({ request }) => {
   await request.post(`${BACKEND}/__e2e/reset`);
+  await request.post(`${BACKEND}/__e2e/rulebook`);
 });
 
 test("discovers projects, prioritizes work and never writes without approval", async ({ page, request }) => {
@@ -59,14 +60,16 @@ test("discovers projects, prioritizes work and never writes without approval", a
   await expect(page.getByRole("link", { name: "alpha-ci #2026.501 failed" })).toBeVisible();
   await expect(page.locator("ol").getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
   await expect(page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
-  await expect(page.getByRole("table").getByText("No estimate")).toBeVisible();
+  // SOP rulebook rule T-01 (estimate) fails for #102, #103 and #106.
+  await expect(page.getByRole("table").getByText("T-01")).toHaveCount(3);
   await expect(page.getByRole("link", { name: "!1 Login flow", exact: true })).toBeVisible();
   await expect(page.getByText("2 unresolved", { exact: true })).toBeVisible();
 
   expect(await azureWrites(request)).toEqual([]);
 
-  // Propose → reject: nothing reaches Azure
-  await page.getByRole("button", { name: "Close after merge…" }).click();
+  // Propose → reject: nothing reaches Azure. Alpha's SOP has no Testing stage, so closing after merge is offered.
+  await page.getByRole("table").getByRole("link", { name: "#103 Crash on save" }).click();
+  await page.getByRole("button", { name: "Review closing…" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Close #103 Crash on save (all linked PRs merged)")).toBeVisible();
   await expect(dialog.getByRole("cell", { name: "Resolved" })).toBeVisible();
@@ -79,7 +82,7 @@ test("discovers projects, prioritizes work and never writes without approval", a
   expect((await fakeWorkItem(request, 103)).workItem?.fields["System.State"]).toBe("Resolved");
 
   // Propose → approve: exactly one write, verified in Azure
-  await page.getByRole("button", { name: "Close after merge…" }).click();
+  await page.getByRole("button", { name: "Review closing…" }).click();
   await dialog.getByRole("button", { name: "Approve & execute" }).click();
   await expect(dialog.getByText("Executed in Azure DevOps.")).toBeVisible();
   await expect(dialog.getByText("✓ Verified: System.State")).toBeVisible();
@@ -107,7 +110,7 @@ test("updates a work item through the approval flow", async ({ page, request }) 
   await page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" }).click();
 
   await expect(page.getByRole("heading", { name: "#102 Fix flaky test" })).toBeVisible();
-  await expect(page.getByText("No approach comment")).toBeVisible();
+  await expect(page.getByText("No original estimate (hours).")).toBeVisible();
 
   await page.getByLabel("Comment").fill("Approach: quarantine the flaky test, then fix the race");
   await page.getByRole("button", { name: "Review comment…" }).click();
@@ -123,9 +126,8 @@ test("updates a work item through the approval flow", async ({ page, request }) 
   const { comments } = await fakeWorkItem(request, 102);
   expect(comments.at(-1)?.text).toBe("Approach: quarantine the flaky test, then fix the race");
 
-  // The refreshed detail page reflects the new comment and clears the approach gap.
+  // The refreshed detail page reflects the new comment.
   await expect(page.getByText("Approach: quarantine the flaky test, then fix the race").first()).toBeVisible();
-  await expect(page.getByText("No approach comment")).toHaveCount(0);
 });
 
 test("shows pipeline failures and only proposes pipeline actions", async ({ page, request }) => {
@@ -230,9 +232,10 @@ test("keeps the selected project across tabs and filters lists", async ({ page }
   await expect(table.getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
   await expect(table.getByRole("link", { name: "#102 Fix flaky test" })).toHaveCount(0);
   await page.getByRole("button", { name: "Clear filters" }).first().click();
-  await page.getByLabel("SOP").selectOption({ label: "SOP: No estimate (1)" });
+  await page.getByLabel("SOP").selectOption({ label: "SOP: T-01 · Estimate exists (3)" });
   await expect(table.getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
-  await expect(table.getByRole("row")).toHaveCount(2);
+  await expect(table.getByRole("link", { name: "#101 Implement login" })).toHaveCount(0);
+  await expect(table.getByRole("row")).toHaveCount(4);
 
   await page.getByRole("group", { name: "Filter by category" }).getByRole("button", { name: /Failed pipeline/ }).click();
   await expect(page.getByRole("link", { name: "alpha-ci #2026.501 failed" })).toBeVisible();

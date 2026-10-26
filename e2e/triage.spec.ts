@@ -35,6 +35,8 @@ const tile = (page: Page, label: string) => page.getByText(label, { exact: true 
 
 test.beforeEach(async ({ request }) => {
   await request.post(`${BACKEND}/__e2e/reset`);
+  // SOP rules for Alpha, so #103 shows up as an SOP gap to triage.
+  await request.post(`${BACKEND}/__e2e/rulebook`);
 });
 
 test("snoozes, acknowledges and abandons dashboard items without touching Azure DevOps", async ({ page, request }) => {
