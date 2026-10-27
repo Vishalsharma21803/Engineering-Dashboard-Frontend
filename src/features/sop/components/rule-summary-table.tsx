@@ -1,5 +1,6 @@
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { CardSummary, RuleSeverity } from "../types/sop.types";
+import { SEVERITY_LABELS, checkerLabel, itemTypeLabel } from "../utils/rule-labels";
 
 const SEVERITY_TONE: Record<RuleSeverity, "danger" | "warning" | "info" | "neutral"> = {
   fail: "danger",
@@ -20,14 +21,18 @@ const WHEN_LABELS: Record<string, string> = {
   always: "Always",
 };
 
+function checkedBy(card: CardSummary): string {
+  return card.checker === "ai" ? "AI" : card.uses ? `Code · ${checkerLabel(card.uses)}` : "Code";
+}
+
 export function RuleSummaryTable({ cards }: { cards: CardSummary[] }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
-      <table className="w-full min-w-[720px] text-left text-sm">
+      <table className="w-full min-w-[520px] text-left text-sm sm:min-w-[720px]">
         <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <th className="px-3 py-2 font-medium">Rule</th>
-            <th className="px-3 py-2 font-medium">Checked by</th>
+            <th className="hidden px-3 py-2 font-medium sm:table-cell">Checked by</th>
             <th className="px-3 py-2 font-medium">Applies to</th>
             <th className="px-3 py-2 font-medium">When</th>
             <th className="px-3 py-2 font-medium">Severity</th>
@@ -42,12 +47,16 @@ export function RuleSummaryTable({ cards }: { cards: CardSummary[] }) {
                 {card.origin === "personal" ? (
                   <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700">yours</span>
                 ) : null}
+                {/* On phones the "Checked by" column is folded under the title. */}
+                <span className="mt-0.5 block text-xs text-slate-500 sm:hidden">{checkedBy(card)}</span>
               </td>
-              <td className="px-3 py-2 text-slate-700">{card.checker === "ai" ? "AI" : `Code · ${card.uses}`}</td>
-              <td className="px-3 py-2 text-slate-700">{card.appliesTo.length === 6 ? "All types" : card.appliesTo.join(", ")}</td>
+              <td className="hidden px-3 py-2 text-slate-700 sm:table-cell">{checkedBy(card)}</td>
+              <td className="px-3 py-2 text-slate-700">
+                {card.appliesTo.length === 6 ? "All types" : card.appliesTo.map(itemTypeLabel).join(", ")}
+              </td>
               <td className="px-3 py-2 text-slate-700">{WHEN_LABELS[card.when] ?? card.when}</td>
               <td className="px-3 py-2">
-                <StatusBadge tone={SEVERITY_TONE[card.severity]}>{card.severity}</StatusBadge>
+                <StatusBadge tone={SEVERITY_TONE[card.severity]}>{SEVERITY_LABELS[card.severity]}</StatusBadge>
               </td>
             </tr>
           ))}

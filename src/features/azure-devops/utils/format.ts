@@ -55,3 +55,11 @@ export function formatValue(value: string | number | null | undefined): string {
 export function stripRef(ref: string | null | undefined): string {
   return ref ? ref.replace(/^refs\/heads\//, "") : "—";
 }
+
+/** Turns "2 day(s) ago" into "2 days ago" and "1 thread(s)" into "1 thread", using the nearest number before each word. */
+export function pluralizeText(text: string): string {
+  return text.replace(/([A-Za-z]+)\(s\)/g, (_match, word: string, offset: number) => {
+    const count = text.slice(0, offset).match(/(\d+(?:\.\d+)?)\D*$/)?.[1];
+    return count !== undefined && Number(count) === 1 ? word : `${word}s`;
+  });
+}

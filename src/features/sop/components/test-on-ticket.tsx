@@ -13,7 +13,7 @@ import { testRulesOnTicket } from "../api/sop.api";
 import type { RulebookScope } from "../types/sop.types";
 import { SopResultPanel } from "./sop-result-panel";
 
-const SELECT_CLASS = "h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm";
+const SELECT_CLASS = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm";
 
 /** Tries the rules in the editor (or the saved ones) on one real ticket. Reads only. */
 export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookScope; content: string; allowDraft: boolean }) {
@@ -52,57 +52,61 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
         <h2 className="text-sm font-semibold text-slate-900">Test on a ticket</h2>
         <p className="text-xs text-slate-500">Runs the code rules on one ticket. It only reads from Azure DevOps and saves nothing.</p>
       </div>
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-        {azure.length > 1 ? (
-          <label className="flex flex-col gap-1 text-xs text-slate-600">
-            Organization
-            <select
-              className={SELECT_CLASS}
-              value={credentialId}
-              onChange={(event) => {
-                setChosenCredential(event.target.value);
-                setChosenProject(null);
-              }}
-            >
-              {azure.map((credential) => (
-                <option key={credential.id} value={credential.id}>
-                  {getCredentialDisplayName(credential)}
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-end gap-2">
+          {azure.length > 1 ? (
+            <label className="flex w-full flex-col gap-1 text-xs text-slate-600 sm:w-56">
+              Organization
+              <select
+                className={SELECT_CLASS}
+                value={credentialId}
+                onChange={(event) => {
+                  setChosenCredential(event.target.value);
+                  setChosenProject(null);
+                }}
+              >
+                {azure.map((credential) => (
+                  <option key={credential.id} value={credential.id}>
+                    {getCredentialDisplayName(credential)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-slate-600 sm:w-56 sm:flex-none">
+            Project
+            <select className={SELECT_CLASS} value={projectId} onChange={(event) => setChosenProject(event.target.value)}>
+              {(projects.data?.projects ?? []).map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
                 </option>
               ))}
             </select>
           </label>
-        ) : null}
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          Project
-          <select className={SELECT_CLASS} value={projectId} onChange={(event) => setChosenProject(event.target.value)}>
-            {(projects.data?.projects ?? []).map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-slate-600">
-          Ticket #
-          <Input
-            className="h-9 w-28"
-            type="number"
-            min={1}
-            value={ticket}
-            onChange={(event) => setTicket(event.target.value)}
-            aria-label="Ticket number"
-          />
-        </label>
+          <label className="flex w-28 flex-col gap-1 text-xs text-slate-600">
+            Ticket #
+            <Input
+              className="h-9 w-28"
+              type="number"
+              min={1}
+              value={ticket}
+              onChange={(event) => setTicket(event.target.value)}
+              aria-label="Ticket number"
+            />
+          </label>
+        </div>
         {allowDraft ? (
-          <label className="flex h-9 items-center gap-2 text-xs text-slate-600">
-            <input type="checkbox" checked={useDraft} onChange={(event) => setUseDraft(event.target.checked)} />
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" className="size-4 shrink-0" checked={useDraft} onChange={(event) => setUseDraft(event.target.checked)} />
             Use the rules in the editor (unsaved)
           </label>
         ) : null}
-        <Button type="submit" size="sm" className="h-9" disabled={!projectId || !(Number(ticket) > 0) || run.isPending}>
-          {run.isPending ? <Spinner className="size-4" /> : null}
-          Run rules
-        </Button>
+        <div>
+          <Button type="submit" size="sm" disabled={!projectId || !(Number(ticket) > 0) || run.isPending}>
+            {run.isPending ? <Spinner className="size-4" /> : null}
+            Run rules
+          </Button>
+        </div>
       </form>
 
       {run.error ? (

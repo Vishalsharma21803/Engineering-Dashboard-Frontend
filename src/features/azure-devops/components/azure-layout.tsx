@@ -14,11 +14,11 @@ import {
 } from "../utils/last-project";
 
 const selectClassName =
-  "h-10 w-full min-w-44 rounded-lg border border-slate-300 bg-surface px-3 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50";
+  "h-9 w-full min-w-0 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50 sm:h-10 sm:min-w-44 sm:px-3";
 
 const tabClassName = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "-mb-px inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition",
+    "-mb-px inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-2.5 py-3 text-sm font-medium transition sm:px-3",
     isActive
       ? "border-indigo-600 text-indigo-700"
       : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-950"
@@ -43,7 +43,8 @@ export function AzureLayout() {
   const onMyWork = useMatch("/azure/:credentialId") !== null;
   const onApprovals = useMatch("/azure/:credentialId/actions") !== null;
   const onOverview = useMatch("/azure/:credentialId/projects/:projectId") !== null;
-  // Work item and PR pages belong to a project; keep that tab highlighted there.
+  const onProjectsIndex = useMatch("/azure/:credentialId/projects") !== null;
+  // Work item and PR pages also live under /projects; they are reached from any tab, so no tab is highlighted there.
   const onProjectPage = useMatch("/azure/:credentialId/projects/*") !== null;
 
   // The URL wins; otherwise fall back to what was chosen last for this organization.
@@ -121,25 +122,25 @@ export function AzureLayout() {
   return (
     <section className="flex w-full flex-col gap-6">
       <div className="rounded-xl border border-slate-200 bg-surface shadow-sm">
-        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex items-center gap-4">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-600 to-sky-500 text-white shadow-sm">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="size-6">
+        <div className="flex flex-col gap-3 p-4 sm:gap-5 sm:p-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-600 to-sky-500 text-white shadow-sm sm:size-12">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="size-5 sm:size-6">
                 <path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z" strokeLinejoin="round" />
               </svg>
             </span>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Azure DevOps</p>
-              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Developer cockpit</h1>
-              <p className="mt-0.5 truncate text-sm text-slate-500">
+              <p className="hidden text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 sm:block">Azure DevOps</p>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Developer cockpit</h1>
+              <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
                 {credential?.organizationUrl ?? "Loading organization..."}
                 {project ? ` · ${project.name}` : " · all projects"}
               </p>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="min-w-0 space-y-1">
               <label htmlFor="credential-select" className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                 Organization
               </label>
@@ -157,7 +158,7 @@ export function AzureLayout() {
               </select>
             </div>
 
-            <div className="space-y-1">
+            <div className="min-w-0 space-y-1">
               <label htmlFor="project-select" className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                 Project
               </label>
@@ -186,18 +187,21 @@ export function AzureLayout() {
           </div>
         </div>
 
-        <nav aria-label="Azure DevOps" className="flex gap-1 overflow-x-auto border-t border-slate-200 px-3">
+        <nav aria-label="Azure DevOps" className="flex gap-1 overflow-x-auto whitespace-nowrap border-t border-slate-200 px-2 sm:px-3">
           <NavLink to={withProject(base)} end className={tabClassName}>
             My work
           </NavLink>
           <NavLink
             to={overviewProject ? `${base}/projects/${encodeURIComponent(overviewProject)}` : `${base}/projects`}
-            className={({ isActive }) => tabClassName({ isActive: isActive || onProjectPage })}
+            end
+            className={() => tabClassName({ isActive: onOverview || onProjectsIndex })}
           >
             Project overview
           </NavLink>
           <NavLink to={withProject(`${base}/actions`)} className={tabClassName}>
-            Approvals & audit
+            <span>
+              Approvals<span className="sr-only sm:not-sr-only"> & audit</span>
+            </span>
             {pendingCount > 0 ? (
               <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
                 {pendingCount}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { ActionReviewDialog } from "../components/action-review-dialog";
@@ -117,66 +118,72 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
       )}
 
       <SectionCard title="Awaiting your approval">
-        {pending.isLoading ? (
-          <SkeletonRows rows={2} />
-        ) : pending.error ? (
-          <ErrorCard error={pending.error} onRetry={() => void pending.refetch()} />
-        ) : pendingActions.length === 0 ? (
-          <EmptyState>No pending changes.</EmptyState>
-        ) : (
-          <ActionRows actions={pendingActions} onReview={setReviewing} />
-        )}
+        <Updating active={pending.isPlaceholderData}>
+          {pending.isLoading ? (
+            <SkeletonRows rows={2} />
+          ) : pending.error ? (
+            <ErrorCard error={pending.error} onRetry={() => void pending.refetch()} />
+          ) : pendingActions.length === 0 ? (
+            <EmptyState>No pending changes.</EmptyState>
+          ) : (
+            <ActionRows actions={pendingActions} onReview={setReviewing} />
+          )}
+        </Updating>
         <ListPager label="Awaiting approval pages" page={pending.data} disabled={pending.isFetching} onChange={(page) => pendingList.setPage(page)} />
       </SectionCard>
 
       <SectionCard title="History">
-        {all.isLoading ? (
-          <SkeletonRows rows={2} />
-        ) : all.error ? (
-          <ErrorCard error={all.error} onRetry={() => void all.refetch()} />
-        ) : history.length === 0 ? (
-          <EmptyState>No decided actions yet.</EmptyState>
-        ) : (
-          <ActionRows actions={history} onReview={setReviewing} />
-        )}
+        <Updating active={all.isPlaceholderData}>
+          {all.isLoading ? (
+            <SkeletonRows rows={2} />
+          ) : all.error ? (
+            <ErrorCard error={all.error} onRetry={() => void all.refetch()} />
+          ) : history.length === 0 ? (
+            <EmptyState>No decided actions yet.</EmptyState>
+          ) : (
+            <ActionRows actions={history} onReview={setReviewing} />
+          )}
+        </Updating>
         <ListPager label="History pages" page={all.data} disabled={all.isFetching} onChange={(page) => historyList.setPage(page)} />
       </SectionCard>
 
       <SectionCard title="Audit log" description="Append-only record of proposals, approvals, rejections and executions.">
-        {audit.isLoading ? (
-          <SkeletonRows rows={3} />
-        ) : audit.error ? (
-          <ErrorCard error={audit.error} onRetry={() => void audit.refetch()} />
-        ) : auditEntries.length === 0 ? (
-          <EmptyState>No audit entries yet.</EmptyState>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="py-2 pr-3 font-medium">When</th>
-                  <th className="px-3 py-2 font-medium">Event</th>
-                  <th className="px-3 py-2 font-medium">Action</th>
-                  <th className="px-3 py-2 font-medium">From</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {auditEntries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="py-2 pr-3 text-slate-600">{formatDateTime(entry.createdAt)}</td>
-                    <td className="px-3 py-2">
-                      <StatusBadge tone={AUDIT_TONES[entry.event]}>{entry.event.replace(/_/g, " ").toLowerCase()}</StatusBadge>
-                    </td>
-                    <td className="px-3 py-2 text-slate-700">
-                      {entry.actionSummary ?? <span className="font-mono text-xs text-slate-500">{entry.actionId?.slice(0, 8) ?? "—"}</span>}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-slate-500">{entry.ipAddress ?? "—"}</td>
+        <Updating active={audit.isPlaceholderData}>
+          {audit.isLoading ? (
+            <SkeletonRows rows={3} />
+          ) : audit.error ? (
+            <ErrorCard error={audit.error} onRetry={() => void audit.refetch()} />
+          ) : auditEntries.length === 0 ? (
+            <EmptyState>No audit entries yet.</EmptyState>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="py-2 pr-3 font-medium">When</th>
+                    <th className="px-3 py-2 font-medium">Event</th>
+                    <th className="px-3 py-2 font-medium">Action</th>
+                    <th className="px-3 py-2 font-medium">From</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {auditEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="py-2 pr-3 text-slate-600">{formatDateTime(entry.createdAt)}</td>
+                      <td className="px-3 py-2">
+                        <StatusBadge tone={AUDIT_TONES[entry.event]}>{entry.event.replace(/_/g, " ").toLowerCase()}</StatusBadge>
+                      </td>
+                      <td className="px-3 py-2 text-slate-700">
+                        {entry.actionSummary ?? <span className="font-mono text-xs text-slate-500">{entry.actionId?.slice(0, 8) ?? "—"}</span>}
+                      </td>
+                      <td className="px-3 py-2 text-xs text-slate-500">{entry.ipAddress ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Updating>
         <ListPager label="Audit log pages" page={audit.data} disabled={audit.isFetching} onChange={(page) => auditList.setPage(page)} />
       </SectionCard>
 

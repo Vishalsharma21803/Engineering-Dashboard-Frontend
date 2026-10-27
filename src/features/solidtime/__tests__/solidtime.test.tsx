@@ -6,12 +6,13 @@ import { mockBackend, renderWithProviders } from "@/test/render";
 import { SolidtimeConnectionsSection } from "../components/solidtime-connections-section";
 import { TicketTimerButton } from "../components/ticket-timer-button";
 import { TimerBar } from "../components/timer-bar";
+import { TimesheetTab } from "../components/timesheet-tab";
 import { DraftTab } from "../components/draft-tab";
 import { TicketTimeLookup } from "../components/ticket-time-lookup";
 import { TicketTimePanel } from "../components/ticket-time-panel";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { projectNameKey, solidtimeProjectFor } from "../utils/project-map";
-import { localDay, zonedClock, zonedInstant } from "../utils/time";
+import { localDay, shiftDay, weekStart, zonedClock, zonedInstant } from "../utils/time";
 import type { SolidtimeConnection } from "../types/solidtime.types";
 
 const connection: SolidtimeConnection = {
@@ -180,6 +181,54 @@ describe("DraftTab", () => {
     await userEvent.click(screen.getByRole("button", { name: "Suggest hours with AI" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose an AI provider");
     expect(screen.getByRole("link", { name: "Open AI settings" })).toHaveAttribute("href", "/credentials");
+  });
+});
+
+describe("TimesheetTab", () => {
+  const day = localDay(undefined, "UTC");
+  const entry = { id: "e1", start: `${day}T09:00:00Z`, end: `${day}T11:00:00Z`, seconds: 7200, description: "#101 Implement login", projectId: null, projectName: null, taskId: null, tags: [], billable: false, running: false, tickets: [{ id: 101, title: "Implement login" }] };
+  const page = <T,>(items: T[]) => ({ items, total: items.length, page: 1, pageSize: 10, totalPages: 1 });
+  const sheet = (from: string, to: string) => ({
+    timesheet: {
+      from,
+      to,
+      timeZone: "UTC",
+      totalSeconds: 7200,
+      days: Array.from({ length: 7 }, (_, index) => ({ day: shiftDay(from, index), seconds: shiftDay(from, index) === day ? 7200 : 0 })),
+      byTicket: page([{ ticketId: 101, title: "Implement login", seconds: 7200 }]),
+      unlinkedSeconds: 0,
+      entries: page([entry]),
+      ticketsChecked: true,
+      truncated: false,
+    },
+  });
+
+  it("lists the picked day's entries, offers the whole week, and shows totals per ticket in their own view", async () => {
+    const from = weekStart(day);
+    const calls = mockBackend([{ path: `${base}/timesheet`, body: sheet(from, shiftDay(from, 6)) }, { path: `${base}/catalog`, body: catalog }]);
+    renderWithProviders(<TimesheetTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+
+    expect(await screen.findByRole("heading", { name: /^Entries on / })).toBeInTheDocument();
+    expect(calls.find((call) => call.url.includes("/timesheet"))?.url).toContain(`day=${day}`);
+    expect(within(screen.getByRole("list", { name: "Time entries" })).getByText("09:00 – 11:00")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Whole week" }));
+    expect(await screen.findByRole("heading", { name: "Entries this week" })).toBeInTheDocument();
+    expect(calls.at(-1)?.url).not.toContain("day=");
+
+    await userEvent.click(screen.getByRole("button", { name: /^By ticket/ }));
+    expect(within(screen.getByRole("list", { name: "Time per ticket" })).getByText("2h 00m")).toBeInTheDocument();
+  });
+
+  it("edits an entry in the Solidtime time zone", async () => {
+    const from = weekStart(day);
+    mockBackend([{ path: `${base}/timesheet`, body: sheet(from, shiftDay(from, 6)) }, { path: `${base}/catalog`, body: catalog }]);
+    renderWithProviders(<TimesheetTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const form = screen.getByRole("form", { name: "Edit time entry" });
+    expect(within(form).getByLabelText("Start")).toHaveValue(`${day}T09:00`);
+    expect(within(form).getByText("Times are in UTC, your Solidtime time zone.")).toBeInTheDocument();
   });
 });
 

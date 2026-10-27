@@ -86,6 +86,7 @@ function ConnectionCard({ connection }: { connection: SolidtimeConnection }) {
   const [target, setTarget] = useState(String(connection.dailyTargetHours));
   const [alert, setAlert] = useState(String(connection.timerAlertHours));
   const [newToken, setNewToken] = useState("");
+  const [replacing, setReplacing] = useState(false);
   const memberships = useQuery({
     queryKey: solidtimeKeys.memberships(connection.credentialId),
     queryFn: () => listMemberships(connection.credentialId),
@@ -131,7 +132,7 @@ function ConnectionCard({ connection }: { connection: SolidtimeConnection }) {
         </label>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           Azure DevOps organization
           <select
@@ -156,32 +157,6 @@ function ConnectionCard({ connection }: { connection: SolidtimeConnection }) {
           Flag a timer after (hours)
           <Input type="number" min={1} max={48} step={1} value={alert} onChange={(event) => setAlert(event.target.value)} />
         </label>
-      </div>
-
-      <form
-        className="flex flex-wrap items-end gap-2"
-        aria-label={`Replace the API token for ${name}`}
-        onSubmit={(event) => {
-          event.preventDefault();
-          update.mutate({ token: newToken.trim() }, { onSuccess: () => setNewToken("") });
-        }}
-      >
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
-          New API token
-          <Input type="password" autoComplete="off" className="h-9 w-72" value={newToken} onChange={(event) => setNewToken(event.target.value)} />
-        </label>
-        <Button size="sm" variant="secondary" type="submit" disabled={update.isPending || newToken.trim().length < 20}>
-          Replace token
-        </Button>
-      </form>
-
-      {error ? (
-        <p role="alert" className="text-sm text-rose-600">
-          {errorText(error, "That change could not be saved.")}
-        </p>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="secondary"
@@ -190,18 +165,55 @@ function ConnectionCard({ connection }: { connection: SolidtimeConnection }) {
         >
           Save targets
         </Button>
-        <Button size="sm" variant="secondary" disabled={check.isPending} onClick={() => check.mutate()}>
-          {check.isPending ? <Spinner className="size-4" /> : null}
-          Check token
-        </Button>
+      </div>
+
+      {replacing ? (
+        <form
+          className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3"
+          aria-label={`Replace the API token for ${name}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            update.mutate({ token: newToken.trim() }, { onSuccess: () => { setNewToken(""); setReplacing(false); } });
+          }}
+        >
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm text-slate-700">
+            New API token
+            <Input type="password" autoComplete="off" className="h-9" value={newToken} onChange={(event) => setNewToken(event.target.value)} />
+          </label>
+          <Button size="sm" type="submit" disabled={update.isPending || newToken.trim().length < 20}>
+            Save new token
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => { setReplacing(false); setNewToken(""); }}>
+            Cancel
+          </Button>
+        </form>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="text-sm text-rose-600">
+          {errorText(error, "That change could not be saved.")}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
         {connection.organizationId ? (
           <Link to={`/time/${encodeURIComponent(connection.credentialId)}`} className={buttonClassName({ size: "sm" })}>
             Open Time
           </Link>
         ) : null}
+        <Button size="sm" variant="secondary" disabled={check.isPending} onClick={() => check.mutate()}>
+          {check.isPending ? <Spinner className="size-4" /> : null}
+          Check token
+        </Button>
+        {!replacing ? (
+          <Button size="sm" variant="secondary" onClick={() => setReplacing(true)}>
+            Replace token…
+          </Button>
+        ) : null}
         <Button
           size="sm"
-          variant="ghost"
+          variant="secondary"
+          className="text-rose-700 hover:bg-rose-50 sm:ml-auto"
           disabled={remove.isPending}
           onClick={() => {
             if (window.confirm(`Disconnect ${name}? Your time in Solidtime is not affected.`)) {
@@ -235,7 +247,7 @@ export function SolidtimeConnectionsSection() {
         </div>
         {!adding ? (
           <Button size="sm" onClick={() => setAdding(true)}>
-            Connect Solidtime
+            {(connections.data ?? []).length > 0 ? "Connect another" : "Connect Solidtime"}
           </Button>
         ) : null}
       </div>

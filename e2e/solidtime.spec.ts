@@ -65,6 +65,7 @@ test("connects Solidtime and tracks time on a ticket only through approval", asy
   // The Time page lists it, attributed to the ticket.
   await page.getByRole("link", { name: "Time", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Time", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^By ticket/ }).click();
   await expect(page.getByRole("list", { name: "Time per ticket" })).toContainText("#101 Implement login");
 });
 

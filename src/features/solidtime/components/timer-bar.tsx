@@ -75,7 +75,7 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
           });
         }}
       >
-        <Input aria-label="What are you working on?" placeholder="What are you working on? (e.g. #21786 Fix login)" value={description} onChange={(event) => setDescription(event.target.value)} className="h-9 sm:flex-1" />
+        <Input aria-label="What are you working on?" placeholder="What are you working on? e.g. #21786" value={description} onChange={(event) => setDescription(event.target.value)} className="h-9 sm:flex-1" />
         <select aria-label="Project" className={SELECT} value={projectId} onChange={(event) => setProjectId(event.target.value)}>
           <option value="">No project</option>
           {(catalog.data?.projects ?? []).map((project) => (

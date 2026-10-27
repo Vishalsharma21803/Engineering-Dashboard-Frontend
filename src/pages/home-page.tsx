@@ -1,162 +1,84 @@
 import { Link } from "react-router-dom";
 
 import { buttonClassName } from "@/components/ui/button-styles";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useCredentials } from "@/features/credentials/hooks/use-credentials";
 
-const modules = [
-  {
-    title: "Credentials",
-    status: "Available",
-    statusClass: "bg-emerald-50 text-emerald-700",
-    description:
-      "Add, validate, update, and delete encrypted Azure DevOps PATs.",
-  },
+const areas = [
   {
     title: "Azure DevOps",
-    status: "Available",
-    statusClass: "bg-emerald-50 text-emerald-700",
-    description:
-      "Projects, work items, repositories, pull requests, pipelines, and builds.",
+    to: "/azure",
+    description: "My work, pull requests, pipelines and approvals across your projects.",
   },
   {
-    title: "Insights",
-    status: "Planned",
-    statusClass: "bg-slate-100 text-slate-600",
-    description:
-      "Delivery visibility across teams, repositories, and build health.",
+    title: "Time",
+    to: "/time",
+    description: "Track time on tickets with Solidtime and see what is still unlogged.",
+  },
+  {
+    title: "SOP rules",
+    to: "/sop-rules",
+    description: "See which SOP rules apply to your tickets and tune your own.",
+  },
+  {
+    title: "Credentials",
+    to: "/credentials",
+    description: "Connect Azure DevOps, Solidtime and AI providers.",
   },
 ];
 
 export function HomePage() {
   const { user } = useAuth();
+  const credentials = useCredentials();
   const firstName = user?.name.split(/\s+/).filter(Boolean)[0] ?? "there";
+  const needsAzure = credentials.isSuccess && credentials.data.length === 0;
 
   return (
-    <section className="flex w-full flex-col gap-10">
+    <section className="flex w-full flex-col gap-8">
       <div className="max-w-3xl">
-        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
-          Authenticated
-        </span>
-
-        <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
           Welcome back, {firstName}.
         </h1>
-
-        <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-          Your session is active. Credential management is live.
-          Add an Azure DevOps PAT to validate organization access and
-          prepare for the workspace.
+        <p className="mt-3 text-base leading-7 text-slate-600">
+          Your Azure DevOps work, time tracking and SOP checks in one place.
         </p>
+      </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            to="/credentials"
-            className={buttonClassName({ size: "md" })}
-          >
-            <svg
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-              className="size-4"
-            >
-              <path
-                fillRule="evenodd"
-                d="M8 7a4 4 0 1 1 8 0 4 4 0 0 1-8 0Zm-5.5 8a5.5 5.5 0 0 1 9.58-3.68A4.5 4.5 0 0 0 10 14.5v1a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5V15Zm5.25-8a3 3 0 1 0 6 0 3 3 0 0 0-6 0ZM3 15.5A4.5 4.5 0 0 1 7.5 11h.257a5.49 5.49 0 0 0-1.284 2.65A2.5 2.5 0 0 0 4.5 15.5v.5h4.75a2.5 2.5 0 0 0 .25 1.5H3a.5.5 0 0 1-.5-.5v-1Z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Manage credentials
-          </Link>
-
-          <Link
-            to="/credentials/new"
-            className={buttonClassName({
-              variant: "secondary",
-              size: "md",
-            })}
-          >
-            <svg
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-              className="size-4"
-            >
-              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-            </svg>
+      {needsAzure ? (
+        <Card className="flex flex-col gap-4 border-indigo-200 bg-indigo-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">First step</p>
+            <h2 className="mt-1 text-base font-semibold text-slate-950">Add your Azure DevOps credential</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Connect an organization with a personal access token to see your work items, pull requests and SOP checks.
+            </p>
+          </div>
+          <Link to="/credentials/new" className={buttonClassName({ size: "md", className: "self-start sm:self-auto" })}>
             Add credential
           </Link>
-        </div>
-      </div>
+        </Card>
+      ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {modules.map((module) => (
-          <Card key={module.title}>
-            <CardHeader>
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle>{module.title}</CardTitle>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${module.statusClass}`}
-                >
-                  {module.status}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {areas.map((area) => (
+          <Link
+            key={area.to}
+            to={area.to}
+            className="group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <Card className="h-full p-5 transition group-hover:border-indigo-300">
+              <h2 className="flex items-center justify-between gap-2 text-base font-semibold text-slate-950">
+                {area.title}
+                <span aria-hidden="true" className="text-slate-400 transition group-hover:text-indigo-600">
+                  →
                 </span>
-              </div>
-              <CardDescription>
-                {module.description}
-              </CardDescription>
-            </CardHeader>
-          </Card>
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">{area.description}</p>
+            </Card>
+          </Link>
         ))}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Signed-in session</CardTitle>
-          <CardDescription>
-            Your session is backed by an httpOnly JWT cookie and
-            restored automatically on refresh.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <dl className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Name
-              </dt>
-              <dd className="mt-1 truncate text-sm font-semibold text-slate-900">
-                {user?.name ?? "Unknown"}
-              </dd>
-            </div>
-
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Email
-              </dt>
-              <dd className="mt-1 truncate text-sm font-semibold text-slate-900">
-                {user?.email ?? "Unknown"}
-              </dd>
-            </div>
-
-            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Session
-              </dt>
-              <dd className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                <span className="size-1.5 rounded-full bg-emerald-500" />
-                Active
-              </dd>
-            </div>
-          </dl>
-        </CardContent>
-      </Card>
     </section>
   );
 }

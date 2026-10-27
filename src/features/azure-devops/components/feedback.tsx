@@ -107,13 +107,13 @@ export function SectionCard({
   return (
     <Card>
       <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-semibold tracking-tight text-slate-950">{title}</h2>
           {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
         </div>
         {actions}
       </div>
-      <div className="p-5 pt-0">{children}</div>
+      <div className="min-w-0 p-5 pt-0">{children}</div>
     </Card>
   );
 }

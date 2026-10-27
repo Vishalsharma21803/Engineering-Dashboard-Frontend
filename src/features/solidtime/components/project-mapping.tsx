@@ -35,11 +35,11 @@ export function ProjectMapping({ connection }: { connection: SolidtimeConnection
           const sameName = sameNameProjects(project.name, projects);
 
           return (
-            <li key={project.id} className="flex items-center justify-between gap-2 px-3 py-2">
-              <span className="text-slate-800">{project.name}</span>
+            <li key={project.id} className="grid items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_18rem]">
+              <span className="font-medium text-slate-800">{project.name}</span>
               <select
                 aria-label={`Solidtime project for ${project.name}`}
-                className="h-8 rounded-md border border-slate-300 bg-surface px-2 text-xs"
+                className="h-9 w-full rounded-lg border border-slate-300 bg-surface px-2.5 text-sm"
                 value={connection.projectMap[key] ?? ""}
                 disabled={save.isPending}
                 onChange={(event) => {

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { useCatalog } from "../hooks/use-solidtime";
 import type { SolidtimeConnection, TimesheetEntry } from "../types/solidtime.types";
-import { fromLocalInput, toLocalInput } from "../utils/time";
+import { fromLocalInput, fromZonedInput, toLocalInput, toZonedInput } from "../utils/time";
 
 const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm";
 
@@ -16,25 +16,29 @@ interface EntryFormProps {
   onPropose: (input: ProposeActionInput) => void;
   isProposing: boolean;
   onCancel: () => void;
+  /** Times are shown and entered in this zone (my Solidtime one); without it, the browser's. */
+  timeZone?: string | null | undefined;
 }
 
 /** Add or edit one entry (in local time). Proposes the change; nothing is saved until it is approved. */
-export function EntryForm({ connection, entry, onPropose, isProposing, onCancel }: EntryFormProps) {
+export function EntryForm({ connection, entry, onPropose, isProposing, onCancel, timeZone = null }: EntryFormProps) {
   const catalog = useCatalog(connection.credentialId);
+  const toInput = (iso: string) => (timeZone ? toZonedInput(iso, timeZone) : toLocalInput(iso));
+  const fromInput = (value: string) => (timeZone ? fromZonedInput(value, timeZone) : fromLocalInput(value));
   const [description, setDescription] = useState(entry?.description ?? "");
   const [projectId, setProjectId] = useState(entry?.projectId ?? "");
   const [taskId, setTaskId] = useState(entry?.taskId ?? "");
   // New entries default to the last hour.
-  const [start, setStart] = useState(() => toLocalInput(entry?.start ?? new Date(Date.now() - 3_600_000).toISOString()));
-  const [end, setEnd] = useState(() => (entry?.end ? toLocalInput(entry.end) : entry ? "" : toLocalInput(new Date().toISOString())));
+  const [start, setStart] = useState(() => toInput(entry?.start ?? new Date(Date.now() - 3_600_000).toISOString()));
+  const [end, setEnd] = useState(() => (entry?.end ? toInput(entry.end) : entry ? "" : toInput(new Date().toISOString())));
   const [billable, setBillable] = useState(entry?.billable ?? false);
   const [error, setError] = useState<string | null>(null);
   const tasks = (catalog.data?.tasks ?? []).filter((task) => task.project_id === projectId);
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    const startIso = fromLocalInput(start);
-    const endIso = end ? fromLocalInput(end) : null;
+    const startIso = fromInput(start);
+    const endIso = end ? fromInput(end) : null;
 
     if (!startIso || (!endIso && !entry?.running)) {
       setError("Enter a start and an end.");
@@ -51,8 +55,8 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel 
 
     if (entry) {
       // The inputs show minutes only: unchanged times are left exactly as they are.
-      const startChanged = start !== toLocalInput(entry.start);
-      const endChanged = Boolean(endIso) && (!entry.end || end !== toLocalInput(entry.end));
+      const startChanged = start !== toInput(entry.start);
+      const endChanged = Boolean(endIso) && (!entry.end || end !== toInput(entry.end));
       onPropose({
         credentialId: connection.credentialId,
         kind: "SOLIDTIME_ENTRY_UPDATE",
@@ -107,6 +111,7 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel 
         End
         <Input type="datetime-local" value={end} onChange={(event) => setEnd(event.target.value)} disabled={entry?.running && !end} />
       </label>
+      {timeZone ? <p className="text-xs text-slate-500 sm:col-span-2">Times are in {timeZone}, your Solidtime time zone.</p> : null}
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={billable} onChange={(event) => setBillable(event.target.checked)} /> Billable
       </label>

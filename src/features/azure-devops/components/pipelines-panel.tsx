@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { usePipelineRuns, usePipelines } from "../hooks/use-pipelines";
@@ -20,6 +21,17 @@ const HEALTH_TONES: Record<PipelineSummary["health"], Tone> = {
   running: "info",
   never: "neutral",
 };
+
+/** Health in words; a running pipeline also says how its previous run ended. */
+function healthLabel(pipeline: PipelineSummary): string {
+  if (pipeline.health === "running") {
+    return pipeline.latestCompletedBuild
+      ? `Running · previous run ${pipeline.latestCompletedBuild.result ?? "completed"}`
+      : "Running";
+  }
+
+  return pipeline.health === "never" ? "never run" : pipeline.health;
+}
 
 interface PipelinesPanelProps {
   credentialId: string;
@@ -161,57 +173,59 @@ export function PipelinesPanel(props: PipelinesPanelProps) {
 
   return (
     <div>
-      <ul className="divide-y divide-slate-100">
-        {pipelines.map((pipeline) => (
-          <li key={pipeline.id} className="py-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <button
-                type="button"
-                className="flex items-center gap-2 text-left"
-                aria-expanded={open === pipeline.id}
-                onClick={() => setExpanded(open === pipeline.id ? -1 : pipeline.id)}
-              >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                  className={`size-4 text-slate-400 transition ${open === pipeline.id ? "rotate-90" : ""}`}
+      <Updating active={query.isPlaceholderData}>
+        <ul className="divide-y divide-slate-100">
+          {pipelines.map((pipeline) => (
+            <li key={pipeline.id} className="py-3">
+              <div className="flex items-start justify-between gap-2">
+                <button
+                  type="button"
+                  className="-my-1 flex min-h-11 min-w-0 flex-1 items-start gap-2 rounded-md py-1 text-left hover:text-indigo-600"
+                  aria-expanded={open === pipeline.id}
+                  onClick={() => setExpanded(open === pipeline.id ? -1 : pipeline.id)}
                 >
-                  <path d="M7.5 5 13 10l-5.5 5V5Z" />
-                </svg>
-                <StatusBadge tone={HEALTH_TONES[pipeline.health]}>{pipeline.health}</StatusBadge>
-                <span className="font-medium text-slate-950">{pipeline.name}</span>
-                {pipeline.health === "running" && pipeline.latestCompletedBuild ? (
-                  <StatusBadge
-                    tone={buildTone("completed", pipeline.latestCompletedBuild.result)}
-                    title="Result of the last completed run"
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className={`mt-0.5 size-4 shrink-0 text-slate-400 transition ${open === pipeline.id ? "rotate-90" : ""}`}
                   >
-                    last: {pipeline.latestCompletedBuild.result ?? "completed"}
-                  </StatusBadge>
-                ) : null}
-                <span className="text-xs text-slate-500">
-                  last run {formatRelative(pipeline.latestBuild?.queueTime)}
-                </span>
-              </button>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={isProposing}
-                onClick={() =>
-                  onPropose({ credentialId, kind: "PIPELINE_QUEUE_RUN", target: { projectId, definitionId: pipeline.id }, params: {} })
-                }
-              >
-                Queue run…
-              </Button>
-            </div>
-            {open === pipeline.id ? (
-              <div className="mt-3">
-                <PipelineRuns {...props} pipeline={pipeline} focusBuildId={focusBuildId} />
+                    <path d="M7.5 5 13 10l-5.5 5V5Z" />
+                  </svg>
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words font-medium text-slate-950">{pipeline.name}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <StatusBadge
+                        tone={HEALTH_TONES[pipeline.health]}
+                        title={pipeline.health === "running" ? "A run is in progress; the result of the run before it is shown too" : undefined}
+                      >
+                        {healthLabel(pipeline)}
+                      </StatusBadge>
+                      <span className="text-xs text-slate-500">last run {formatRelative(pipeline.latestBuild?.queueTime)}</span>
+                    </span>
+                  </span>
+                </button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="shrink-0"
+                  disabled={isProposing}
+                  onClick={() =>
+                    onPropose({ credentialId, kind: "PIPELINE_QUEUE_RUN", target: { projectId, definitionId: pipeline.id }, params: {} })
+                  }
+                >
+                  Queue run…
+                </Button>
               </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+              {open === pipeline.id ? (
+                <div className="mt-3">
+                  <PipelineRuns {...props} pipeline={pipeline} focusBuildId={focusBuildId} />
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </Updating>
       <Pagination
         label="Pipeline pages"
         page={query.data.page}

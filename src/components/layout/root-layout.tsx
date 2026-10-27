@@ -14,7 +14,7 @@ const navLinkClassName = ({
   isActive: boolean;
 }) =>
   cn(
-    "rounded-lg px-3 py-2 text-sm font-medium transition",
+    "shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
     isActive
       ? "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-200"
       : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
@@ -115,7 +115,7 @@ export function RootLayout() {
         ) : null}
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:px-8">
+      <main className="mx-auto flex w-full min-w-0 max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         <Outlet />
       </main>
     </div>

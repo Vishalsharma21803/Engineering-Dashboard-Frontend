@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { ComplianceResult, ComplianceViolation } from "@/features/azure-devops/types/azure.types";
 import { SEVERITY_TONES } from "@/features/azure-devops/utils/labels";
+import { rulebookVersionsLabel } from "../utils/rule-labels";
 import { AiResults, type AiResultsProps } from "./ai-results";
 
 interface SopResultPanelProps {
@@ -12,10 +13,6 @@ interface SopResultPanelProps {
   renderAction?: (violation: ComplianceViolation) => ReactNode;
   /** AI verdicts; without it the AI rules are only listed. */
   ai?: Omit<AiResultsProps, "ruleCount">;
-}
-
-function versionLabel(version: number): string {
-  return version === -1 ? "draft" : `v${version}`;
 }
 
 /** One ticket's SOP result: gaps first, then notices, what is still open, skipped or left to AI. */
@@ -102,8 +99,8 @@ export function SopResultPanel({ result, renderAction, ai }: SopResultPanelProps
 
       <details className="text-xs text-slate-500">
         <summary className="cursor-pointer select-none">
-          {result.passedRules.length} passed · {result.skippedRules.length} not checked · rules default{" "}
-          {versionLabel(result.rulebook.defaultVersion)}, yours {versionLabel(result.rulebook.personalVersion)}
+          {result.passedRules.length} passed · {result.skippedRules.length} not checked ·{" "}
+          {rulebookVersionsLabel(result.rulebook.defaultVersion, result.rulebook.personalVersion)}
         </summary>
         <ul className="mt-2 space-y-0.5">
           {result.passedRules.map((rule) => (

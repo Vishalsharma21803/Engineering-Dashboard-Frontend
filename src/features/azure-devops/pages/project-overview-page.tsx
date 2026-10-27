@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SopReportCard } from "@/features/sop/components/sop-report-card";
 import { Pagination } from "@/components/ui/pagination";
+import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 
@@ -60,7 +61,9 @@ function PagedList<T>({
 
   return (
     <>
-      <ul className="divide-y divide-slate-100">{query.data.items.map(render)}</ul>
+      <Updating active={query.isPlaceholderData}>
+        <ul className="divide-y divide-slate-100">{query.data.items.map(render)}</ul>
+      </Updating>
       <Pagination
         label={label}
         page={query.data.page}
@@ -124,24 +127,27 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
       title="Team work items"
       description="Everyone's work items in this project, most recently changed first (up to 200, 10 per page)."
       actions={
-        <div role="group" aria-label="State" className="inline-flex rounded-lg border border-slate-200 p-0.5">
-          {(["open", "all"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={state === value}
-              onClick={() => {
-                setState(value);
-                setPage(1, { replace: true });
-              }}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-medium transition",
-                state === value ? "bg-inverse text-on-inverse" : "text-slate-600 hover:text-slate-950"
-              )}
-            >
-              {value === "open" ? "Open" : "Last 90 days"}
-            </button>
-          ))}
+        <div className="flex shrink-0 items-center gap-2">
+          <span aria-hidden="true" className="text-xs font-medium text-slate-500">Show:</span>
+          <div role="group" aria-label="State" className="inline-flex rounded-lg border border-slate-200 p-0.5">
+            {(["open", "all"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={state === value}
+                onClick={() => {
+                  setState(value);
+                  setPage(1, { replace: true });
+                }}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition",
+                  state === value ? "bg-inverse text-on-inverse" : "text-slate-600 hover:text-slate-950"
+                )}
+              >
+                {value === "open" ? "Open" : "Changed in last 90 days"}
+              </button>
+            ))}
+          </div>
         </div>
       }
     >

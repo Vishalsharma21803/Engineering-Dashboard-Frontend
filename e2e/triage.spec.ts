@@ -60,9 +60,9 @@ test("snoozes, acknowledges and abandons dashboard items without touching Azure 
   await expect(acknowledged.getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
 
   // Snooze a pull request from its own section.
-  const pr = page.getByRole("link", { name: "!1 Login flow", exact: true });
+  const pr = page.getByRole("link", { name: "PR 1 Login flow", exact: true });
   await expect(pr).toBeVisible();
-  await triage(page, "!1 Login flow", "Snooze · tomorrow");
+  await triage(page, "PR 1 Login flow", "Snooze · tomorrow");
   await expect(pr).toHaveCount(0);
   await expect(tile(page, "Active PRs")).toContainText("1 hidden");
 

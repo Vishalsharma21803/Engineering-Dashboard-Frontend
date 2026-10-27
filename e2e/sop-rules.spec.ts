@@ -34,7 +34,7 @@ test("a developer tunes their own rules; the default rules stay read-only", asyn
   await page.getByRole("tab", { name: "Rules that apply to me" }).click();
   const dev02 = page.getByRole("row", { name: /DEV-02/ });
   await expect(dev02).toContainText("yours");
-  await expect(dev02).toContainText("off");
+  await expect(dev02).toContainText("Off");
 
   await page.getByRole("tab", { name: "Default rules" }).click();
   await expect(page.getByText("Only SOP owners can change the default rules.", { exact: false })).toBeVisible();

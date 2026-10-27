@@ -16,7 +16,7 @@ import { estimateDraft, getDraft } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import { useCatalog } from "../hooks/use-solidtime";
 import type { DayDraft, DraftEstimate, DraftRow, ProjectSource, SolidtimeConnection } from "../types/solidtime.types";
-import { formatHours, shiftDay, zonedClock, zonedInstant } from "../utils/time";
+import { formatDayLabel, formatHours, shiftDay, zonedClock, zonedInstant } from "../utils/time";
 
 const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 const HOUR = 3_600_000;
@@ -251,7 +251,7 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                 Today
               </Button>
             ) : null}
-            <Button size="sm" variant="ghost" disabled={draft.isFetching} onClick={() => void draft.refetch()}>
+            <Button size="sm" variant="secondary" disabled={draft.isFetching} onClick={() => void draft.refetch()} title="Read Azure DevOps and Solidtime again (your edits on this day are replaced)">
               {draft.isFetching && !draft.isLoading ? <Spinner className="size-4" /> : null}
               Rebuild
             </Button>
@@ -276,6 +276,17 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
           <div className="relative h-2 overflow-hidden rounded-full bg-slate-100" aria-hidden="true">
             <div className="absolute inset-y-0 left-0 bg-slate-400" style={{ width: percent(tracked) }} />
             <div className="absolute inset-y-0 bg-indigo-500" style={{ left: percent(tracked), width: percent(plannedHours) }} />
+          </div>
+          <div className="flex flex-wrap gap-4 text-xs text-slate-500" aria-hidden="true">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-slate-400" /> Already in Solidtime
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-indigo-500" /> In this draft
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-sm bg-slate-100 ring-1 ring-slate-200" /> Left to your target
+            </span>
           </div>
         </div>
 
@@ -306,7 +317,9 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
       ) : draft.error || !data ? (
         <ErrorCard error={draft.error} onRetry={() => void draft.refetch()} />
       ) : data.rows.length === 0 ? (
-        <EmptyState>No Azure DevOps activity by you on {day}.</EmptyState>
+        <EmptyState>
+          You made no changes in Azure DevOps on {formatDayLabel(day, { weekday: "long", day: "numeric", month: "long" })}, so there is nothing to draft. Pick another day, or add time on the Timesheet tab.
+        </EmptyState>
       ) : (
         <>
           <ul aria-label="Drafted entries" className="flex flex-col gap-3">

@@ -56,7 +56,7 @@ export function CredentialCard({
             {displayName}
           </h2>
 
-          <p className="mt-1 break-all font-mono text-xs text-slate-500">
+          <p className="mt-1 break-all font-mono text-sm text-slate-600">
             {credential.organizationUrl}
           </p>
 
@@ -116,12 +116,12 @@ export function CredentialCard({
           </Link>
 
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={() => onDelete(credential)}
             disabled={deleteDisabled}
             aria-label={`Delete ${displayName}`}
-            className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+            className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
           >
             <svg
               viewBox="0 0 20 20"

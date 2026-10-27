@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
 import { Input } from "@/components/ui/input";
@@ -458,85 +459,94 @@ export function ProjectsTab() {
       ) : projects.error || !projects.data ? (
         <ErrorCard error={projects.error} credentialId={credentialId} onRetry={() => void projects.refetch()} />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full min-w-[640px] text-left text-sm" aria-label="SOP projects">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2 font-medium">Project</th>
-                <th className="px-3 py-2 font-medium">SOP set-up</th>
-                <th className="px-3 py-2 font-medium">Check for me</th>
-                <th className="px-3 py-2 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {projects.data.projects.items.map((project) => {
-                const setUp = setUpByName.get(project.name.toLowerCase());
-                return (
-                  <tr key={project.id} className="align-top">
-                    <td className="px-3 py-2 font-medium text-slate-900">
-                      {project.name}
-                      {showHistory === project.name ? (
-                        <div className="mt-1">
-                          <History projectName={project.name} />
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2">
-                      {setUp ? (
-                        <span className="text-xs text-slate-600">
-                          <StatusBadge tone="success">Set up</StatusBadge>{" "}
-                          {setUp.updatedBy ? `by ${setUp.updatedBy} · ` : ""}
-                          {formatRelative(setUp.updatedAt)}
-                        </span>
-                      ) : (
-                        <StatusBadge tone="neutral">Not set up</StatusBadge>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        aria-label={`Check ${project.name} for me`}
-                        checked={project.setUp && (pendingChoice[project.name] ?? project.checkedForMe)}
-                        disabled={!project.setUp || toggle.isPending}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setPendingChoice((current) => ({ ...current, [project.name]: checked }));
-                          toggle.mutate({ name: project.name, checked });
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-wrap justify-end gap-1">
-                        <Button size="sm" variant={project.setUp ? "ghost" : "secondary"} onClick={() => setEditing(project)}>
-                          {project.setUp ? "Edit" : "Set up"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setShowHistory(showHistory === project.name ? null : project.name)}>
-                          History
-                        </Button>
-                        {project.setUp ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={remove.isPending}
-                            onClick={() => {
-                              if (window.confirm(`Stop SOP checks on ${project.name} for everyone? The set-up history is kept.`)) {
-                                remove.mutate(project.name);
-                              }
-                            }}
-                          >
-                            Remove
-                          </Button>
+        <Updating active={projects.isPlaceholderData}>
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-left text-sm sm:min-w-[640px]" aria-label="SOP projects">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Project</th>
+                  <th className="px-3 py-2 font-medium">SOP set-up</th>
+                  <th className="px-3 py-2 font-medium">Check for me</th>
+                  <th className="px-3 py-2 font-medium">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {projects.data.projects.items.map((project) => {
+                  const setUp = setUpByName.get(project.name.toLowerCase());
+                  return (
+                    <tr key={project.id} className="align-top">
+                      <td className="px-3 py-3.5 font-medium text-slate-900">
+                        {project.name}
+                        {showHistory === project.name ? (
+                          <div className="mt-1">
+                            <History projectName={project.name} />
+                          </div>
                         ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-3 py-3.5">
+                        {setUp ? (
+                          <span className="text-xs text-slate-600">
+                            <StatusBadge tone="success">Set up</StatusBadge>{" "}
+                            <span className="hidden sm:inline">
+                              {setUp.updatedBy ? `by ${setUp.updatedBy} · ` : ""}
+                              {formatRelative(setUp.updatedAt)}
+                            </span>
+                          </span>
+                        ) : (
+                          <StatusBadge tone="neutral">Not set up</StatusBadge>
+                        )}
+                      </td>
+                      <td
+                        className="px-3 py-3.5"
+                        title={project.setUp ? undefined : "Set this project up first; only set-up projects can be checked."}
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-4 align-middle"
+                          aria-label={`Check ${project.name} for me`}
+                          checked={project.setUp && (pendingChoice[project.name] ?? project.checkedForMe)}
+                          disabled={!project.setUp || toggle.isPending}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setPendingChoice((current) => ({ ...current, [project.name]: checked }));
+                            toggle.mutate({ name: project.name, checked });
+                          }}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <Button size="sm" variant="secondary" onClick={() => setEditing(project)}>
+                            {project.setUp ? "Edit" : "Set up"}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => setShowHistory(showHistory === project.name ? null : project.name)}>
+                            History
+                          </Button>
+                          {project.setUp ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
+                              disabled={remove.isPending}
+                              onClick={() => {
+                                if (window.confirm(`Stop SOP checks on ${project.name} for everyone? The set-up history is kept.`)) {
+                                  remove.mutate(project.name);
+                                }
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Updating>
       )}
 
       {projects.data ? (
@@ -578,7 +588,8 @@ export function ProjectsTab() {
                   </label>
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
+                    className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
                     disabled={remove.isPending}
                     onClick={() => {
                       if (window.confirm(`Stop SOP checks on ${setUp.projectName} for everyone? The set-up history is kept.`)) {

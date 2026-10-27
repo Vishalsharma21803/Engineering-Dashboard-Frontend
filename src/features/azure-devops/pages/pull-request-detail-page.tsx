@@ -20,12 +20,12 @@ export function PullRequestDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="break-words text-sm text-slate-500">
           {pr.projectName} · {pr.repositoryName} · {pr.sourceBranch} → {pr.targetBranch} · by {pr.createdBy.displayName}{" "}
           {formatRelative(pr.creationDate)}
         </p>
-        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-          !{pr.pullRequestId} {pr.title}
+        <h2 className="mt-1 break-words text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
+          PR {pr.pullRequestId} {pr.title}
         </h2>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <StatusBadge tone={pr.status === "completed" ? "success" : pr.status === "active" ? "info" : "neutral"}>{pr.status}</StatusBadge>
@@ -119,7 +119,7 @@ export function PullRequestDetailPage() {
                   .map((thread) => (
                     <li key={thread.id} className="rounded-lg border border-slate-200 p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-xs text-slate-500">{thread.filePath ?? "General"}</span>
+                        <span className="truncate text-xs text-slate-500">{thread.filePath ?? "General comment"}</span>
                         <StatusBadge tone={thread.isResolved ? "success" : "warning"}>{thread.status}</StatusBadge>
                       </div>
                       <ul className="mt-2 space-y-2">

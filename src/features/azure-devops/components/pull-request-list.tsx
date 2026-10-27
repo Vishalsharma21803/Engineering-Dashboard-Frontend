@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Pagination } from "@/components/ui/pagination";
+import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 
@@ -43,7 +44,7 @@ function mergeBadge(pr: PullRequestSummary) {
   if (pr.isDraft) return <StatusBadge tone="neutral">Draft</StatusBadge>;
   if (pr.mergeStatus === "conflicts") return <StatusBadge tone="danger">Conflicts</StatusBadge>;
   if (pr.rejections > 0) return <StatusBadge tone="warning">Changes requested</StatusBadge>;
-  if (pr.approvals > 0) return <StatusBadge tone="success">{pr.approvals} approval(s)</StatusBadge>;
+  if (pr.approvals > 0) return <StatusBadge tone="success">{pr.approvals} {pr.approvals === 1 ? "approval" : "approvals"}</StatusBadge>;
   return <StatusBadge tone="info">Awaiting review</StatusBadge>;
 }
 
@@ -128,51 +129,53 @@ export function PullRequestList(props: PullRequestListProps) {
           toFirstPage();
         }}
       />
-      {hiddenCount > 0 ? (
-        <div className="flex justify-end">
-          <HiddenToggle
-            count={hiddenCount}
-            shown={data.showingHidden ?? false}
-            onToggle={() => {
-              setShowHidden(!data.showingHidden);
-              toFirstPage();
-            }}
-          />
-        </div>
-      ) : null}
-      <ul className="divide-y divide-slate-100">
-        {data.items.filter((pr) => !movedByPendingMark(triageOf(pr), data.showingHidden ?? false)).map((pr) => (
-          <li
-            key={`${pr.repositoryId}:${pr.pullRequestId}`}
-            className={cn("flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between", triageOf(pr).state !== "active" && "opacity-75")}
-          >
-            <div className="min-w-0">
-              <Link
-                to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(pr.projectId)}/repos/${encodeURIComponent(pr.repositoryId)}/pull-requests/${pr.pullRequestId}`}
-                className="font-medium text-slate-950 hover:text-indigo-600"
-              >
-                !{pr.pullRequestId} {pr.title}
-              </Link>
-              <p className="mt-0.5 text-xs text-slate-500">
-                {pr.repositoryName} · {pr.sourceBranch} → {pr.targetBranch} · {pr.myRole === "author" ? "You authored" : `by ${pr.createdBy.displayName}`} · {formatRelative(pr.creationDate)}
-                {pr.myRole === "reviewer" ? " · you're a reviewer" : ""}
-              </p>
-              {pr.myRole === "reviewer" && pr.myVote !== null ? <p className="mt-1 text-xs text-slate-600">Your vote: {voteFromValue(pr.myVote).label}</p> : null}
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              <TriageBadge resolved={triageOf(pr)} />
-              {mergeBadge(pr)}
-              {pr.unresolvedThreads ? <StatusBadge tone="warning">{pr.unresolvedThreads} unresolved</StatusBadge> : null}
-              {triage ? (
-                <TriageMenu triage={triage} itemKey={pullRequestKey(pr.repositoryId, pr.pullRequestId)} projectName={pr.projectName} label={`!${pr.pullRequestId} ${pr.title}`} resolved={triageOf(pr)} />
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {data.total === 0 ? (
-        <EmptyState>{data.poolTotal === 0 && !data.showingHidden ? "All your pull requests are snoozed or abandoned." : "No pull requests match these filters."}</EmptyState>
-      ) : null}
+      <Updating active={query.isPlaceholderData}>
+        {hiddenCount > 0 ? (
+          <div className="flex justify-end">
+            <HiddenToggle
+              count={hiddenCount}
+              shown={data.showingHidden ?? false}
+              onToggle={() => {
+                setShowHidden(!data.showingHidden);
+                toFirstPage();
+              }}
+            />
+          </div>
+        ) : null}
+        <ul className="divide-y divide-slate-100">
+          {data.items.filter((pr) => !movedByPendingMark(triageOf(pr), data.showingHidden ?? false)).map((pr) => (
+            <li
+              key={`${pr.repositoryId}:${pr.pullRequestId}`}
+              className={cn("flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between", triageOf(pr).state !== "active" && "opacity-75")}
+            >
+              <div className="min-w-0">
+                <Link
+                  to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(pr.projectId)}/repos/${encodeURIComponent(pr.repositoryId)}/pull-requests/${pr.pullRequestId}`}
+                  className="break-words font-medium text-slate-950 hover:text-indigo-600"
+                >
+                  PR {pr.pullRequestId} {pr.title}
+                </Link>
+                <p className="mt-0.5 break-words text-xs text-slate-500">
+                  {pr.repositoryName} · {pr.sourceBranch} → {pr.targetBranch} · {pr.myRole === "author" ? "You authored" : `by ${pr.createdBy.displayName}`} · {formatRelative(pr.creationDate)}
+                  {pr.myRole === "reviewer" ? " · you're a reviewer" : ""}
+                </p>
+                {pr.myRole === "reviewer" && pr.myVote !== null ? <p className="mt-1 text-xs text-slate-600">Your vote: {voteFromValue(pr.myVote).label}</p> : null}
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                <TriageBadge resolved={triageOf(pr)} />
+                {mergeBadge(pr)}
+                {pr.unresolvedThreads ? <StatusBadge tone="warning">{pr.unresolvedThreads} unresolved</StatusBadge> : null}
+                {triage ? (
+                  <TriageMenu triage={triage} itemKey={pullRequestKey(pr.repositoryId, pr.pullRequestId)} projectName={pr.projectName} label={`PR ${pr.pullRequestId} ${pr.title}`} resolved={triageOf(pr)} />
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+        {data.total === 0 ? (
+          <EmptyState>{data.poolTotal === 0 && !data.showingHidden ? "All your pull requests are snoozed or abandoned." : "No pull requests match these filters."}</EmptyState>
+        ) : null}
+      </Updating>
       <Pagination
         label="Pull request pages"
         page={data.page}

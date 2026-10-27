@@ -100,7 +100,7 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
             {dashboard.identity.displayName
               .split(/\s+/)
@@ -109,11 +109,11 @@ export function DashboardPage() {
               .slice(0, 2)
               .toUpperCase()}
           </span>
-          <div className="text-sm">
+          <div className="min-w-0 text-sm">
             <p className="font-medium text-slate-950">{dashboard.identity.displayName}</p>
             <p className="text-slate-500">
               Only your work: items assigned to you, PRs you authored or review, runs you triggered ·{" "}
-              {dashboard.projectsScanned} project(s) · updated {formatRelative(dashboard.generatedAt)}
+              {dashboard.projectsScanned} {dashboard.projectsScanned === 1 ? "project" : "projects"} · updated {formatRelative(dashboard.generatedAt)}
             </p>
           </div>
         </div>
@@ -223,7 +223,7 @@ export function DashboardPage() {
         </SectionView>
       </SectionCard>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 [&>*]:min-w-0">
         <SectionCard title="Pull requests & reviews">
           <SectionView section={dashboard.sections.pullRequests} label="pull requests">
             {() => (

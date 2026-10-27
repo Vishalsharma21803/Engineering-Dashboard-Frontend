@@ -87,54 +87,53 @@ export function AiProviderCard({ provider, credential }: AiProviderCardProps) {
   }
 
   return (
-    <Card className="p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold text-slate-950">{info.name}</h3>
-            {credential ? <CredentialStatusBadge status={credential.lastValidationStatus} /> : null}
-          </div>
-          <p className="mt-1 text-sm text-slate-600">{info.description}</p>
-          {credential ? (
-            <p className="mt-2 text-xs text-slate-500">
-              Key ending <span className="font-mono font-semibold text-slate-700">…{credential.keyHint}</span>
-              {credential.lastValidatedAt ? ` · validated ${formatDateTime(credential.lastValidatedAt)}` : " · not validated yet"}
-            </p>
-          ) : null}
+    <Card className="flex h-full flex-col p-5">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-base font-semibold text-slate-950">{info.name}</h3>
+          {credential ? <CredentialStatusBadge status={credential.lastValidationStatus} /> : null}
         </div>
-
-        {credential && !editing ? (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => runValidation(credential.id)}>
-              {validate.isPending ? <Spinner className="size-3.5" /> : null}
-              Validate
-            </Button>
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setEditing(true); setNotice(null); }}>
-              Replace key
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => {
-                if (window.confirm(`Delete your ${info.name} key? AI checks using it will stop.`)) {
-                  remove.mutate(credential.id, {
-                    onError: (error) => setNotice({ tone: "error", text: describeAiError(error, "Could not delete the key.") }),
-                  });
-                }
-              }}
-            >
-              Delete
-            </Button>
-          </div>
+        <p className="mt-1 text-sm text-slate-600">{info.description}</p>
+        {credential ? (
+          <p className="mt-2 text-xs text-slate-500">
+            Key ending <span className="font-mono font-semibold text-slate-700">…{credential.keyHint}</span>
+            {credential.lastValidatedAt ? ` · validated ${formatDateTime(credential.lastValidatedAt)}` : " · not validated yet"}
+          </p>
         ) : null}
       </div>
+
+      {credential && !editing ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => runValidation(credential.id)}>
+            {validate.isPending ? <Spinner className="size-3.5" /> : null}
+            Validate
+          </Button>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setEditing(true); setNotice(null); }}>
+            Replace key
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
+            disabled={busy}
+            onClick={() => {
+              if (window.confirm(`Delete your ${info.name} key? AI checks using it will stop.`)) {
+                remove.mutate(credential.id, {
+                  onError: (error) => setNotice({ tone: "error", text: describeAiError(error, "Could not delete the key.") }),
+                });
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </div>
+      ) : null}
 
       {showForm ? (
         <form onSubmit={submit} className="mt-4 space-y-2">
           <Label htmlFor={`ai-key-${provider}`}>{credential ? "New API key" : "API key"}</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="flex-1">
+          <div className="flex flex-col gap-2">
+            <div className="min-w-0">
               <PasswordInput
                 id={`ai-key-${provider}`}
                 autoComplete="off"
@@ -143,15 +142,17 @@ export function AiProviderCard({ provider, credential }: AiProviderCardProps) {
                 onChange={(event) => setApiKey(event.target.value)}
               />
             </div>
-            <Button type="submit" disabled={busy || apiKey.trim().length < 20}>
-              {create.isPending || replace.isPending ? <Spinner className="size-4" /> : null}
-              Save & validate
-            </Button>
-            {credential ? (
-              <Button type="button" variant="ghost" onClick={() => { setEditing(false); setApiKey(""); }}>
-                Cancel
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="submit" disabled={busy || apiKey.trim().length < 20}>
+                {create.isPending || replace.isPending ? <Spinner className="size-4" /> : null}
+                Save & validate
               </Button>
-            ) : null}
+              {credential ? (
+                <Button type="button" variant="ghost" onClick={() => { setEditing(false); setApiKey(""); }}>
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
           </div>
           <p className="text-xs text-slate-500">
             {info.keyHelp}{" "}

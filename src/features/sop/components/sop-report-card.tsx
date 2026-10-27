@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState, ErrorCard, SectionCard, StatTile } from "@/features/azure-devops/components/feedback";
@@ -86,7 +87,7 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
       title="Team SOP report"
       description="Every open or recently closed ticket in this project, checked with the default SOP rules (code rules only; AI results stay private to each person). Each run is saved for you only."
       actions={
-        <Button size="sm" variant="secondary" disabled={run.isPending} onClick={() => run.mutate()}>
+        <Button size="sm" variant="secondary" className="self-start whitespace-nowrap" disabled={run.isPending} onClick={() => run.mutate()}>
           {run.isPending ? <Spinner className="size-4" /> : null}
           {run.isPending ? "Running…" : "Run report"}
         </Button>
@@ -117,43 +118,45 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
           <>
             <details open={runsOpen} onToggle={(event) => setRunsOpen(event.currentTarget.open)}>
               <summary className="cursor-pointer text-sm font-medium text-slate-700">Your saved reports ({runs.data.total})</summary>
-              <ul aria-label="Saved reports" className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
-                {runs.data.items.map((item) => (
-                  <li key={item.id} className={cn("flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm", item.id === runId && "bg-indigo-50/60")}>
-                    <span className="text-slate-700">
-                      <span className="font-medium text-slate-900">{formatDateTime(item.createdAt)}</span> · {item.itemsChecked} checked ·{" "}
-                      {item.itemsWithGaps} with gaps · rules v{item.defaultVersion}
-                    </span>
-                    <span className="flex gap-2">
-                      <Button size="sm" variant="secondary" disabled={item.id === runId} onClick={() => selectRun(item.id)}>
-                        {item.id === runId ? "Showing" : "Open"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={remove.isPending}
-                        aria-label={`Delete the report from ${formatDateTime(item.createdAt)}`}
-                        onClick={() => {
-                          if (window.confirm(`Delete the report from ${formatDateTime(item.createdAt)}? This cannot be undone.`)) {
-                            remove.mutate(item.id);
-                          }
-                        }}
-                      >
-                        Delete
-                      </Button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <Pagination
-                label="Saved report pages"
-                page={runs.data.page}
-                totalPages={runs.data.totalPages}
-                total={runs.data.total}
-                pageSize={runs.data.pageSize}
-                disabled={runs.isFetching}
-                onChange={(next) => runsPageParam.setPage(next)}
-              />
+              <Updating active={runs.isPlaceholderData}>
+                <ul aria-label="Saved reports" className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
+                  {runs.data.items.map((item) => (
+                    <li key={item.id} className={cn("flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm", item.id === runId && "bg-indigo-50/60")}>
+                      <span className="text-slate-700">
+                        <span className="font-medium text-slate-900">{formatDateTime(item.createdAt)}</span> · {item.itemsChecked} checked ·{" "}
+                        {item.itemsWithGaps} with gaps · rules v{item.defaultVersion}
+                      </span>
+                      <span className="flex gap-2">
+                        <Button size="sm" variant="secondary" disabled={item.id === runId} onClick={() => selectRun(item.id)}>
+                          {item.id === runId ? "Showing" : "Open"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={remove.isPending}
+                          aria-label={`Delete the report from ${formatDateTime(item.createdAt)}`}
+                          onClick={() => {
+                            if (window.confirm(`Delete the report from ${formatDateTime(item.createdAt)}? This cannot be undone.`)) {
+                              remove.mutate(item.id);
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <Pagination
+                  label="Saved report pages"
+                  page={runs.data.page}
+                  totalPages={runs.data.totalPages}
+                  total={runs.data.total}
+                  pageSize={runs.data.pageSize}
+                  disabled={runs.isFetching}
+                  onChange={(next) => runsPageParam.setPage(next)}
+                />
+              </Updating>
             </details>
             {remove.error ? <p role="alert" className="text-sm text-rose-600">Could not delete that report. Please try again.</p> : null}
 
@@ -232,134 +235,136 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
           toFirstPages();
         }}
       />
-      {data.facets.roles.every((role) => role.value === "developer") ? (
-        <p className="text-xs text-slate-500">
-          Everyone counts as a developer until the project's team leads, QA and product owners are listed in its set-up (SOP rules → Projects → Advanced).
-        </p>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile label="Tickets checked" value={data.itemsChecked} hint={`default rules v${data.run.defaultVersion}`} />
-        <StatTile label="With SOP gaps" value={data.itemsWithGaps} />
-        <StatTile label="Compliant" value={percent(data.compliantShare)} />
-        <StatTile label="Run" value={<span className="text-base">{formatRelative(data.run.createdAt)}</span>} hint={formatDateTime(data.run.createdAt)} />
-        {data.trackedHours !== null ? (
-          <StatTile label="Tracked (Solidtime)" value={`${data.trackedHours} h`} hint={data.run.timeScope === "team" ? "whole team" : "your own time only"} />
+      <Updating active={report.isPlaceholderData}>
+        {data.facets.roles.every((role) => role.value === "developer") ? (
+          <p className="text-xs text-slate-500">
+            Everyone counts as a developer until the project's team leads, QA and product owners are listed in its set-up (SOP rules → Projects → Advanced).
+          </p>
         ) : null}
-      </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div>
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className={TABLE} aria-label="Gaps by rule">
-              <thead className={HEAD}>
-                <tr>
-                  <th className="px-3 py-2 font-medium">Rule</th>
-                  <th className="px-3 py-2 text-right font-medium">Failing</th>
-                  <th className="px-3 py-2 text-right font-medium">Checked</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.byRule.items.map((rule) => (
-                  <tr key={rule.ruleId}>
-                    <td className="px-3 py-2">
-                      <StatusBadge tone={rule.failing ? SEVERITY_TONES[rule.severity] : "success"}>{rule.ruleId}</StatusBadge>{" "}
-                      <span className="text-slate-800">{rule.ruleTitle}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium text-slate-900">{rule.failing}</td>
-                    <td className="px-3 py-2 text-right text-slate-600">{rule.checked}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            label="Gaps by rule pages"
-            page={data.byRule.page}
-            totalPages={data.byRule.totalPages}
-            total={data.byRule.total}
-            pageSize={data.byRule.pageSize}
-            disabled={busy}
-            onChange={(next) => rulePage.setPage(next)}
-          />
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatTile label="Tickets checked" value={data.itemsChecked} hint={`default rules v${data.run.defaultVersion}`} />
+          <StatTile label="With SOP gaps" value={data.itemsWithGaps} />
+          <StatTile label="Compliant" value={percent(data.compliantShare)} />
+          <StatTile label="Run" value={<span className="text-base">{formatRelative(data.run.createdAt)}</span>} hint={formatDateTime(data.run.createdAt)} />
+          {data.trackedHours !== null ? (
+            <StatTile label="Tracked (Solidtime)" value={`${data.trackedHours} h`} hint={data.run.timeScope === "team" ? "whole team" : "your own time only"} />
+          ) : null}
         </div>
 
-        <div>
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className={TABLE} aria-label="Gaps by person">
-              <thead className={HEAD}>
-                <tr>
-                  <th className="px-3 py-2 font-medium">Assigned to</th>
-                  <th className="px-3 py-2 text-right font-medium">Tickets</th>
-                  <th className="px-3 py-2 text-right font-medium">With gaps</th>
-                  <th className="px-3 py-2 text-right font-medium">Gaps</th>
-                  {data.run.timeScope ? <th className="px-3 py-2 text-right font-medium">Tracked</th> : null}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.byPerson.items.map((person) => (
-                  <tr key={person.personKey}>
-                    <td className="px-3 py-2 text-slate-800">
-                      {person.assignee?.displayName ?? "Unassigned"}{" "}
-                      <span className="text-xs text-slate-500">{person.roles.map((role) => ROLE_LABELS[role]).join(", ")}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right text-slate-600">{person.items}</td>
-                    <td className="px-3 py-2 text-right text-slate-600">{person.itemsWithGaps}</td>
-                    <td className="px-3 py-2 text-right font-medium text-slate-900">{person.gaps}</td>
-                    {data.run.timeScope ? <td className="px-3 py-2 text-right text-slate-600">{person.trackedHours ?? 0} h</td> : null}
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className={TABLE} aria-label="Gaps by rule">
+                <thead className={HEAD}>
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Rule</th>
+                    <th className="px-3 py-2 text-right font-medium">Failing</th>
+                    <th className="px-3 py-2 text-right font-medium">Checked</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            label="Gaps by person pages"
-            page={data.byPerson.page}
-            totalPages={data.byPerson.totalPages}
-            total={data.byPerson.total}
-            pageSize={data.byPerson.pageSize}
-            disabled={busy}
-            onChange={(next) => personPage.setPage(next)}
-          />
-        </div>
-      </div>
-
-      {data.items.total > 0 ? (
-        <details open={ticketsOpen} onToggle={(event) => setTicketsOpen(event.currentTarget.open)}>
-          <summary className="cursor-pointer text-sm font-medium text-slate-700">Tickets with gaps ({data.items.total})</summary>
-          <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
-            {data.items.items.map((item) => (
-              <li key={item.workItemId} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <Link to={`${base}/${item.workItemId}`} className="text-sm font-medium text-indigo-700 hover:underline">
-                  #{item.workItemId} {item.title}
-                </Link>
-                <span className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
-                  {item.assignee?.displayName ?? "Unassigned"} · {item.type} · {item.state}
-                  {typeof item.trackedHours === "number" ? ` · ${item.trackedHours} h tracked` : ""} ·
-                  {item.violations.map((violation) => (
-                    <StatusBadge key={violation.ruleId} tone={SEVERITY_TONES[violation.severity]} title={`${violation.ruleTitle}: ${violation.message}`}>
-                      {violation.ruleId}
-                    </StatusBadge>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.byRule.items.map((rule) => (
+                    <tr key={rule.ruleId}>
+                      <td className="px-3 py-2">
+                        <StatusBadge tone={rule.failing ? SEVERITY_TONES[rule.severity] : "success"}>{rule.ruleId}</StatusBadge>{" "}
+                        <span className="text-slate-800">{rule.ruleTitle}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-900">{rule.failing}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{rule.checked}</td>
+                    </tr>
                   ))}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <Pagination
-            label="Tickets with gaps pages"
-            page={data.items.page}
-            totalPages={data.items.totalPages}
-            total={data.items.total}
-            pageSize={data.items.pageSize}
-            disabled={busy}
-            onChange={(next) => itemsPage.setPage(next)}
-          />
-        </details>
-      ) : data.itemsChecked > 0 ? (
-        <p className="text-sm text-emerald-700">No SOP gaps in these tickets.</p>
-      ) : (
-        <EmptyState>No tickets match these filters.</EmptyState>
-      )}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              label="Gaps by rule pages"
+              page={data.byRule.page}
+              totalPages={data.byRule.totalPages}
+              total={data.byRule.total}
+              pageSize={data.byRule.pageSize}
+              disabled={busy}
+              onChange={(next) => rulePage.setPage(next)}
+            />
+          </div>
+
+          <div>
+            <div className="overflow-x-auto rounded-lg border border-slate-200">
+              <table className={TABLE} aria-label="Gaps by person">
+                <thead className={HEAD}>
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Assigned to</th>
+                    <th className="px-3 py-2 text-right font-medium">Tickets</th>
+                    <th className="px-3 py-2 text-right font-medium">With gaps</th>
+                    <th className="px-3 py-2 text-right font-medium">Gaps</th>
+                    {data.run.timeScope ? <th className="px-3 py-2 text-right font-medium">Tracked</th> : null}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.byPerson.items.map((person) => (
+                    <tr key={person.personKey}>
+                      <td className="px-3 py-2 text-slate-800">
+                        {person.assignee?.displayName ?? "Unassigned"}{" "}
+                        <span className="text-xs text-slate-500">{person.roles.map((role) => ROLE_LABELS[role]).join(", ")}</span>
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-600">{person.items}</td>
+                      <td className="px-3 py-2 text-right text-slate-600">{person.itemsWithGaps}</td>
+                      <td className="px-3 py-2 text-right font-medium text-slate-900">{person.gaps}</td>
+                      {data.run.timeScope ? <td className="px-3 py-2 text-right text-slate-600">{person.trackedHours ?? 0} h</td> : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              label="Gaps by person pages"
+              page={data.byPerson.page}
+              totalPages={data.byPerson.totalPages}
+              total={data.byPerson.total}
+              pageSize={data.byPerson.pageSize}
+              disabled={busy}
+              onChange={(next) => personPage.setPage(next)}
+            />
+          </div>
+        </div>
+
+        {data.items.total > 0 ? (
+          <details open={ticketsOpen} onToggle={(event) => setTicketsOpen(event.currentTarget.open)}>
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">Tickets with gaps ({data.items.total})</summary>
+            <ul className="mt-2 divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {data.items.items.map((item) => (
+                <li key={item.workItemId} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Link to={`${base}/${item.workItemId}`} className="text-sm font-medium text-indigo-700 hover:underline">
+                    #{item.workItemId} {item.title}
+                  </Link>
+                  <span className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
+                    {item.assignee?.displayName ?? "Unassigned"} · {item.type} · {item.state}
+                    {typeof item.trackedHours === "number" ? ` · ${item.trackedHours} h tracked` : ""} ·
+                    {item.violations.map((violation) => (
+                      <StatusBadge key={violation.ruleId} tone={SEVERITY_TONES[violation.severity]} title={`${violation.ruleTitle}: ${violation.message}`}>
+                        {violation.ruleId}
+                      </StatusBadge>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <Pagination
+              label="Tickets with gaps pages"
+              page={data.items.page}
+              totalPages={data.items.totalPages}
+              total={data.items.total}
+              pageSize={data.items.pageSize}
+              disabled={busy}
+              onChange={(next) => itemsPage.setPage(next)}
+            />
+          </details>
+        ) : data.itemsChecked > 0 ? (
+          <p className="text-sm text-emerald-700">No SOP gaps in these tickets.</p>
+        ) : (
+          <EmptyState>No tickets match these filters.</EmptyState>
+        )}
+      </Updating>
     </div>
   );
 }

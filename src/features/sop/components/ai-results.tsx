@@ -29,6 +29,7 @@ export interface AiResultsProps {
 }
 
 const VERDICT_ORDER = { fail: 0, unsure: 1, pass: 2 } as const;
+const VERDICT_LABELS = { fail: "Failed", unsure: "Unsure", pass: "Passed" } as const;
 
 /** A gap the AI left for facts only the developer knows. */
 const PLACEHOLDER = /\[\[\s*fill in[^\]]*\]\]/gi;
@@ -77,15 +78,14 @@ function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult
 
 function Verdict({ result, onUseFix, isProposing }: { result: AiRuleResult; onUseFix: AiResultsProps["onUseFix"]; isProposing: boolean }) {
   const tone = result.verdict === "fail" ? SEVERITY_TONES[result.severity] : result.verdict === "unsure" ? "warning" : "success";
+  const label = result.verdict === "fail" ? (result.severity === "low" ? "Notice" : "Failed") : VERDICT_LABELS[result.verdict];
 
   return (
     <li className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone={tone}>{result.ruleId}</StatusBadge>
+        <StatusBadge tone={tone}>{label}</StatusBadge>
+        <span className="font-mono text-xs text-slate-500">{result.ruleId}</span>
         <span className="text-sm font-medium text-slate-900">{result.ruleTitle}</span>
-        <span className="text-xs uppercase tracking-wide text-slate-500">
-          {result.verdict === "fail" && result.severity === "low" ? "notice" : result.verdict}
-        </span>
       </div>
       <p className="text-sm text-slate-700">{result.reason}</p>
       {result.quotes.length > 0 ? (
@@ -146,12 +146,16 @@ export function AiResults({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-medium text-slate-900">
-          AI checks
-          {check?.model ? <span className="font-normal text-slate-500"> · {check.model}</span> : null}
-          {check?.costUsd ? <span className="font-normal text-slate-500"> · ${check.costUsd.toFixed(4)}</span> : null}
-          {check?.finishedAt ? <span className="font-normal text-slate-500"> · {formatRelative(check.finishedAt)}</span> : null}
-        </p>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-900">AI checks</p>
+          {check?.model || check?.costUsd || check?.finishedAt ? (
+            <p className="break-all text-xs text-slate-500">
+              {[check.model, check.costUsd ? `$${check.costUsd.toFixed(4)}` : null, check.finishedAt ? formatRelative(check.finishedAt) : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
+        </div>
         <Button size="sm" variant="secondary" onClick={onRecheck} disabled={busy || isRechecking}>
           {busy || isRechecking ? <Spinner className="size-4" /> : null}
           {busy ? "Checking…" : paused ? "Try now" : pausedByOther ? `Check with ${providerName}` : "Re-check with AI"}

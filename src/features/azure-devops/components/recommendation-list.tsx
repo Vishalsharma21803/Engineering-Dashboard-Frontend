@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Pagination } from "@/components/ui/pagination";
+import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import type { ActionKind, ProposeActionInput } from "../types/action.types";
 import type { Recommendation } from "../types/azure.types";
 import type { ResolvedTriage } from "../types/triage.types";
 import { CATEGORY_LABELS, actionKindLabel } from "../utils/labels";
+import { pluralizeText } from "../utils/format";
 import { movedByPendingMark } from "../utils/triage";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { EmptyState, ErrorCard, SkeletonRows } from "./feedback";
@@ -123,7 +125,8 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
     const suggestion = recommendation.suggestedAction;
     const workItem =
       recommendation.target.type === "workItem" ? workItems.get(recommendation.target.id) : undefined;
-    const reasons = recommendation.reasons.filter((reason) => !PRIORITY_REASON.test(reason));
+    const reasons = recommendation.reasons.filter((reason) => !PRIORITY_REASON.test(reason)).map(pluralizeText);
+    const targetBadge = recommendation.target.type === "workItem" ? null : TARGET_BADGES[recommendation.target.type];
     const path = targetPath(credentialId, recommendation);
     const muted = resolved.state !== "active";
 
@@ -151,14 +154,14 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
               <StatusBadge tone={category.tone}>{category.label}</StatusBadge>
               {workItem ? (
                 <WorkItemTypeBadge type={workItem.type} compact />
-              ) : recommendation.target.type !== "workItem" ? (
+              ) : targetBadge && targetBadge.label !== category.label ? (
                 <span
                   className={cn(
                     "inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ring-1 ring-inset",
-                    TARGET_BADGES[recommendation.target.type].className
+                    targetBadge.className
                   )}
                 >
-                  {TARGET_BADGES[recommendation.target.type].label}
+                  {targetBadge.label}
                 </span>
               ) : null}
               {workItem && workItem.priority !== null ? <PriorityBadge priority={workItem.priority} /> : null}
@@ -186,43 +189,46 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-9 sm:pl-4">
-          {suggestion && !suggestion.requiresInput ? (
-            <Button
-              size="sm"
-              disabled={isProposing}
-              onClick={() =>
-                onPropose({
-                  credentialId,
-                  kind: suggestion.kind as ActionKind,
-                  source: "RECOMMENDATION",
-                  target: suggestion.target,
-                  params: suggestion.params,
-                })
-              }
-            >
-              {actionKindLabel(suggestion.kind)}…
-            </Button>
-          ) : suggestion ? (
-            <Link to={path} className={buttonClassName({ size: "sm" })}>
-              {actionKindLabel(suggestion.kind)}…
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap sm:pl-4">
+          {/* Buttons and the triage menu stay on one row; only the score may wrap below them. */}
+          <div className="flex items-center gap-2">
+            {suggestion && !suggestion.requiresInput ? (
+              <Button
+                size="sm"
+                disabled={isProposing}
+                onClick={() =>
+                  onPropose({
+                    credentialId,
+                    kind: suggestion.kind as ActionKind,
+                    source: "RECOMMENDATION",
+                    target: suggestion.target,
+                    params: suggestion.params,
+                  })
+                }
+              >
+                {actionKindLabel(suggestion.kind)}…
+              </Button>
+            ) : suggestion ? (
+              <Link to={path} className={buttonClassName({ size: "sm" })}>
+                {actionKindLabel(suggestion.kind)}…
+              </Link>
+            ) : null}
+            <Link to={path} className={buttonClassName({ size: "sm", variant: "secondary" })}>
+              Open
             </Link>
-          ) : null}
-          <Link to={path} className={buttonClassName({ size: "sm", variant: "secondary" })}>
-            Open
-          </Link>
-          <TriageMenu
-            triage={triage}
-            itemKey={itemKey}
-            projectName={recommendation.target.projectName}
-            label={recommendation.title}
-            resolved={resolved}
-          />
+            <TriageMenu
+              triage={triage}
+              itemKey={itemKey}
+              projectName={recommendation.target.projectName}
+              label={recommendation.title}
+              resolved={resolved}
+            />
+          </div>
           <span
-            className="hidden w-8 text-right text-xs tabular-nums text-slate-400 sm:inline"
-            title="Priority score"
+            className="ml-auto whitespace-nowrap pl-1 text-right text-xs tabular-nums text-slate-400 sm:ml-0"
+            title="Priority score: higher means more urgent. The list is sorted by it."
           >
-            {recommendation.score}
+            score {recommendation.score}
           </span>
         </div>
       </li>
@@ -270,30 +276,32 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
         </div>
       ) : null}
 
-      {showHidden ? (
-        <ol aria-label="Snoozed and abandoned" className="space-y-2">
-          {entries.map((entry) => renderItem(entry, null))}
-        </ol>
-      ) : (
-        <>
-          {active.length > 0 ? (
-            <ol className="space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
-          ) : data.activeTotal === 0 ? (
-            <EmptyState>
-              Nothing needs your attention right now
-              {data.acknowledgedTotal > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
-            </EmptyState>
-          ) : null}
+      <Updating active={query.isPlaceholderData}>
+        {showHidden ? (
+          <ol aria-label="Snoozed and abandoned" className="space-y-2">
+            {entries.map((entry) => renderItem(entry, null))}
+          </ol>
+        ) : (
+          <>
+            {active.length > 0 ? (
+              <ol className="space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
+            ) : data.activeTotal === 0 ? (
+              <EmptyState>
+                Nothing needs your attention right now
+                {data.acknowledgedTotal > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
+              </EmptyState>
+            ) : null}
 
-          {acknowledged.length > 0 ? (
-            <section aria-label="Acknowledged" className="space-y-2 pt-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Acknowledged · {data.acknowledgedTotal}</h3>
-              <ol className="space-y-2">{acknowledged.map((entry) => renderItem(entry, null))}</ol>
-            </section>
-          ) : null}
-        </>
-      )}
+            {acknowledged.length > 0 ? (
+              <section aria-label="Acknowledged" className="space-y-2 pt-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Acknowledged · {data.acknowledgedTotal}</h3>
+                <ol className="space-y-2">{acknowledged.map((entry) => renderItem(entry, null))}</ol>
+              </section>
+            ) : null}
+          </>
+        )}
 
+      </Updating>
       <Pagination
         label="Prioritized action pages"
         page={data.page}

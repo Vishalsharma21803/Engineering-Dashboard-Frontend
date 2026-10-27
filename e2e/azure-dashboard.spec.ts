@@ -62,7 +62,7 @@ test("discovers projects, prioritizes work and never writes without approval", a
   await expect(page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
   // SOP rule T-01 (estimate) fails for the started tickets #102 and #103; #106 is still New, so it is not flagged.
   await expect(page.getByRole("table").getByText("T-01")).toHaveCount(2);
-  await expect(page.getByRole("link", { name: "!1 Login flow", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "PR 1 Login flow", exact: true })).toBeVisible();
   await expect(page.getByText("2 unresolved", { exact: true })).toBeVisible();
 
   expect(await azureWrites(request)).toEqual([]);
@@ -175,7 +175,7 @@ test("tabs work and project overview shows the whole team while My work stays mi
   await expect(teamTable.getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
 
   await expect(page.getByRole("heading", { name: "Active pull requests" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "!3 Refactor settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "PR 3 Refactor settings", exact: true })).toBeVisible();
 
   // Approvals & audit tab
   await tabs.getByRole("link", { name: "Approvals & audit" }).click();

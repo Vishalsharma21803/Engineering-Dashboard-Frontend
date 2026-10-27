@@ -177,14 +177,14 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
               params: { repositoryId, pullRequestId: Number(pullRequestId) },
             });
           }}
-          className="grid grid-cols-[1fr_7rem_auto] gap-2"
+          className="grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-[1fr_7rem_auto]"
         >
           <Label htmlFor="action-repo" className="sr-only">
             Repository
           </Label>
           <select
             id="action-repo"
-            className={selectClassName}
+            className={`${selectClassName} col-span-2 sm:col-span-1`}
             value={repositoryId}
             onChange={(event) => setRepositoryId(event.target.value)}
           >

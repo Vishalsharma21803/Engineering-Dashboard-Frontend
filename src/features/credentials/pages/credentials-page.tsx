@@ -232,8 +232,8 @@ export function CredentialsPage() {
             Credentials
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Manage Azure DevOps organization access. PATs are
-            encrypted at rest and never returned to the browser.
+            Connect your Azure DevOps organizations, Solidtime and AI
+            providers. Tokens are stored encrypted and never shown again.
           </p>
         </div>
 
@@ -355,9 +355,7 @@ export function CredentialsPage() {
         </svg>
 
         <p>
-          Stored PATs are AES-256-GCM encrypted. This page only
-          receives metadata such as the label, organization URL, and
-          validation status.
+          Tokens are stored encrypted and never shown again.
         </p>
       </div>
 

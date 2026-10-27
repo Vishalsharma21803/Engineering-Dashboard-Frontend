@@ -2,19 +2,26 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Updating } from "@/components/ui/updating";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState, ErrorCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
-import { formatDateTime } from "@/features/azure-devops/utils/format";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { getUnlinked } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import type { SolidtimeConnection, TimesheetEntry } from "../types/solidtime.types";
-import { formatDuration, shiftDay } from "../utils/time";
+import { useSolidtimeTimeZone } from "../hooks/use-solidtime";
+import { formatDayLabel, formatDuration, localDay, shiftDay, zonedClock } from "../utils/time";
 
-function FixDescription({ connection, entry, onPropose, isProposing }: { connection: SolidtimeConnection; entry: TimesheetEntry; onPropose: (input: ProposeActionInput) => void; isProposing: boolean }) {
+/** "Tue, Oct 27 · 09:00–10:30" in my Solidtime time zone. */
+function when(entry: TimesheetEntry, timeZone: string): string {
+  const day = formatDayLabel(localDay(new Date(entry.start), timeZone), { weekday: "short", day: "numeric", month: "short" });
+  return `${day} · ${zonedClock(entry.start, timeZone)}–${entry.end ? zonedClock(entry.end, timeZone) : "now"}`;
+}
+
+function FixDescription({ connection, entry, label, onPropose, isProposing }: { connection: SolidtimeConnection; entry: TimesheetEntry; label: string; onPropose: (input: ProposeActionInput) => void; isProposing: boolean }) {
   const [text, setText] = useState(entry.description ?? "");
 
   return (
@@ -25,7 +32,7 @@ function FixDescription({ connection, entry, onPropose, isProposing }: { connect
         onPropose({ credentialId: connection.credentialId, kind: "SOLIDTIME_ENTRY_UPDATE", target: { entryId: entry.id, entryStart: entry.start }, params: { description: text.trim() || null } });
       }}
     >
-      <Input aria-label={`Description for the entry at ${formatDateTime(entry.start)}`} className="h-8 text-xs" value={text} onChange={(event) => setText(event.target.value)} placeholder="#21786 Ticket title" />
+      <Input aria-label={`Description for the entry on ${label}`} className="h-9 min-w-0 flex-1 text-sm" value={text} onChange={(event) => setText(event.target.value)} placeholder="#21786 Ticket title" />
       <Button size="sm" type="submit" disabled={isProposing || text.trim() === (entry.description ?? "")}>
         Fix…
       </Button>
@@ -38,6 +45,7 @@ export function UnlinkedTab({ connection, onPropose, isProposing, today }: { con
   const to = today;
   const from = shiftDay(to, -13);
   const pageParam = usePageParam("unlinkedPage");
+  const timeZone = useSolidtimeTimeZone(connection.credentialId) ?? "UTC";
   const list = useQuery({
     queryKey: [...solidtimeKeys.unlinked(connection.credentialId), { from, to, page: pageParam.page }],
     queryFn: () => getUnlinked(connection.credentialId, { from, to, page: pageParam.page }),
@@ -52,24 +60,27 @@ export function UnlinkedTab({ connection, onPropose, isProposing, today }: { con
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-slate-600">
-        Entries from {from} to {to} without a ticket number. Add the number (e.g. #21786) so the time counts for the ticket.
+        Your entries from {formatDayLabel(from, { day: "numeric", month: "short" })} to {formatDayLabel(to, { day: "numeric", month: "short" })} that name no ticket. Add the ticket number (e.g. #21786) so the time counts for it.
       </p>
       {!list.data.ticketsChecked ? <p className="text-xs text-amber-700">Ticket numbers could not be checked against Azure DevOps; only entries with no number at all are listed.</p> : null}
-      {list.data.total === 0 ? (
-        <EmptyState>Every entry names a ticket.</EmptyState>
-      ) : (
-        <ul aria-label="Entries without a ticket" className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-          {list.data.items.map((entry) => (
-            <li key={entry.id} className="flex flex-col gap-1.5 px-3 py-2">
-              <p className="text-xs text-slate-500">
-                {formatDateTime(entry.start)} · {formatDuration(entry.seconds)}
-                {entry.projectName ? ` · ${entry.projectName}` : ""}
-              </p>
-              <FixDescription connection={connection} entry={entry} onPropose={onPropose} isProposing={isProposing} />
-            </li>
-          ))}
-        </ul>
-      )}
+      <Updating active={list.isPlaceholderData}>
+        {list.data.total === 0 ? (
+          <EmptyState>Every entry names a ticket.</EmptyState>
+        ) : (
+          <ul aria-label="Entries without a ticket" className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-surface shadow-sm">
+            {list.data.items.map((entry) => (
+              <li key={entry.id} className="flex flex-col gap-2 p-4">
+                <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <span className="font-semibold tabular-nums text-slate-950">{formatDuration(entry.seconds)}</span>
+                  <span className="text-slate-500">{when(entry, timeZone)}</span>
+                  {entry.projectName ? <span className="text-slate-500">· {entry.projectName}</span> : null}
+                </p>
+                <FixDescription connection={connection} entry={entry} label={when(entry, timeZone)} onPropose={onPropose} isProposing={isProposing} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Updating>
       <Pagination label="Unlinked entry pages" page={list.data.page} totalPages={list.data.totalPages} total={list.data.total} pageSize={list.data.pageSize} disabled={list.isFetching} onChange={(next) => pageParam.setPage(next)} />
     </div>
   );

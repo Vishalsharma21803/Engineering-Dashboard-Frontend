@@ -9,6 +9,7 @@ import { RuleSummaryTable } from "../components/rule-summary-table";
 import { RulebookEditor } from "../components/rulebook-editor";
 import { useEffectiveRules, useRulebook } from "../hooks/use-sop";
 import type { RulebookScope } from "../types/sop.types";
+import { rulebookVersionsLabel } from "../utils/rule-labels";
 
 type Tab = RulebookScope | "effective" | "projects";
 
@@ -23,7 +24,7 @@ function isTab(value: string | null): value is Tab {
   return TABS.some((tab) => tab.id === value);
 }
 
-const PERSONAL_PLACEHOLDER = `Your rules change only your own checks. Examples:
+const PERSONAL_PLACEHOLDER = `Example only (start typing to replace it). Your rules change only your own checks:
 
 ---
 id: DEV-02
@@ -85,8 +86,8 @@ function EffectiveTab() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-slate-600">
-        Default rules v{effective.data.defaultVersion} + your rules v{effective.data.personalVersion}. Team reports always use
-        the default rules only.
+        {rulebookVersionsLabel(effective.data.defaultVersion, effective.data.personalVersion)}. Team reports always use the
+        default rules only.
       </p>
       {effective.data.issues.length > 0 ? (
         <ul className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -118,7 +119,7 @@ export function SopRulesPage() {
 
 
   return (
-    <section className="flex w-full flex-col gap-6">
+    <section className="flex w-full min-w-0 flex-col gap-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">SOP</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">SOP rules</h1>
@@ -128,7 +129,7 @@ export function SopRulesPage() {
         </p>
       </div>
 
-      <div role="tablist" className="flex gap-1 border-b border-slate-200">
+      <div role="tablist" className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -137,7 +138,7 @@ export function SopRulesPage() {
             aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
             className={cn(
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition",
+              "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition",
               tab === item.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:text-slate-950"
             )}
           >

@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -20,12 +19,6 @@ export function NotFoundPage() {
             The page you are looking for does not exist or has moved.
           </CardDescription>
         </CardHeader>
-
-        <CardContent>
-          <p className="text-sm text-slate-500">
-            Return to the cockpit to continue.
-          </p>
-        </CardContent>
 
         <CardFooter className="justify-center">
           <Link

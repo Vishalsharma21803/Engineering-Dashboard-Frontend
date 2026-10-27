@@ -17,17 +17,40 @@ import { TicketTimePanel } from "@/features/solidtime/components/ticket-time-pan
 import { useActionReview } from "../hooks/use-action-review";
 import { useWorkItem } from "../hooks/use-work-item";
 import type { ActionKind } from "../types/action.types";
+import type { WorkFieldChange } from "../types/azure.types";
 import { formatDateTime, formatRelative, formatValue } from "../utils/format";
 import { SopResultPanel } from "@/features/sop/components/sop-result-panel";
 import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
 import { fixToAction } from "@/features/sop/utils/ai-check";
 import { actionKindLabel } from "../utils/labels";
 
-function Field({ label, value }: { label: string; value: string | number | null }) {
+/** Readable names for the fields in the work log history. */
+const HISTORY_FIELDS: Record<WorkFieldChange["field"], { label: string; hours: boolean }> = {
+  OriginalEstimate: { label: "Original estimate", hours: true },
+  RemainingWork: { label: "Remaining work", hours: true },
+  CompletedWork: { label: "Completed work", hours: true },
+  State: { label: "State", hours: false },
+};
+
+function withHours(value: string | number | null, hours: boolean): string {
+  const text = formatValue(value);
+  return hours && text !== "—" ? `${text} h` : text;
+}
+
+/** A detail tile; an empty value is muted, or the tile is left out when `optional`. */
+function Field({ label, value, hours = false, optional = false }: { label: string; value: string | number | null; hours?: boolean; optional?: boolean }) {
+  const empty = formatValue(value) === "—";
+
+  if (empty && optional) {
+    return null;
+  }
+
   return (
-    <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+    <div className="min-w-0 rounded-lg border border-slate-100 bg-slate-50 p-3">
       <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm font-semibold text-slate-900">{formatValue(value)}</dd>
+      <dd className={cn("mt-1 break-words text-sm font-semibold", empty ? "font-normal text-slate-400" : "text-slate-900")}>
+        {withHours(value, hours)}
+      </dd>
     </div>
   );
 }
@@ -61,7 +84,7 @@ export function WorkItemDetailPage() {
           </Link>
           {" / "}#{workItem.id}
         </nav>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        <h2 className="mt-2 break-words text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
           <span className="text-slate-400">#{workItem.id}</span> {workItem.title}
         </h2>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -81,14 +104,14 @@ export function WorkItemDetailPage() {
         </div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
-        <Field label="Priority" value={workItem.priority} />
-        <Field label="Assigned to" value={workItem.assignedTo?.displayName ?? null} />
-        <Field label="Original estimate" value={workItem.originalEstimate} />
-        <Field label="Story points / effort" value={workItem.storyPoints ?? workItem.effort} />
-        <Field label="Completed" value={workItem.completedWork} />
-        <Field label="Remaining" value={workItem.remainingWork} />
-        <Field label="Iteration" value={workItem.iterationPath} />
+      {/* Priority is the P badge above, so it has no tile of its own. */}
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Field label="Assigned to" value={workItem.assignedTo?.displayName ?? "Unassigned"} />
+        <Field label="Original estimate" value={workItem.originalEstimate} hours />
+        <Field label="Completed" value={workItem.completedWork} hours />
+        <Field label="Remaining" value={workItem.remainingWork} hours />
+        <Field label="Story points / effort" value={workItem.storyPoints ?? workItem.effort} optional />
+        <Field label="Iteration" value={workItem.iterationPath} optional />
       </dl>
 
       <SectionCard title="SOP compliance" description="Checked against your SOP rules (the default rules plus your own changes).">
@@ -180,9 +203,9 @@ export function WorkItemDetailPage() {
                     <li key={`${pr.repositoryId}:${pr.pullRequestId}`} className="flex items-center justify-between gap-2 text-sm">
                       <Link
                         to={`${base}/projects/${encodeURIComponent(pr.projectId)}/repos/${encodeURIComponent(pr.repositoryId)}/pull-requests/${pr.pullRequestId}`}
-                        className="font-medium text-slate-900 hover:text-indigo-600"
+                        className="min-w-0 break-words font-medium text-slate-900 hover:text-indigo-600"
                       >
-                        !{pr.pullRequestId} {pr.title ?? "(unavailable)"}
+                        PR {pr.pullRequestId} {pr.title ?? "(unavailable)"}
                       </Link>
                       <StatusBadge tone={pr.status === "completed" ? "success" : pr.status === "active" ? "info" : "neutral"}>
                         {pr.status}
@@ -224,9 +247,11 @@ export function WorkItemDetailPage() {
               ) : (
                 <ul className="space-y-1.5 text-sm">
                   {history.slice(0, 20).map((change, index) => (
-                    <li key={index} className="flex justify-between gap-2">
+                    <li key={index} className="flex flex-wrap justify-between gap-x-2 gap-y-0.5">
                       <span className="text-slate-700">
-                        {change.field}: {formatValue(change.oldValue)} → <span className="font-medium">{formatValue(change.newValue)}</span>
+                        {HISTORY_FIELDS[change.field]?.label ?? change.field}:{" "}
+                        {withHours(change.oldValue, HISTORY_FIELDS[change.field]?.hours ?? false)} →{" "}
+                        <span className="font-medium">{withHours(change.newValue, HISTORY_FIELDS[change.field]?.hours ?? false)}</span>
                       </span>
                       <span className="shrink-0 text-xs text-slate-500">
                         {change.revisedBy?.displayName ?? ""} · {formatRelative(change.revisedDate)}

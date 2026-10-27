@@ -70,3 +70,18 @@ export function zonedInstant(day: string, clock: string, timeZone: string): stri
   instant = guess - offsetMinutes(new Date(instant), timeZone) * 60_000;
   return new Date(instant).toISOString();
 }
+
+/** A YYYY-MM-DD day for people ("Tue, 27 Oct"), in the browser's language; the day itself is not shifted by any time zone. */
+export function formatDayLabel(day: string, options: Intl.DateTimeFormatOptions): string {
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+  return new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, date)));
+}
+
+/** <input type="datetime-local"> value for an instant in the time zone ("2026-10-27T09:30"), and back. */
+export function toZonedInput(iso: string, timeZone: string): string {
+  return `${localDay(new Date(iso), timeZone)}T${zonedClock(iso, timeZone)}`;
+}
+
+export function fromZonedInput(value: string, timeZone: string): string | null {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? zonedInstant(value.slice(0, 10), value.slice(11, 16), timeZone) : null;
+}

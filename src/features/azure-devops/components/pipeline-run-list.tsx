@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Pagination } from "@/components/ui/pagination";
+import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 import { listDashboardPipelineRuns } from "../api/azure.api";
@@ -80,46 +81,48 @@ export function PipelineRunList({ credentialId, projectId, dashboardToken, triag
           }}
         />
       ) : null}
-      {data.hiddenCount > 0 ? (
-        <div className="flex justify-end">
-          <HiddenToggle
-            count={data.hiddenCount}
-            shown={data.showingHidden}
-            onToggle={() => {
-              setShowHidden(!data.showingHidden);
-              setPage(1, { replace: true });
-            }}
-          />
-        </div>
-      ) : null}
-      {data.total === 0 ? (
-        <EmptyState>
-          {data.poolTotal === 0 && !data.showingHidden ? "All your recent pipeline runs are snoozed or abandoned." : "No pipeline runs match this filter."}
-        </EmptyState>
-      ) : null}
-      <ul className="divide-y divide-slate-100">
-        {data.items.filter((build) => !movedByPendingMark(triageOf(build), data.showingHidden)).map((build) => (
-          <li key={build.id} className={cn("flex items-center justify-between gap-2 py-2.5", triageOf(build).state !== "active" && "opacity-75")}>
-            <Link
-              to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(build.projectName ?? "")}?build=${build.id}`}
-              className="min-w-0 truncate text-sm text-slate-800 hover:text-indigo-600"
-            >
-              <span className="font-medium">{build.definitionName}</span> #{build.buildNumber} · {stripRef(build.sourceBranch)} · {formatRelative(build.queueTime)}
-            </Link>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <TriageBadge resolved={triageOf(build)} />
-              <StatusBadge tone={buildTone(build.status, build.result)}>{buildLabel(build.status, build.result)}</StatusBadge>
-              <TriageMenu
-                triage={triage}
-                itemKey={pipelineKey(build)}
-                projectName={build.projectName}
-                label={`${build.definitionName} on ${stripRef(build.sourceBranch)}`}
-                resolved={triageOf(build)}
-              />
-            </span>
-          </li>
-        ))}
-      </ul>
+      <Updating active={query.isPlaceholderData}>
+        {data.hiddenCount > 0 ? (
+          <div className="flex justify-end">
+            <HiddenToggle
+              count={data.hiddenCount}
+              shown={data.showingHidden}
+              onToggle={() => {
+                setShowHidden(!data.showingHidden);
+                setPage(1, { replace: true });
+              }}
+            />
+          </div>
+        ) : null}
+        {data.total === 0 ? (
+          <EmptyState>
+            {data.poolTotal === 0 && !data.showingHidden ? "All your recent pipeline runs are snoozed or abandoned." : "No pipeline runs match this filter."}
+          </EmptyState>
+        ) : null}
+        <ul className="divide-y divide-slate-100">
+          {data.items.filter((build) => !movedByPendingMark(triageOf(build), data.showingHidden)).map((build) => (
+            <li key={build.id} className={cn("flex items-center justify-between gap-2 py-2.5", triageOf(build).state !== "active" && "opacity-75")}>
+              <Link
+                to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(build.projectName ?? "")}?build=${build.id}`}
+                className="min-w-0 truncate text-sm text-slate-800 hover:text-indigo-600"
+              >
+                <span className="font-medium">{build.definitionName}</span> #{build.buildNumber} · {stripRef(build.sourceBranch)} · {formatRelative(build.queueTime)}
+              </Link>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <TriageBadge resolved={triageOf(build)} />
+                <StatusBadge tone={buildTone(build.status, build.result)}>{buildLabel(build.status, build.result)}</StatusBadge>
+                <TriageMenu
+                  triage={triage}
+                  itemKey={pipelineKey(build)}
+                  projectName={build.projectName}
+                  label={`${build.definitionName} on ${stripRef(build.sourceBranch)}`}
+                  resolved={triageOf(build)}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Updating>
       <Pagination
         label="Pipeline run pages"
         page={data.page}

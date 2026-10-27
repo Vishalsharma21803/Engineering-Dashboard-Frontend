@@ -64,7 +64,7 @@ describe("AiResults", () => {
       "As a manager I want a summary so that I can track progress."
     );
     expect(screen.getByText(/Checked: 1 quote\(s\) could not be found/)).toBeInTheDocument();
-    expect(screen.getByText("AI checks").closest("p")).toHaveTextContent(/claude-sonnet-5-5 · \$0\.0042/);
+    expect(screen.getByText("AI checks").closest("div")).toHaveTextContent(/claude-sonnet-5-5 · \$0\.0042/);
 
     await userEvent.click(screen.getByRole("button", { name: "Re-check with AI" }));
     expect(onRecheck).toHaveBeenCalled();

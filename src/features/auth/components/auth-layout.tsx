@@ -85,10 +85,6 @@ export function AuthLayout() {
           </div>
 
           <Outlet />
-
-          <p className="mt-8 text-center text-xs text-slate-400">
-            Secure session via an httpOnly cookie.
-          </p>
         </div>
       </main>
     </div>

@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Updating } from "@/components/ui/updating";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { ErrorCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
@@ -50,34 +51,41 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
         <ErrorCard error={list.error} onRetry={() => void list.refetch()} />
       ) : (
         <>
-          <ul aria-label={TITLES[kind]} className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
-            {list.data.items.length === 0 ? <li className="px-3 py-2 text-slate-500">None yet.</li> : null}
-            {list.data.items.map((item) => (
-              <li key={item.id} className="flex justify-between gap-2 px-3 py-2">
-                <span className="text-slate-800">{item.name}</span>
-                {"spent_time" in item ? <span className="text-xs text-slate-500">{formatDuration((item as SolidtimeProject | SolidtimeTask).spent_time)}</span> : null}
-              </li>
-            ))}
-          </ul>
+          <Updating active={list.isPlaceholderData}>
+            <ul aria-label={TITLES[kind]} className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
+              {list.data.items.length === 0 ? <li className="px-3 py-2 text-slate-500">None yet.</li> : null}
+              {list.data.items.map((item) => (
+                <li key={item.id} className="flex justify-between gap-2 px-3 py-2">
+                  <span className="text-slate-800">{item.name}</span>
+                  {"spent_time" in item ? <span className="text-xs text-slate-500">{formatDuration((item as SolidtimeProject | SolidtimeTask).spent_time)}</span> : null}
+                </li>
+              ))}
+            </ul>
+          </Updating>
           <Pagination label={`${TITLES[kind]} pages`} page={list.data.page} totalPages={list.data.totalPages} total={list.data.total} pageSize={list.data.pageSize} disabled={list.isFetching} onChange={(next) => pageParam.setPage(next)} />
         </>
       )}
-      <form onSubmit={submit} className="flex flex-wrap gap-2" aria-label={`New ${kind.slice(0, -1)}`}>
-        {kind === "tasks" ? (
-          <select aria-label="Project for the new task" className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-            <option value="">Choose a project</option>
-            {(catalog.data?.projects ?? []).map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        <Input aria-label={`New ${kind.slice(0, -1)} name`} placeholder={`New ${kind.slice(0, -1)} name`} className="h-9 w-56" value={name} onChange={(event) => setName(event.target.value)} />
-        <Button size="sm" type="submit" variant="secondary" disabled={isProposing || !name.trim() || (kind === "tasks" && !projectId)}>
-          Create…
-        </Button>
-      </form>
+      {/* Projects, tags and clients need a Manager role in Solidtime; tasks do not. */}
+      {kind !== "tasks" && !connection.canViewTeam ? (
+        <p className="text-xs text-slate-500">Creating {kind} needs a Manager role in Solidtime.</p>
+      ) : (
+        <form onSubmit={submit} className="flex flex-wrap gap-2 sm:flex-nowrap" aria-label={`New ${kind.slice(0, -1)}`}>
+          {kind === "tasks" ? (
+            <select aria-label="Project for the new task" className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+              <option value="">Choose a project</option>
+              {(catalog.data?.projects ?? []).map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <Input aria-label={`New ${kind.slice(0, -1)} name`} placeholder={`New ${kind.slice(0, -1)} name`} className="h-9 min-w-0 flex-1" value={name} onChange={(event) => setName(event.target.value)} />
+          <Button size="sm" type="submit" variant="secondary" disabled={isProposing || !name.trim() || (kind === "tasks" && !projectId)}>
+            Create…
+          </Button>
+        </form>
+      )}
     </section>
   );
 }

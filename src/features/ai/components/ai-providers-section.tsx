@@ -22,7 +22,7 @@ export function AiProvidersSection() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-stretch gap-4 lg:grid-cols-3">
         <AiProviderCard provider="CLAUDE" credential={byProvider.get("CLAUDE")} />
         <AiProviderCard provider="OPENROUTER" credential={byProvider.get("OPENROUTER")} />
         <AiProviderCard provider="OPENCODE" credential={byProvider.get("OPENCODE")} />

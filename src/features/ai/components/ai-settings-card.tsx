@@ -142,15 +142,18 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
               <option value="">{models.isLoading ? "Loading models…" : "Choose a model"}</option>
               {(models.data ?? []).map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.free ? "FREE · " : ""}
-                  {option.label} — {formatPrice(option)}
+                  {option.label}
+                  {option.free ? " · Free" : ""}
                 </option>
               ))}
             </select>
             {models.isError ? (
               <p className="text-xs text-rose-600">{describeAiError(models.error, "Could not load models.")}</p>
-            ) : selectedModel?.description ? (
-              <p className="text-xs text-slate-500">{selectedModel.description}</p>
+            ) : selectedModel ? (
+              <div className="space-y-0.5 text-xs text-slate-500">
+                <p className="font-medium text-slate-600">{formatPrice(selectedModel)}</p>
+                {selectedModel.description ? <p>{selectedModel.description}</p> : null}
+              </div>
             ) : null}
           </div>
         </div>

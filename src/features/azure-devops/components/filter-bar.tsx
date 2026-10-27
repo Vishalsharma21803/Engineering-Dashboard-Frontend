@@ -53,15 +53,15 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-wrap items-center gap-2">
+      <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         {filters.map((filter) => (
-          <label key={filter.id} className="inline-flex items-center">
+          <label key={filter.id} className="flex min-w-0 items-center">
             <span className="sr-only">{filter.label}</span>
             <select
               value={filter.value}
               onChange={(event) => filter.onChange(event.target.value)}
               className={cn(
-                "h-9 rounded-lg border bg-surface px-2.5 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                "h-9 w-full min-w-0 rounded-lg border bg-surface px-2.5 text-sm shadow-sm sm:w-auto sm:min-w-36 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
                 filter.value ? "border-indigo-300 font-medium text-indigo-700" : "border-slate-300 text-slate-700"
               )}
             >
@@ -77,7 +77,7 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
         ))}
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-slate-500">
+      <div className="flex shrink-0 items-center gap-3 whitespace-nowrap text-xs text-slate-500">
         <span aria-live="polite">
           {shown === total ? `${total} item${total === 1 ? "" : "s"}` : `${shown} of ${total}`}
         </span>

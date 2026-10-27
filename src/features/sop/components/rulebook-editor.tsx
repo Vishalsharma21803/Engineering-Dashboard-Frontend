@@ -134,46 +134,48 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
         <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{readOnlyReason}</p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <span className="text-sm text-slate-600">
           Active version <strong>{initial.version}</strong>
           {initial.version === 0 && scope === "default" ? " (built-in starter)" : ""}
           {initial.createdBy ? ` · by ${initial.createdBy}` : ""}
         </span>
-        <label className="sr-only" htmlFor={`versions-${scope}`}>
-          Load a version
-        </label>
-        <select
-          id={`versions-${scope}`}
-          className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm"
-          value=""
-          onChange={(event) => event.target.value && void loadVersion(Number(event.target.value))}
-        >
-          <option value="">History…</option>
-          {(versions.data ?? []).map((version) => (
-            <option key={version.version} value={version.version}>
-              v{version.version}
-              {version.note ? ` — ${version.note}` : ""}
-              {version.createdAt ? ` (${new Date(version.createdAt).toLocaleString()})` : ""}
-            </option>
-          ))}
-        </select>
-        <Button size="sm" variant="secondary" onClick={exportFile}>
-          Export .md
-        </Button>
-        {canSave ? (
-          <>
-            <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>
-              Import .md
-            </Button>
-            <input ref={fileRef} type="file" accept=".md,text/markdown,text/plain" className="hidden" onChange={(event) => void importFile(event)} />
-          </>
-        ) : null}
-        {dirty && canSave ? (
-          <Button size="sm" variant="ghost" onClick={() => { setContent(initial.content); setSaveErrors([]); }}>
-            Discard changes
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="sr-only" htmlFor={`versions-${scope}`}>
+            Load a version
+          </label>
+          <select
+            id={`versions-${scope}`}
+            className="h-9 w-32 min-w-0 rounded-lg border border-slate-300 bg-surface px-2 text-sm sm:w-44"
+            value=""
+            onChange={(event) => event.target.value && void loadVersion(Number(event.target.value))}
+          >
+            <option value="">History…</option>
+            {(versions.data ?? []).map((version) => (
+              <option key={version.version} value={version.version}>
+                v{version.version}
+                {version.note ? ` — ${version.note}` : ""}
+                {version.createdAt ? ` (${new Date(version.createdAt).toLocaleString()})` : ""}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="secondary" onClick={exportFile}>
+            Export .md
           </Button>
-        ) : null}
+          {canSave ? (
+            <>
+              <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>
+                Import .md
+              </Button>
+              <input ref={fileRef} type="file" accept=".md,text/markdown,text/plain" className="hidden" onChange={(event) => void importFile(event)} />
+            </>
+          ) : null}
+          {dirty && canSave ? (
+            <Button size="sm" variant="ghost" onClick={() => { setContent(initial.content); setSaveErrors([]); }}>
+              Discard changes
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex overflow-hidden rounded-lg border border-slate-300 bg-surface shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20">
@@ -201,7 +203,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
               gutterRef.current.scrollTop = event.currentTarget.scrollTop;
             }
           }}
-          className="h-[32rem] flex-1 resize-none bg-transparent px-3 py-2 font-mono text-xs leading-5 text-slate-900 outline-none"
+          className="h-[32rem] flex-1 resize-none bg-transparent px-3 py-2 font-mono text-xs leading-5 text-slate-900 outline-none placeholder:italic placeholder:text-slate-400"
         />
       </div>
 
@@ -210,6 +212,8 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
           <span className="flex items-center gap-1.5 text-sm text-slate-500">
             <Spinner className="size-3.5" /> Checking…
           </span>
+        ) : problems.length === 0 && content.trim() === "" ? (
+          <span className="text-sm text-slate-500">Empty — add a rule card</span>
         ) : problems.length === 0 && validation ? (
           <span className="text-sm font-medium text-emerald-700">
             ✓ Valid · {validation.summary.cards.length} rules
@@ -222,7 +226,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
         {canSave ? (
           <>
             {scope === "default" ? (
-              <div className="w-64">
+              <div className="w-full sm:w-64">
                 <Input aria-label="Change note" placeholder="What changed? (optional)" value={note} onChange={(event) => setNote(event.target.value)} className="h-9" />
               </div>
             ) : null}

@@ -205,10 +205,22 @@ export interface AccuracyRow {
   overEstimate: number;
 }
 
+export interface AccuracyTicket {
+  ticketId: number;
+  title: string;
+  type: string;
+  projectName: string;
+  trackedHours: number;
+  estimateHours: number;
+  ratio: number;
+}
+
 export interface AccuracyReport {
   from: string;
   to: string;
   team: boolean;
+  totals: { tickets: number; trackedHours: number; estimateHours: number; ratio: number | null; overEstimate: number };
+  byTicket: Page<AccuracyTicket>;
   byPerson: Page<AccuracyRow>;
   byType: Page<AccuracyRow>;
   ticketsWithoutEstimate: number;

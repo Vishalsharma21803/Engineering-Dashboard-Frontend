@@ -95,11 +95,12 @@ export function TimePage() {
         ) : null}
       </div>
 
-      <TimerBar {...props} />
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <TimerBar {...props} />
+        <TicketTimeLookup connection={connection} onPropose={review.propose} isProposing={review.isProposing} />
+      </div>
 
-      <TicketTimeLookup connection={connection} onPropose={review.propose} isProposing={review.isProposing} />
-
-      <div role="tablist" aria-label="Time sections" className="flex flex-wrap gap-1 border-b border-slate-200">
+      <div role="tablist" aria-label="Time sections" className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 sm:mx-0 sm:px-0">
         {TABS.map((item) => (
           <button
             key={item.id}
@@ -109,7 +110,7 @@ export function TimePage() {
             aria-selected={tab === item.id}
             aria-controls="time-panel"
             onClick={() => setSearchParams(item.id === "timesheet" ? {} : { tab: item.id })}
-            className={cn("-mb-px border-b-2 px-3 py-2 text-sm font-medium", tab === item.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:text-slate-900")}
+            className={cn("-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium", tab === item.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:text-slate-900")}
           >
             {item.label}
           </button>

@@ -64,8 +64,9 @@ export async function getCatalog(credentialId: string) {
   return apiRequest<Catalog>(read(credentialId, "/catalog"));
 }
 
-export async function getTimesheet(credentialId: string, input: { from: string; to: string; page: number; ticketPage: number }) {
-  const query = new URLSearchParams({ from: input.from, to: input.to, page: String(input.page), ticketPage: String(input.ticketPage) });
+/** `day`: list only that day's entries; totals still cover from–to. */
+export async function getTimesheet(credentialId: string, input: { from: string; to: string; day?: string; page: number; ticketPage: number }) {
+  const query = new URLSearchParams({ from: input.from, to: input.to, ...(input.day ? { day: input.day } : {}), page: String(input.page), ticketPage: String(input.ticketPage) });
   return (await apiRequest<{ timesheet: Timesheet }>(read(credentialId, `/timesheet?${query.toString()}`))).timesheet;
 }
 
@@ -94,8 +95,8 @@ export async function estimateDraft(credentialId: string, input: { day: string; 
   return (await apiRequest<{ estimate: DraftEstimate }>(read(credentialId, "/draft/estimate"), { method: "POST", body: input })).estimate;
 }
 
-export async function getAccuracy(credentialId: string, input: { from: string; to: string; personPage: number; typePage: number }) {
-  const query = new URLSearchParams({ from: input.from, to: input.to, personPage: String(input.personPage), typePage: String(input.typePage) });
+export async function getAccuracy(credentialId: string, input: { from: string; to: string; personPage: number; typePage: number; ticketPage: number }) {
+  const query = new URLSearchParams({ from: input.from, to: input.to, personPage: String(input.personPage), typePage: String(input.typePage), ticketPage: String(input.ticketPage) });
   return (await apiRequest<{ accuracy: AccuracyReport }>(read(credentialId, `/reports/accuracy?${query.toString()}`))).accuracy;
 }
 
