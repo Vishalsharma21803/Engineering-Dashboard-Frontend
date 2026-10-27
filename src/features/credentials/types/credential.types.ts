@@ -1,4 +1,4 @@
-export type CredentialPlatform = "AZURE";
+export type CredentialPlatform = "AZURE" | "SOLIDTIME";
 
 export type ValidationStatus = "VALID" | "INVALID" | "ERROR";
 

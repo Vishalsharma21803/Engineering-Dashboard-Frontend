@@ -10,6 +10,7 @@ import { CredentialAlert } from "../components/credential-alert";
 import { CredentialCard } from "../components/credential-card";
 import { CredentialDeleteDialog } from "../components/credential-delete-dialog";
 import { AiProvidersSection } from "@/features/ai/components/ai-providers-section";
+import { SolidtimeConnectionsSection } from "@/features/solidtime/components/solidtime-connections-section";
 import { useCredentials } from "../hooks/use-credentials";
 import { useDeleteCredential } from "../hooks/use-delete-credential";
 import { useValidateCredential } from "../hooks/use-validate-credential";
@@ -359,6 +360,8 @@ export function CredentialsPage() {
           validation status.
         </p>
       </div>
+
+      <SolidtimeConnectionsSection />
 
       <AiProvidersSection />
 

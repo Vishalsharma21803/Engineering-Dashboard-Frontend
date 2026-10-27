@@ -21,7 +21,7 @@ type Outcome =
 
 /**
  * Shows exactly what will change and requires an explicit click on
- * Approve before anything is sent to Azure DevOps.
+ * Approve before anything is sent to Azure DevOps (or Solidtime).
  */
 export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -48,6 +48,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
   }, [action]);
 
   const current = outcome?.action ?? action;
+  const platform = current?.kind.startsWith("SOLIDTIME_") ? "Solidtime" : "Azure DevOps";
   const canDecide = current?.status === "PENDING" && outcome === null;
 
   function handleApprove() {
@@ -121,7 +122,9 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
           </h2>
 
           <p className="mt-1 text-xs text-slate-500">
-            {current.organizationUrl} · {current.projectId}
+            {current.organizationUrl}
+            {/* Solidtime organizations are ids, not names worth showing. */}
+            {current.kind.startsWith("SOLIDTIME_") ? "" : ` · ${current.projectId}`}
             {current.status === "PENDING" ? ` · expires ${formatDateTime(current.expiresAt)}` : ""}
           </p>
 
@@ -148,7 +151,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
 
           {outcome?.kind === "executed" ? (
             <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <p className="font-medium">Executed in Azure DevOps.</p>
+              <p className="font-medium">Executed in {platform}.</p>
               <ul className="mt-1 space-y-0.5">
                 {outcome.verification.checks.map((check) => (
                   <li key={check.check}>
@@ -161,7 +164,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
 
           {outcome?.kind === "rejected" ? (
             <p role="status" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Rejected. Nothing was changed in Azure DevOps.
+              Rejected. Nothing was changed in {platform}.
             </p>
           ) : null}
 

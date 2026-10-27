@@ -1,0 +1,15 @@
+export const solidtimeKeys = {
+  all: ["solidtime"] as const,
+  connections: ["solidtime", "connections"] as const,
+  memberships: (credentialId: string) => ["solidtime", "memberships", credentialId] as const,
+  profile: (credentialId: string) => ["solidtime", credentialId, "profile"] as const,
+  timer: (credentialId: string) => ["solidtime", credentialId, "timer"] as const,
+  catalog: (credentialId: string) => ["solidtime", credentialId, "catalog"] as const,
+  timesheet: (credentialId: string) => ["solidtime", credentialId, "timesheet"] as const,
+  unlinked: (credentialId: string) => ["solidtime", credentialId, "unlinked"] as const,
+  ticketTime: (credentialId: string, ticketId: number) => ["solidtime", credentialId, "ticket", ticketId] as const,
+  ticketTimes: (credentialId: string) => ["solidtime", credentialId, "ticket-times"] as const,
+  draft: (credentialId: string, day: string) => ["solidtime", credentialId, "draft", day] as const,
+  accuracy: (credentialId: string) => ["solidtime", credentialId, "accuracy"] as const,
+  list: (credentialId: string, kind: string) => ["solidtime", credentialId, "list", kind] as const,
+};

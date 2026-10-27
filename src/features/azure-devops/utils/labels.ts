@@ -19,6 +19,16 @@ export const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   PIPELINE_QUEUE_RUN: "Queue pipeline run",
   BUILD_RETRY_STAGE: "Retry failed stage",
   BUILD_CANCEL: "Cancel run",
+  SOLIDTIME_TIMER_START: "Start timer",
+  SOLIDTIME_TIMER_STOP: "Stop timer",
+  SOLIDTIME_ENTRY_CREATE: "Add time entry",
+  SOLIDTIME_ENTRY_UPDATE: "Edit time entry",
+  SOLIDTIME_ENTRY_DELETE: "Delete time entry",
+  SOLIDTIME_ENTRIES_CREATE: "Add time entries",
+  SOLIDTIME_PROJECT_CREATE: "Create Solidtime project",
+  SOLIDTIME_TASK_CREATE: "Create Solidtime task",
+  SOLIDTIME_TAG_CREATE: "Create Solidtime tag",
+  SOLIDTIME_CLIENT_CREATE: "Create Solidtime client",
 };
 
 export function actionKindLabel(kind: string): string {
@@ -47,6 +57,7 @@ export const CATEGORY_LABELS: Record<RecommendationCategory, { label: string; to
   REVIEW: { label: "Code review", tone: "info" },
   SOP: { label: "SOP", tone: "warning" },
   STALE: { label: "Stale", tone: "neutral" },
+  TIME: { label: "Time", tone: "info" },
 };
 
 export const VOTE_LABELS: Record<PullRequestReviewer["voteLabel"], { label: string; tone: Tone }> = {

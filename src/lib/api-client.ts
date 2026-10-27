@@ -100,3 +100,25 @@ export async function apiRequest<TResponse>(
 
   return payload as TResponse;
 }
+
+/** Downloads a file the API produces (e.g. a CSV export) with the session cookie. */
+export async function apiDownload(path: string): Promise<Blob> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { credentials: "include" });
+  } catch {
+    throw new ApiError(0, "Unable to reach the server");
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
+
+    const payload = (await response.json().catch(() => null)) as ApiErrorPayload | null;
+    throw new ApiError(response.status, payload?.message ?? "Download failed", payload?.errors ?? [], payload?.reason ?? null, payload);
+  }
+
+  return response.blob();
+}

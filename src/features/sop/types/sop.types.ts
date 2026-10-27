@@ -127,6 +127,8 @@ export interface SopReportRunSummary {
   itemsChecked: number;
   itemsWithGaps: number;
   createdAt: string;
+  /** Whose Solidtime hours the run includes: "team", "mine", or null (no Solidtime linked). */
+  timeScope: "team" | "mine" | null;
 }
 
 export type SopReportRole = "tl" | "qa" | "po" | "developer";
@@ -148,11 +150,13 @@ export interface SopReportFacet {
 /** One saved run, filtered and paged by the server; the numbers cover the matching tickets. */
 export interface SopReport {
   run: SopReportRunSummary;
+  /** Solidtime hours on the matching tickets; null when the run has none. */
+  trackedHours: number | null;
   itemsChecked: number;
   itemsWithGaps: number;
   compliantShare: number | null;
   byRule: Page<{ ruleId: string; ruleTitle: string; severity: "high" | "medium"; failing: number; checked: number }>;
-  byPerson: Page<{ personKey: string; assignee: IdentityRef | null; roles: SopReportRole[]; items: number; itemsWithGaps: number; gaps: number }>;
+  byPerson: Page<{ personKey: string; assignee: IdentityRef | null; roles: SopReportRole[]; items: number; itemsWithGaps: number; gaps: number; trackedHours: number | null }>;
   /** Tickets with gaps. */
   items: Page<{
     workItemId: number;
@@ -161,6 +165,7 @@ export interface SopReport {
     state: string;
     assignee: IdentityRef | null;
     violations: Array<{ ruleId: string; ruleTitle: string; severity: "high" | "medium" | "low"; message: string }>;
+    trackedHours?: number | null;
   }>;
   facets: { people: SopReportFacet[]; roles: SopReportFacet[]; rules: SopReportFacet[]; types: SopReportFacet[]; states: SopReportFacet[] };
 }

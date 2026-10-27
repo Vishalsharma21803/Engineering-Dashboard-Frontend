@@ -51,6 +51,8 @@ export function useApproveAction() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: actionKeys.all });
       void queryClient.invalidateQueries({ queryKey: azureKeys.all });
+      // Approved Solidtime changes (timer, entries) show up in the time views.
+      void queryClient.invalidateQueries({ queryKey: ["solidtime"] });
     },
   });
 }

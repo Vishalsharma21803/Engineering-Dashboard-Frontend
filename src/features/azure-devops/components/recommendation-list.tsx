@@ -46,6 +46,7 @@ const PRIORITY_REASON = /^Priority \d$/;
 const TARGET_BADGES = {
   pullRequest: { label: "Pull request", className: "bg-indigo-50 text-indigo-700 ring-indigo-200" },
   build: { label: "Pipeline run", className: "bg-slate-100 text-slate-700 ring-slate-200" },
+  time: { label: "Time", className: "bg-sky-50 text-sky-700 ring-sky-200" },
 } as const;
 
 const CATEGORY_BARS: Record<Recommendation["category"], string> = {
@@ -54,6 +55,7 @@ const CATEGORY_BARS: Record<Recommendation["category"], string> = {
   REVIEW: "bg-sky-500",
   SOP: "bg-amber-400",
   STALE: "bg-slate-300",
+  TIME: "bg-sky-400",
 };
 
 function targetPath(credentialId: string, recommendation: Recommendation): string {
@@ -67,6 +69,8 @@ function targetPath(credentialId: string, recommendation: Recommendation): strin
       return `${base}/projects/${project}/repos/${encodeURIComponent(recommendation.target.repositoryId ?? "")}/pull-requests/${recommendation.target.id}`;
     case "build":
       return `${base}/projects/${project}?build=${recommendation.target.id}`;
+    case "time":
+      return `/time/${encodeURIComponent(recommendation.target.solidtimeCredentialId ?? "")}`;
   }
 }
 

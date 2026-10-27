@@ -29,6 +29,8 @@ export function recommendationKey(
       const build = buildsById.get(target.id);
       return build ? pipelineKey(build) : null;
     }
+    case "time":
+      return target.key ?? null;
   }
 }
 

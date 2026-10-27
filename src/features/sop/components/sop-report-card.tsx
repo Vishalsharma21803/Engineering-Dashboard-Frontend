@@ -243,6 +243,9 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
         <StatTile label="With SOP gaps" value={data.itemsWithGaps} />
         <StatTile label="Compliant" value={percent(data.compliantShare)} />
         <StatTile label="Run" value={<span className="text-base">{formatRelative(data.run.createdAt)}</span>} hint={formatDateTime(data.run.createdAt)} />
+        {data.trackedHours !== null ? (
+          <StatTile label="Tracked (Solidtime)" value={`${data.trackedHours} h`} hint={data.run.timeScope === "team" ? "whole team" : "your own time only"} />
+        ) : null}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
@@ -290,6 +293,7 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
                   <th className="px-3 py-2 text-right font-medium">Tickets</th>
                   <th className="px-3 py-2 text-right font-medium">With gaps</th>
                   <th className="px-3 py-2 text-right font-medium">Gaps</th>
+                  {data.run.timeScope ? <th className="px-3 py-2 text-right font-medium">Tracked</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -302,6 +306,7 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
                     <td className="px-3 py-2 text-right text-slate-600">{person.items}</td>
                     <td className="px-3 py-2 text-right text-slate-600">{person.itemsWithGaps}</td>
                     <td className="px-3 py-2 text-right font-medium text-slate-900">{person.gaps}</td>
+                    {data.run.timeScope ? <td className="px-3 py-2 text-right text-slate-600">{person.trackedHours ?? 0} h</td> : null}
                   </tr>
                 ))}
               </tbody>
@@ -329,7 +334,8 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
                   #{item.workItemId} {item.title}
                 </Link>
                 <span className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
-                  {item.assignee?.displayName ?? "Unassigned"} · {item.type} · {item.state} ·
+                  {item.assignee?.displayName ?? "Unassigned"} · {item.type} · {item.state}
+                  {typeof item.trackedHours === "number" ? ` · ${item.trackedHours} h tracked` : ""} ·
                   {item.violations.map((violation) => (
                     <StatusBadge key={violation.ruleId} tone={SEVERITY_TONES[violation.severity]} title={`${violation.ruleTitle}: ${violation.message}`}>
                       {violation.ruleId}

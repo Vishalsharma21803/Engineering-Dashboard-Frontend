@@ -1,0 +1,100 @@
+import { apiRequest } from "@/lib/api-client";
+import type { Page } from "@/features/azure-devops/types/azure.types";
+import type {
+  AccuracyReport,
+  Catalog,
+  DayDraft,
+  SolidtimeConnection,
+  SolidtimeMembership,
+  SolidtimeNamed,
+  SolidtimeProject,
+  SolidtimeTask,
+  TicketInfo,
+  TicketTime,
+  TimeVsEstimate,
+  Timer,
+  Timesheet,
+  TimesheetEntry,
+} from "../types/solidtime.types";
+
+/** Everything goes through the backend; the token never reaches the browser. */
+const base = "/api/solidtime";
+const read = (credentialId: string, path: string) => `${base}/${encodeURIComponent(credentialId)}${path}`;
+
+export async function listConnections() {
+  return (await apiRequest<{ connections: SolidtimeConnection[] }>(`${base}/connections`)).connections;
+}
+
+export async function createConnection(input: { baseUrl: string; token: string; label?: string }) {
+  return apiRequest<{ connection: SolidtimeConnection; memberships: SolidtimeMembership[] }>(`${base}/connections`, { method: "POST", body: input });
+}
+
+export type ConnectionChange = Partial<{
+  label: string | null;
+  token: string;
+  organizationId: string;
+  azureCredentialId: string | null;
+  projectMap: Record<string, string>;
+  dailyTargetHours: number;
+  timerAlertHours: number;
+}>;
+
+export async function updateConnection(credentialId: string, change: ConnectionChange) {
+  return (await apiRequest<{ connection: SolidtimeConnection }>(`${base}/connections/${encodeURIComponent(credentialId)}`, { method: "PATCH", body: change })).connection;
+}
+
+export async function validateConnection(credentialId: string) {
+  return apiRequest<{ valid: boolean; lastValidatedAt: string }>(`${base}/connections/${encodeURIComponent(credentialId)}/validate`, { method: "POST" });
+}
+
+export async function listMemberships(credentialId: string) {
+  return (await apiRequest<{ memberships: SolidtimeMembership[] }>(`${base}/connections/${encodeURIComponent(credentialId)}/memberships`)).memberships;
+}
+
+export async function getProfile(credentialId: string) {
+  return (await apiRequest<{ profile: { name: string; timeZone: string } }>(read(credentialId, "/profile"))).profile;
+}
+
+export async function getTimer(credentialId: string) {
+  return (await apiRequest<{ timer: Timer | null }>(read(credentialId, "/timer"))).timer;
+}
+
+export async function getCatalog(credentialId: string) {
+  return apiRequest<Catalog>(read(credentialId, "/catalog"));
+}
+
+export async function getTimesheet(credentialId: string, input: { from: string; to: string; page: number; ticketPage: number }) {
+  const query = new URLSearchParams({ from: input.from, to: input.to, page: String(input.page), ticketPage: String(input.ticketPage) });
+  return (await apiRequest<{ timesheet: Timesheet }>(read(credentialId, `/timesheet?${query.toString()}`))).timesheet;
+}
+
+export async function getUnlinked(credentialId: string, input: { from: string; to: string; page: number }) {
+  const query = new URLSearchParams({ from: input.from, to: input.to, page: String(input.page) });
+  return (await apiRequest<{ entries: Page<TimesheetEntry> & { ticketsChecked: boolean } }>(read(credentialId, `/unlinked?${query.toString()}`))).entries;
+}
+
+export async function getTicketTime(credentialId: string, ticketId: number) {
+  return apiRequest<{ time: TicketTime; ticket: TicketInfo | null; comparison: TimeVsEstimate | null }>(read(credentialId, `/tickets/${ticketId}/time`));
+}
+
+export async function getTicketTimes(credentialId: string, ids: number[]) {
+  return (await apiRequest<{ times: TicketTime[] }>(read(credentialId, `/ticket-times?ids=${ids.join(",")}`))).times;
+}
+
+export async function getDraft(credentialId: string, day: string) {
+  return (await apiRequest<{ draft: DayDraft }>(read(credentialId, `/draft?day=${day}`))).draft;
+}
+
+export async function getAccuracy(credentialId: string, input: { from: string; to: string; personPage: number; typePage: number }) {
+  const query = new URLSearchParams({ from: input.from, to: input.to, personPage: String(input.personPage), typePage: String(input.typePage) });
+  return (await apiRequest<{ accuracy: AccuracyReport }>(read(credentialId, `/reports/accuracy?${query.toString()}`))).accuracy;
+}
+
+export const weeklyCsvUrl = (credentialId: string, week: string) => read(credentialId, `/reports/weekly.csv?week=${week}`);
+
+type ListKind = "projects" | "tasks" | "tags" | "clients";
+
+export async function listCatalogPage(credentialId: string, kind: ListKind, page: number) {
+  const response = await apiRequest<Record<ListKind, Page<SolidtimeProject | SolidtimeTask | SolidtimeNamed>>>(read(credentialId, `/${kind}?page=${page}`));
+  return response[kind];
+}

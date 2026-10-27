@@ -48,6 +48,9 @@ export function RootLayout() {
                 <NavLink to="/sop-rules" className={navLinkClassName}>
                   SOP rules
                 </NavLink>
+                <NavLink to="/time" className={navLinkClassName}>
+                  Time
+                </NavLink>
                 <NavLink
                   to="/credentials"
                   className={navLinkClassName}
@@ -97,6 +100,9 @@ export function RootLayout() {
             </NavLink>
             <NavLink to="/sop-rules" className={navLinkClassName}>
               SOP rules
+            </NavLink>
+            <NavLink to="/time" className={navLinkClassName}>
+              Time
             </NavLink>
             <NavLink to="/credentials" className={navLinkClassName}>
               Credentials

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { Pagination } from "@/components/ui/pagination";
@@ -8,6 +8,12 @@ import type { AiCheck } from "@/features/sop/types/sop.types";
 import { describeAiCheckReason, describeAiPause } from "@/features/sop/utils/ai-check";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
+import { getTicketTimes } from "@/features/solidtime/api/solidtime.api";
+import { solidtimeKeys } from "@/features/solidtime/api/solidtime.keys";
+import { TicketTimerButton } from "@/features/solidtime/components/ticket-timer-button";
+import type { SolidtimeConnection } from "@/features/solidtime/types/solidtime.types";
+import { formatDuration } from "@/features/solidtime/utils/time";
+import type { ProposeActionInput } from "../types/action.types";
 import { getMyWorkPage, getTeamWorkPage } from "../api/azure.api";
 import { azureKeys } from "../api/azure.keys";
 import type { DashboardTriage } from "../hooks/use-triage";
@@ -135,10 +141,12 @@ interface WorkItemRowsProps {
   aiChecks?: Map<number, AiCheck> | undefined;
   /** Dashboard snooze / acknowledge / abandon state; omitted for team lists. */
   triage?: DashboardTriage | undefined;
+  /** Tracked time and the timer for a row (My work, when Solidtime is linked). */
+  timeCell?: ((item: WorkItemSummary) => ReactNode) | undefined;
 }
 
 /** One page of tickets. Filtering and paging happen on the server. */
-export function WorkItemRows({ credentialId, rows, team, myId, aiChecks, triage }: WorkItemRowsProps) {
+export function WorkItemRows({ credentialId, rows, team, myId, aiChecks, triage, timeCell }: WorkItemRowsProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left text-sm">
@@ -192,6 +200,7 @@ export function WorkItemRows({ credentialId, rows, team, myId, aiChecks, triage 
                 <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-700">
                   {formatValue(item.originalEstimate ?? item.storyPoints ?? item.effort)} · {formatValue(item.completedWork)} ·{" "}
                   {formatValue(item.remainingWork)}
+                  {timeCell ? <div className="mt-1.5 flex flex-col items-start gap-1">{timeCell(item)}</div> : null}
                 </td>
                 <td className="px-3 py-3">
                   {team ? (
@@ -272,10 +281,12 @@ interface MyWorkTableProps {
   dashboardToken: string;
   aiChecks: Map<number, AiCheck>;
   triage: DashboardTriage;
+  /** Time tracking on the rows (Solidtime linked to this organization). */
+  time?: { connection: SolidtimeConnection; onPropose: (input: ProposeActionInput) => void; isProposing: boolean } | undefined;
 }
 
 /** My open tickets, 10 per page, filtered by the server. The page lives in the URL (?page=). */
-export function MyWorkTable({ credentialId, projectId, dashboardToken, aiChecks, triage }: MyWorkTableProps) {
+export function MyWorkTable({ credentialId, projectId, dashboardToken, aiChecks, triage, time }: MyWorkTableProps) {
   const pageParam = usePageParam("page");
   const { page, setPage } = pageParam;
   const [showHidden, setShowHidden] = useState(false);
@@ -291,6 +302,14 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, aiChecks,
     retry: retryUnlessClientError,
   });
   useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
+  const pageIds = (query.data?.items ?? []).map((row) => row.workItem.id);
+  const times = useQuery({
+    queryKey: [...solidtimeKeys.ticketTimes(time?.connection.credentialId ?? ""), pageIds],
+    queryFn: () => getTicketTimes(time?.connection.credentialId ?? "", pageIds),
+    enabled: Boolean(time) && pageIds.length > 0,
+    retry: retryUnlessClientError,
+  });
+  const timeById = new Map((times.data ?? []).map((entry) => [entry.ticketId, entry]));
 
   if (query.isLoading) {
     return <SkeletonRows rows={5} />;
@@ -334,7 +353,31 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, aiChecks,
           />
         </div>
       ) : null}
-      <WorkItemRows credentialId={credentialId} rows={data.items} team={false} myId={null} aiChecks={aiChecks} triage={triage} />
+      <WorkItemRows
+        credentialId={credentialId}
+        rows={data.items}
+        team={false}
+        myId={null}
+        aiChecks={aiChecks}
+        triage={triage}
+        timeCell={
+          time
+            ? (item) => (
+                <>
+                  <span className="text-xs text-slate-500" title="Your time tracked in Solidtime">
+                    <span aria-hidden="true">⏱</span> {timeById.has(item.id) ? formatDuration(timeById.get(item.id)?.mySeconds ?? 0) : "…"}
+                  </span>
+                  <TicketTimerButton
+                    connection={time.connection}
+                    ticket={{ id: item.id, title: item.title, projectName: item.projectName }}
+                    onPropose={time.onPropose}
+                    disabled={time.isProposing}
+                  />
+                </>
+              )
+            : undefined
+        }
+      />
       {data.total === 0 ? (
         <EmptyState className="mt-3">
           {data.poolTotal === 0 && !data.showingHidden ? "All your open work items are snoozed or abandoned." : "No work items match these filters."}

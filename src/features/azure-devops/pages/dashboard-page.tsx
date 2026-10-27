@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
+import { useLinkedSolidtime } from "@/features/solidtime/hooks/use-solidtime";
 import { withAiViolations } from "@/features/sop/utils/ai-check";
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
@@ -42,6 +43,7 @@ export function DashboardPage() {
   const pendingActions = useActions({ status: "PENDING" });
   const review = useActionReview();
   const triage = useDashboardTriage(credentialId, dashboard);
+  const linkedTime = useLinkedSolidtime(credentialId);
 
   const codeCompliance = useMemo(
     () =>
@@ -215,6 +217,7 @@ export function DashboardPage() {
               dashboardToken={dashboard.generatedAt}
               aiChecks={ai.checks}
               triage={triage}
+              time={linkedTime.connection ? { connection: linkedTime.connection, onPropose: (input) => review.propose(input), isProposing: review.isProposing } : undefined}
             />
           )}
         </SectionView>

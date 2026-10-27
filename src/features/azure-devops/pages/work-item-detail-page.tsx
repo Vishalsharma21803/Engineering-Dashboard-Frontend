@@ -13,6 +13,7 @@ import {
 import { workItemTypeStyle } from "../utils/work-item-types";
 import { cn } from "@/utils/cn";
 import { WorkItemActions } from "../components/work-item-actions";
+import { TicketTimePanel } from "@/features/solidtime/components/ticket-time-panel";
 import { useActionReview } from "../hooks/use-action-review";
 import { useWorkItem } from "../hooks/use-work-item";
 import type { ActionKind } from "../types/action.types";
@@ -134,6 +135,13 @@ export function WorkItemDetailPage() {
           }
         />
       </SectionCard>
+
+      <TicketTimePanel
+        azureCredentialId={credentialId}
+        ticket={{ id: workItem.id, title: workItem.title, projectName: workItem.projectName }}
+        onPropose={(input) => review.propose(input)}
+        isProposing={review.isProposing}
+      />
 
       <div id="propose-change" className="scroll-mt-24">
         <SectionCard title="Propose a change" description="Nothing is written to Azure DevOps until you approve it in the review dialog.">
