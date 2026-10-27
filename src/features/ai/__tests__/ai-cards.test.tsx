@@ -1,8 +1,9 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { mockBackend, renderWithProviders } from "@/test/render";
+import { AddAiProviderForm } from "../components/add-ai-provider-form";
 import { AiProviderCard } from "../components/ai-provider-card";
 import { AiSettingsCard } from "../components/ai-settings-card";
 import type { AiCredential, AiModelOption } from "../types/ai.types";
@@ -34,32 +35,40 @@ const freeModel: AiModelOption = {
   mayCollectData: true,
 };
 
-describe("AiProviderCard", () => {
-  it("saves a new key, validates it, and never displays it", async () => {
+describe("AddAiProviderForm", () => {
+  const providers = [
+    { id: "claude", category: "ai", aiProvider: "CLAUDE", label: "Claude (Anthropic)", description: "", fields: [{ name: "apiKey", label: "API key", type: "secret", required: true }] },
+    { id: "openrouter", category: "ai", aiProvider: "OPENROUTER", label: "OpenRouter", description: "", fields: [{ name: "apiKey", label: "API key", type: "secret", required: true }] },
+  ];
+
+  it("adds a key for a provider from the registry with an optional label, checks it, and never displays it", async () => {
     const calls = mockBackend([
-      { method: "POST", path: "/api/ai/credentials", status: 201, body: { credential: openRouterCredential } },
+      { path: "/api/credentials/platforms", body: { platforms: providers } },
+      { method: "POST", path: "/api/credentials/connect", status: 201, body: { kind: "ai", id: openRouterCredential.id, name: "OpenRouter", record: openRouterCredential } },
       {
         method: "POST",
         path: `/api/ai/credentials/${openRouterCredential.id}/validate`,
         body: { valid: true, details: { freeRequestsToday: 3, freeRequestsDailyLimit: 50 }, lastValidatedAt: new Date().toISOString() },
       },
-      { path: "/api/ai/credentials", body: { credentials: [] } },
-      { path: "/api/ai/preferences", body: { preference: null } },
-      { path: "/api/ai/usage", body: { usage: null } },
+      { path: /\/api\/(credentials|ai|solidtime)/, body: {} },
     ]);
-    renderWithProviders(<AiProviderCard provider="OPENROUTER" credential={undefined} />);
+    const onDone = vi.fn();
+    renderWithProviders(<AddAiProviderForm existing={new Set(["CLAUDE"])} onDone={onDone} onCancel={vi.fn()} />);
 
+    // A provider that already has a key cannot be added twice; the first free one is chosen.
+    expect(await screen.findByRole("option", { name: "Claude (Anthropic) (already added)" })).toBeDisabled();
+    expect(screen.getByLabelText("Provider")).toHaveValue("openrouter");
+    await userEvent.type(screen.getByLabelText("Label (optional)"), "Team key");
     await userEvent.type(screen.getByLabelText("API key"), KEY);
     await userEvent.click(screen.getByRole("button", { name: "Save & validate" }));
 
-    expect(await screen.findByText(/Key works\. Free-model requests today: 3 of 50\./)).toBeInTheDocument();
-    expect(calls.find((call) => call.method === "POST" && call.url === "/api/ai/credentials")?.body).toEqual({
-      provider: "OPENROUTER",
-      apiKey: KEY,
-    });
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("OPENROUTER", { tone: "success", text: "Key works. Free-model requests today: 3 of 50." }));
+    expect(calls.find((call) => call.url === "/api/credentials/connect")?.body).toEqual({ platform: "openrouter", label: "Team key", fields: { apiKey: KEY } });
     expect(screen.queryByDisplayValue(KEY)).not.toBeInTheDocument();
   });
+});
 
+describe("AiProviderCard", () => {
   it("explains a rejected key", async () => {
     mockBackend([
       {
@@ -71,10 +80,10 @@ describe("AiProviderCard", () => {
       { path: "/api/ai/preferences", body: { preference: null } },
       { path: "/api/ai/usage", body: { usage: null } },
     ]);
-    renderWithProviders(<AiProviderCard provider="OPENROUTER" credential={openRouterCredential} />);
+    renderWithProviders(<AiProviderCard credential={openRouterCredential} />);
 
-    expect(screen.getByText("…6789")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Validate" }));
+    expect(screen.getByText("Key ending …6789")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Validate OpenRouter" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The provider rejected this key");
   });
 
@@ -90,10 +99,10 @@ describe("AiProviderCard", () => {
       { path: "/api/ai/preferences", body: { preference: null } },
       { path: "/api/ai/usage", body: { usage: null } },
     ]);
-    renderWithProviders(<AiProviderCard provider="OPENCODE" credential={credential} />);
+    renderWithProviders(<AiProviderCard credential={credential} />);
 
     expect(screen.getByRole("heading", { name: /OpenCode/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Validate" }));
+    await userEvent.click(screen.getByRole("button", { name: "Validate OpenCode" }));
     expect(await screen.findByText(/free models only inside the OpenCode app/)).toBeInTheDocument();
   });
 });
@@ -182,7 +191,9 @@ describe("AiSettingsCard", () => {
 
     const claudeOption = (await screen.findByRole("option", { name: /Claude \(Anthropic\) \(add a key first\)/ })) as HTMLOptionElement;
     expect(claudeOption.disabled).toBe(true);
-    const usage = (await screen.findByText(/\(4 calls\)/)).closest("p");
-    expect(usage).toHaveTextContent("Today $0.12 (4 calls) · This month $1.50");
+    const strip = screen.getByLabelText("AI usage");
+    await waitFor(() => expect(strip).toHaveTextContent("Spent today$0.12 of $2.00"));
+    expect(strip).toHaveTextContent("Calls today4");
+    expect(strip).toHaveTextContent("This month$1.50");
   });
 });

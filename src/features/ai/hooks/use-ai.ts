@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  createAiCredential,
   deleteAiCredential,
   getAiPreference,
   getAiUsage,
@@ -45,11 +44,6 @@ export function useOpenRouterAllowlist() {
 function useInvalidateAi() {
   const queryClient = useQueryClient();
   return () => void queryClient.invalidateQueries({ queryKey: aiKeys.all });
-}
-
-export function useCreateAiCredential() {
-  const invalidate = useInvalidateAi();
-  return useMutation({ mutationFn: createAiCredential, onSettled: invalidate });
 }
 
 export function useReplaceAiKey() {

@@ -37,6 +37,8 @@ describe("RulebookEditor", () => {
 
     fireEvent.change(screen.getByLabelText("My rules"), { target: { value: "---\nid: MY-01\n---" } });
     expect(await screen.findByText(/✓ Valid · 1 rules · 0 overrides/, {}, { timeout: 2000 })).toBeInTheDocument();
+    // The parsed rules are listed in the Rules view.
+    await userEvent.click(screen.getByRole("button", { name: "Rules (1)" }));
     expect(screen.getByText("Bugs name the browser")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Save as new version" }));
@@ -52,7 +54,7 @@ describe("RulebookEditor", () => {
     renderWithProviders(<RulebookEditor scope="personal" initial={empty} canSave />);
 
     fireEvent.change(screen.getByLabelText("My rules"), { target: { value: "---\nbad\n---" } });
-    expect(await screen.findByText(/1 problem\(s\) to fix/, {}, { timeout: 2000 })).toBeInTheDocument();
+    expect(await screen.findByText(/1 problem to fix/, {}, { timeout: 2000 })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Line 2" })).toBeInTheDocument();
     expect(screen.getByText(/"nope" is not a built-in check/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save as new version" })).toBeDisabled();
@@ -68,6 +70,9 @@ describe("RulebookEditor", () => {
     );
 
     expect(screen.getByText("Only SOP owners can change the default rules.")).toBeInTheDocument();
+    // Read-only rulebooks open on the rule list; the Markdown stays readable but not editable.
+    expect(await screen.findByText("Bugs name the browser", {}, { timeout: 2000 })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Markdown" }));
     expect(screen.getByLabelText("Default rulebook")).toHaveAttribute("readonly");
     expect(screen.queryByRole("button", { name: "Save as new version" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Import .md" })).not.toBeInTheDocument();

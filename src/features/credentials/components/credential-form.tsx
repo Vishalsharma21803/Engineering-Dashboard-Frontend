@@ -74,7 +74,6 @@ export function CredentialForm({
           </p>
           <p className="mt-0.5 text-xs leading-5 text-slate-500">
             Connect an organization with a personal access token.
-            Azure DevOps is the only supported platform right now.
           </p>
         </div>
 
@@ -89,9 +88,9 @@ export function CredentialForm({
 
       <FormField
         id="label"
-        label="Label"
+        label="Label (optional)"
         error={errors.label?.message}
-        hint="Optional. Helps distinguish multiple organizations."
+        hint="Helps tell several organizations apart."
       >
         <Input
           id="label"

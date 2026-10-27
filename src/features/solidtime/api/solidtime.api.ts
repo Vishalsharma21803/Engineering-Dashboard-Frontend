@@ -26,10 +26,6 @@ export async function listConnections() {
   return (await apiRequest<{ connections: SolidtimeConnection[] }>(`${base}/connections`)).connections;
 }
 
-export async function createConnection(input: { baseUrl: string; token: string; label?: string }) {
-  return apiRequest<{ connection: SolidtimeConnection; memberships: SolidtimeMembership[] }>(`${base}/connections`, { method: "POST", body: input });
-}
-
 export type ConnectionChange = Partial<{
   label: string | null;
   token: string;

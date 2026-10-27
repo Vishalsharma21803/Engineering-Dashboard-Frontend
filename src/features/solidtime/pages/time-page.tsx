@@ -81,7 +81,7 @@ export function TimePage() {
   const props = { connection, onPropose: review.propose, isProposing: review.isProposing, today: localDay(undefined, timeZone) };
 
   return (
-    <section className="flex w-full flex-col gap-5">
+    <section className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Solidtime · {connection.organizationName}</p>

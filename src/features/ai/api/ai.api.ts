@@ -15,10 +15,6 @@ export async function listAiCredentials() {
   return (await apiRequest<{ credentials: AiCredential[] }>("/api/ai/credentials")).credentials;
 }
 
-export async function createAiCredential(input: { provider: AiProvider; apiKey: string }) {
-  return (await apiRequest<{ credential: AiCredential }>("/api/ai/credentials", { method: "POST", body: input })).credential;
-}
-
 export async function replaceAiKey(id: string, apiKey: string) {
   return (
     await apiRequest<{ credential: AiCredential }>(`/api/ai/credentials/${encodeURIComponent(id)}`, {

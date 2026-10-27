@@ -1,6 +1,5 @@
 import { apiRequest } from "@/lib/api-client";
 import type {
-  CreateCredentialInput,
   CredentialListResponse,
   CredentialResponse,
   DeleteCredentialResponse,
@@ -14,20 +13,6 @@ export async function listCredentials() {
   );
 
   return response.credentials;
-}
-
-export async function createCredential(
-  input: CreateCredentialInput
-) {
-  const response = await apiRequest<CredentialResponse>(
-    "/api/credentials",
-    {
-      method: "POST",
-      body: input,
-    }
-  );
-
-  return response.credential;
 }
 
 export async function updateCredential(

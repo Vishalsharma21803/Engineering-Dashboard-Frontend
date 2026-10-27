@@ -13,7 +13,7 @@ import { testRulesOnTicket } from "../api/sop.api";
 import type { RulebookScope } from "../types/sop.types";
 import { SopResultPanel } from "./sop-result-panel";
 
-const SELECT_CLASS = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm";
+const SELECT_CLASS = "h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 /** Tries the rules in the editor (or the saved ones) on one real ticket. Reads only. */
 export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookScope; content: string; allowDraft: boolean }) {
@@ -47,15 +47,15 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-slate-200 p-4">
+    <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-surface p-5 shadow-sm">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">Test on a ticket</h2>
-        <p className="text-xs text-slate-500">Runs the code rules on one ticket. It only reads from Azure DevOps and saves nothing.</p>
+        <h2 className="text-base font-semibold text-slate-950">Test on a ticket</h2>
+        <p className="mt-0.5 text-sm text-slate-600">Runs the code rules on one ticket. It only reads from Azure DevOps and saves nothing.</p>
       </div>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-end gap-3">
           {azure.length > 1 ? (
-            <label className="flex w-full flex-col gap-1 text-xs text-slate-600 sm:w-56">
+            <label className="flex w-full flex-col gap-1.5 text-sm font-medium text-slate-700 sm:w-56">
               Organization
               <select
                 className={SELECT_CLASS}
@@ -73,7 +73,7 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
               </select>
             </label>
           ) : null}
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-slate-600 sm:w-56 sm:flex-none">
+          <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium text-slate-700 sm:w-56 sm:flex-none">
             Project
             <select className={SELECT_CLASS} value={projectId} onChange={(event) => setChosenProject(event.target.value)}>
               {(projects.data?.projects ?? []).map((project) => (
@@ -83,10 +83,10 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
               ))}
             </select>
           </label>
-          <label className="flex w-28 flex-col gap-1 text-xs text-slate-600">
+          <label className="flex w-32 flex-col gap-1.5 text-sm font-medium text-slate-700">
             Ticket #
             <Input
-              className="h-9 w-28"
+              className="h-10 w-32"
               type="number"
               min={1}
               value={ticket}
@@ -94,6 +94,10 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
               aria-label="Ticket number"
             />
           </label>
+          <Button type="submit" className="h-10" disabled={!projectId || !(Number(ticket) > 0) || run.isPending}>
+            {run.isPending ? <Spinner className="size-4" /> : null}
+            Run rules
+          </Button>
         </div>
         {allowDraft ? (
           <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -101,12 +105,6 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
             Use the rules in the editor (unsaved)
           </label>
         ) : null}
-        <div>
-          <Button type="submit" size="sm" disabled={!projectId || !(Number(ticket) > 0) || run.isPending}>
-            {run.isPending ? <Spinner className="size-4" /> : null}
-            Run rules
-          </Button>
-        </div>
       </form>
 
       {run.error ? (

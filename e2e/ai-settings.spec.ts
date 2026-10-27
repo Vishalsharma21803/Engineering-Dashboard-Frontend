@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { addAiKey } from "./helpers/credentials.js";
 
 const BACKEND = "http://localhost:3100";
 // Keys accepted by the fake providers in backend/tests/support/fake-ai.ts.
@@ -22,16 +23,13 @@ test("a developer adds their own AI keys and picks a free model with consent", a
   await expect(page.getByRole("heading", { name: "AI providers" })).toBeVisible();
 
   // Claude key: saved, validated, never shown again
-  await page.locator("#ai-key-CLAUDE").fill(CLAUDE_KEY);
-  await page.getByRole("button", { name: "Save & validate" }).first().click();
+  await addAiKey(page, "CLAUDE", CLAUDE_KEY);
   await expect(page.getByText(/Key works\. Models available: Claude Opus 5\.5/)).toBeVisible();
   await expect(page.getByText("…cdef")).toBeVisible();
   await expect(page.locator(`input[value="${CLAUDE_KEY}"]`)).toHaveCount(0);
 
   // OpenRouter key
-  await page.locator("#ai-key-OPENROUTER").fill(OPENROUTER_KEY);
-  // Each provider card has its own form; submit the OpenRouter one.
-  await page.locator("form").filter({ has: page.locator("#ai-key-OPENROUTER") }).getByRole("button", { name: "Save & validate" }).click();
+  await addAiKey(page, "OPENROUTER", OPENROUTER_KEY);
   await expect(page.getByText(/Free-model requests today: 3 of 50/)).toBeVisible();
 
   // Settings: free model requires the data notice
@@ -46,9 +44,10 @@ test("a developer adds their own AI keys and picks a free model with consent", a
   // Switch to Claude Sonnet with High effort
   await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
   await page.getByLabel("Model", { exact: true }).selectOption("claude-sonnet-5-5");
-  await page.getByRole("radio", { name: /High/ }).click();
+  await page.getByLabel("Effort", { exact: true }).selectOption("HIGH");
   await save.click();
-  await expect(page.getByRole("radio", { name: /High/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+  await expect(page.getByLabel("Effort", { exact: true })).toHaveValue("HIGH");
   await page.reload();
   await expect(page.getByLabel("Model", { exact: true })).toHaveValue("claude-sonnet-5-5");
 
@@ -72,8 +71,7 @@ test("a developer adds an OpenCode key and picks a paid OpenCode model", async (
   await expect(page).toHaveURL("/");
 
   await page.goto("/credentials");
-  await page.locator("#ai-key-OPENCODE").fill(OPENCODE_KEY);
-  await page.locator("form").filter({ has: page.locator("#ai-key-OPENCODE") }).getByRole("button", { name: "Save & validate" }).click();
+  await addAiKey(page, "OPENCODE", OPENCODE_KEY);
   await expect(page.getByText(/free models only inside the OpenCode app/)).toBeVisible();
   await expect(page.locator(`input[value="${OPENCODE_KEY}"]`)).toHaveCount(0);
 

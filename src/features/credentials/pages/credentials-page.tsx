@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { PageLoader } from "@/components/ui/page-loader";
 import { ApiError } from "@/lib/api-client";
 import { CredentialAlert } from "../components/credential-alert";
 import { CredentialCard } from "../components/credential-card";
+import type { CardNotice } from "../components/credential-card-frame";
 import { CredentialDeleteDialog } from "../components/credential-delete-dialog";
 import { AiProvidersSection } from "@/features/ai/components/ai-providers-section";
 import { SolidtimeConnectionsSection } from "@/features/solidtime/components/solidtime-connections-section";
@@ -66,6 +67,17 @@ export function CredentialsPage() {
     () => routeNotice ?? null
   );
 
+  const noticeRef = useRef<HTMLDivElement>(null);
+  /** A validation result, shown inside the card it belongs to. */
+  const [cardNotice, setCardNotice] = useState<(CardNotice & { id: string }) | null>(null);
+
+  // A new message (also for actions further down the page) is brought into view once.
+  useEffect(() => {
+    if (notice) {
+      noticeRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    }
+  }, [notice]);
+
   useEffect(() => {
     if (!routeNotice) {
       return;
@@ -104,20 +116,21 @@ export function CredentialsPage() {
 
   function handleValidate(credential: Credential) {
     setNotice(null);
+    setCardNotice(null);
 
     validateMutation.mutate(credential.id, {
       onSuccess: (result) => {
         const displayName = getCredentialDisplayName(credential);
 
         if (result.valid) {
-          setNotice({
+          setCardNotice({ id: credential.id,
             tone: "success",
             message: `${displayName} validated successfully with Azure DevOps.`,
           });
           return;
         }
 
-        setNotice({
+        setCardNotice({ id: credential.id,
           tone: "error",
           message: getValidationReasonMessage(result.reason),
         });
@@ -134,7 +147,7 @@ export function CredentialsPage() {
           mutationError instanceof ApiError &&
           mutationError.status === 404
         ) {
-          setNotice({
+          setCardNotice({ id: credential.id,
             tone: "error",
             message:
               "This credential no longer exists. Refreshing the list.",
@@ -147,7 +160,7 @@ export function CredentialsPage() {
           mutationError instanceof ApiError &&
           mutationError.status === 502
         ) {
-          setNotice({
+          setCardNotice({ id: credential.id,
             tone: "error",
             message:
               "Azure DevOps could not be reached. Try validating again later.",
@@ -155,7 +168,7 @@ export function CredentialsPage() {
           return;
         }
 
-        setNotice({
+        setCardNotice({ id: credential.id,
           tone: "error",
           message:
             mutationError instanceof ApiError
@@ -228,7 +241,7 @@ export function CredentialsPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
             Workspace
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
             Credentials
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
@@ -254,112 +267,98 @@ export function CredentialsPage() {
       </div>
 
       {notice ? (
-        <CredentialAlert
-          tone={notice.tone}
-          message={notice.message}
-          onDismiss={() => setNotice(null)}
-        />
+        <div ref={noticeRef} className="scroll-mt-24">
+          <CredentialAlert
+            tone={notice.tone}
+            message={notice.message}
+            onDismiss={() => setNotice(null)}
+          />
+        </div>
       ) : null}
 
-      {isLoading ? (
-        <CredentialsSkeleton />
-      ) : isError ? (
-        <Card className="p-6">
-          <h2 className="text-base font-semibold text-slate-950">
-            Unable to load credentials
+      <section aria-labelledby="azure-title" className="flex flex-col gap-4">
+        <div>
+          <h2 id="azure-title" className="text-xl font-semibold tracking-tight text-slate-950">
+            Azure DevOps
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            {error instanceof ApiError
-              ? error.message
-              : "Something went wrong while loading your credentials."}
-          </p>
-          <Button
-            variant="secondary"
-            className="mt-4"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-          >
-            {isFetching ? "Retrying..." : "Try again"}
-          </Button>
-        </Card>
-      ) : credentialList.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-surface p-10 text-center">
-          <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className="size-6"
+          <p className="mt-1 text-sm text-slate-600">Organizations Cockpit reads your work items, pull requests and pipelines from.</p>
+        </div>
+        {isLoading ? (
+          <CredentialsSkeleton />
+        ) : isError ? (
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-slate-950">
+              Unable to load credentials
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {error instanceof ApiError
+                ? error.message
+                : "Something went wrong while loading your credentials."}
+            </p>
+            <Button
+              variant="secondary"
+              className="mt-4"
+              onClick={() => void refetch()}
+              disabled={isFetching}
             >
-              <circle cx="8" cy="15" r="4" />
-              <path d="m10.85 12.15 7.65-7.65" />
-              <path d="m14 9 3 3" />
-              <path d="m17 6 3 3" />
-            </svg>
-          </span>
-          <h2 className="mt-4 text-lg font-semibold text-slate-950">
-            No credentials yet
-          </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
-            Add an Azure DevOps personal access token to validate
-            organization access and prepare for project data.
-          </p>
-          <Link
-            to="/credentials/new"
-            className={`${buttonClassName({
-              size: "md",
-            })} mt-6`}
-          >
-            Add your first credential
-          </Link>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            {credentialList.length}{" "}
-            {credentialList.length === 1
-              ? "credential"
-              : "credentials"}
-          </p>
+              {isFetching ? "Retrying..." : "Try again"}
+            </Button>
+          </Card>
+        ) : credentialList.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-surface p-10 text-center">
+            <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="size-6"
+              >
+                <circle cx="8" cy="15" r="4" />
+                <path d="m10.85 12.15 7.65-7.65" />
+                <path d="m14 9 3 3" />
+                <path d="m17 6 3 3" />
+              </svg>
+            </span>
+            <h3 className="mt-4 text-lg font-semibold text-slate-950">
+              No Azure DevOps organization yet
+            </h3>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
+              Add an organization URL and a personal access token to see your work items, pull requests and pipelines.
+            </p>
+            <Link
+              to="/credentials/new?platform=azure"
+              className={`${buttonClassName({
+                size: "md",
+              })} mt-6`}
+            >
+              Add Azure DevOps
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-3">
 
-          {credentialList.map((credential) => (
-            <CredentialCard
-              key={credential.id}
-              credential={credential}
-              isValidating={validatingId === credential.id}
-              validateDisabled={isMutating}
-              deleteDisabled={isMutating}
-              onValidate={handleValidate}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-      )}
+            {credentialList.map((credential) => (
+              <CredentialCard
+                key={credential.id}
+                credential={credential}
+                isValidating={validatingId === credential.id}
+                validateDisabled={isMutating}
+                deleteDisabled={isMutating}
+                onValidate={handleValidate}
+                onDelete={handleDelete}
+                notice={cardNotice?.id === credential.id ? cardNotice : null}
+                onDismissNotice={() => setCardNotice(null)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-      <div className="flex gap-3 rounded-lg border border-slate-200 bg-surface p-4 text-xs leading-5 text-slate-600">
-        <svg
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          aria-hidden="true"
-          className="mt-0.5 size-4 shrink-0 text-slate-400"
-        >
-          <path
-            fillRule="evenodd"
-            d="M10 1.944a11.954 11.954 0 0 1-3.944.753c-.882 0-1.74-.095-2.567-.277A2.25 2.25 0 0 0 1.25 4.66v4.254c0 4.313 2.626 7.992 6.39 9.944a2.25 2.25 0 0 0 1.72 0c3.764-1.952 6.39-5.631 6.39-9.944V4.66a2.25 2.25 0 0 0-2.239-2.24c-.827.182-1.685.277-2.567.277A11.954 11.954 0 0 1 10 1.944Zm3.28 6.025a.75.75 0 1 0-1.06-1.06L9.25 9.88 7.78 8.41a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5Z"
-            clipRule="evenodd"
-          />
-        </svg>
-
-        <p>
-          Tokens are stored encrypted and never shown again.
-        </p>
-      </div>
-
-      <SolidtimeConnectionsSection />
+      <SolidtimeConnectionsSection onNotice={setNotice} />
 
       <AiProvidersSection />
 

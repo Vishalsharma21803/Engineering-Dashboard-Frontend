@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { addAiKey } from "./helpers/credentials.js";
 
 const BACKEND = "http://localhost:3100";
 // Accepted by the fake provider in backend/tests/support/fake-ai.ts; it fails every AI rule it is asked about.
@@ -30,8 +31,7 @@ test("My work checks wording rules with the developer's own AI model", async ({ 
   await expect(page.getByRole("link", { name: "Set up your AI model" })).toBeVisible();
 
   await page.goto("/credentials");
-  await page.locator("#ai-key-CLAUDE").fill(CLAUDE_KEY);
-  await page.getByRole("button", { name: "Save & validate" }).first().click();
+  await addAiKey(page, "CLAUDE", CLAUDE_KEY);
   await expect(page.getByText(/Key works/)).toBeVisible();
   await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
   await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");
@@ -72,8 +72,7 @@ test("an AI fix is applied only through the approval dialog", async ({ page, req
   await page.getByLabel("Personal access token").fill("fake-pat-token-0123456789abcdefghij");
   await page.getByRole("button", { name: "Save credential" }).click();
   await expect(page).toHaveURL("/credentials");
-  await page.locator("#ai-key-CLAUDE").fill(CLAUDE_KEY);
-  await page.getByRole("button", { name: "Save & validate" }).first().click();
+  await addAiKey(page, "CLAUDE", CLAUDE_KEY);
   await expect(page.getByText(/Key works/)).toBeVisible();
   await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
   await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");

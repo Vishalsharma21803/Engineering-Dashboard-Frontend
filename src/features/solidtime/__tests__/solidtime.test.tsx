@@ -347,21 +347,11 @@ describe("times in the Solidtime time zone", () => {
   });
 });
 
-describe("SolidtimeConnectionsSection", () => {
-  it("connects with an address and token, then shows the connection without the token", async () => {
-    const calls = mockBackend([
-      { path: "/api/solidtime/connections", body: { connections: [] } },
-      { method: "POST", path: "/api/solidtime/connections", status: 201, body: { connection, memberships: [] } },
-      { path: "/api/credentials", body: { credentials: [] } },
-    ]);
-    renderWithProviders(<SolidtimeConnectionsSection />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "Connect Solidtime" }));
-    const form = screen.getByRole("form", { name: "Connect Solidtime" });
-    await userEvent.type(within(form).getByLabelText("Solidtime address"), "https://time.example.com");
-    await userEvent.type(within(form).getByLabelText("API token"), "st-token-0123456789abcdefghij");
-    await userEvent.click(within(form).getByRole("button", { name: "Connect" }));
-
-    await waitFor(() => expect(calls.find((call) => call.method === "POST")?.body).toEqual({ baseUrl: "https://time.example.com", token: "st-token-0123456789abcdefghij" }));
+describe("Solidtime on the Credentials page", () => {
+  it("points an empty Solidtime section to the Add credential page", async () => {
+    mockBackend([{ path: "/api/solidtime/connections", body: { connections: [] } }]);
+    renderWithProviders(<SolidtimeConnectionsSection onNotice={vi.fn()} />);
+    expect(await screen.findByRole("link", { name: "Add one" })).toHaveAttribute("href", "/credentials/new?platform=solidtime");
+    expect(screen.queryByRole("button", { name: /Connect/ })).not.toBeInTheDocument();
   });
 });

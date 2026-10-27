@@ -62,7 +62,7 @@ test("discovers projects, prioritizes work and never writes without approval", a
   await expect(page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
   // SOP rule T-01 (estimate) fails for the started tickets #102 and #103; #106 is still New, so it is not flagged.
   await expect(page.getByRole("table").getByText("T-01")).toHaveCount(2);
-  await expect(page.getByRole("link", { name: "PR 1 Login flow", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "PR 1 Login flow", exact: true }).first()).toBeVisible();
   await expect(page.getByText("2 unresolved", { exact: true })).toBeVisible();
 
   expect(await azureWrites(request)).toEqual([]);

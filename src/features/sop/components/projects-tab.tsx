@@ -460,14 +460,14 @@ export function ProjectsTab() {
         <ErrorCard error={projects.error} credentialId={credentialId} onRetry={() => void projects.refetch()} />
       ) : (
         <Updating active={projects.isPlaceholderData}>
-          <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-surface shadow-sm">
             <table className="w-full text-left text-sm sm:min-w-[640px]" aria-label="SOP projects">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Project</th>
-                  <th className="px-3 py-2 font-medium">SOP set-up</th>
-                  <th className="px-3 py-2 font-medium">Check for me</th>
-                  <th className="px-3 py-2 font-medium">
+                  <th className="px-4 py-2.5 font-medium">Project</th>
+                  <th className="px-4 py-2.5 font-medium">SOP set-up</th>
+                  <th className="px-4 py-2.5 font-medium">Check for me</th>
+                  <th className="px-4 py-2.5 font-medium">
                     <span className="sr-only">Actions</span>
                   </th>
                 </tr>
@@ -476,8 +476,8 @@ export function ProjectsTab() {
                 {projects.data.projects.items.map((project) => {
                   const setUp = setUpByName.get(project.name.toLowerCase());
                   return (
-                    <tr key={project.id} className="align-top">
-                      <td className="px-3 py-3.5 font-medium text-slate-900">
+                    <tr key={project.id} className="align-middle">
+                      <td className="px-4 py-3 font-medium text-slate-900">
                         {project.name}
                         {showHistory === project.name ? (
                           <div className="mt-1">
@@ -485,7 +485,7 @@ export function ProjectsTab() {
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-3 py-3.5">
+                      <td className="px-4 py-3">
                         {setUp ? (
                           <span className="text-xs text-slate-600">
                             <StatusBadge tone="success">Set up</StatusBadge>{" "}
@@ -499,7 +499,7 @@ export function ProjectsTab() {
                         )}
                       </td>
                       <td
-                        className="px-3 py-3.5"
+                        className="px-4 py-3"
                         title={project.setUp ? undefined : "Set this project up first; only set-up projects can be checked."}
                       >
                         <input
@@ -515,7 +515,7 @@ export function ProjectsTab() {
                           }}
                         />
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-4 py-2">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <Button size="sm" variant="secondary" onClick={() => setEditing(project)}>
                             {project.setUp ? "Edit" : "Set up"}

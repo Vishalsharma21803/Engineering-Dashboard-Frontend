@@ -29,15 +29,19 @@ test("a developer tunes their own rules; the default rules stay read-only", asyn
   await editor.fill("---\nid: DEV-02\nseverity: off\n---\n");
   await expect(page.getByText(/✓ Valid · 0 rules · 1 overrides/)).toBeVisible();
   await page.getByRole("button", { name: "Save as new version" }).click();
-  await expect(page.getByText("Active version")).toContainText("1");
+  await expect(page.getByText(/^Version 1/)).toBeVisible();
 
   await page.getByRole("tab", { name: "Rules that apply to me" }).click();
+  // The rule list is paged; search finds the rule wherever it is.
+  await page.getByPlaceholder("Search rule id or title").fill("DEV-02");
   const dev02 = page.getByRole("row", { name: /DEV-02/ });
   await expect(dev02).toContainText("yours");
   await expect(dev02).toContainText("Off");
 
   await page.getByRole("tab", { name: "Default rules" }).click();
   await expect(page.getByText("Only SOP owners can change the default rules.", { exact: false })).toBeVisible();
+  // Read-only: it opens on the rule list; the Markdown can be read, not edited.
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
   await expect(page.getByLabel("Default rulebook")).toHaveAttribute("readonly", "");
 });
 
@@ -54,7 +58,7 @@ test("an SOP owner saves a new default version with a note", async ({ page }) =>
 
   await page.getByLabel("Change note").fill("Shorter STR-03 title");
   await page.getByRole("button", { name: "Save as new version" }).click();
-  await expect(page.getByText(/Active version/)).toContainText("1");
+  await expect(page.getByText(/^Version 1/)).toBeVisible();
   await expect(page.locator("#versions-default option", { hasText: "Shorter STR-03 title" })).toHaveCount(1);
 });
 

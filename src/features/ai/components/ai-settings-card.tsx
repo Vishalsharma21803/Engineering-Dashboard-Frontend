@@ -99,158 +99,172 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
     );
   }
 
+  const savedModelLabel = initial.model ? ((initial.provider === provider ? models.data : undefined)?.find((option) => option.id === initial.model)?.label ?? initial.model) : null;
+  const spentShare = usage.data && initial.dailyLimitUsd > 0 ? Math.min(1, usage.data.todayUsd / initial.dailyLimitUsd) : 0;
+
   return (
-    <Card className="p-5">
-      <h3 className="text-base font-semibold text-slate-950">AI settings</h3>
-      <p className="mt-1 text-sm text-slate-600">
-        Used for AI checks and suggested fixes. Your own key pays for your checks; results are private to you.
-      </p>
+    <Card className="overflow-hidden">
+      <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-slate-950">AI settings</h3>
+          <p className="mt-1 text-sm text-slate-600">Used for AI checks and suggested fixes. Your own key pays for your checks; results are private to you.</p>
+        </div>
+        {initial.provider ? (
+          <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald-500" />
+            AI checks on · {savedModelLabel ?? PROVIDER_INFO[initial.provider].name}
+          </span>
+        ) : (
+          <span className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-slate-400" />
+            AI checks off
+          </span>
+        )}
+      </div>
 
-      <form onSubmit={submit} className="mt-4 space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="ai-provider">Provider</Label>
-            <select
-              id="ai-provider"
-              className={selectClassName}
-              value={provider ?? ""}
-              onChange={(event) => {
-                const next = (event.target.value || null) as AiProvider | null;
-                setProvider(next);
-                setModel(null);
-              }}
-            >
-              <option value="">AI checks off</option>
-              {(["CLAUDE", "OPENROUTER", "OPENCODE"] as const).map((option) => (
-                <option key={option} value={option} disabled={!providersWithKeys.includes(option)}>
-                  {PROVIDER_INFO[option].name}
-                  {providersWithKeys.includes(option) ? "" : " (add a key first)"}
-                </option>
-              ))}
-            </select>
-          </div>
+      <dl aria-label="AI usage" className="grid border-y border-slate-200 bg-slate-50 sm:grid-cols-3">
+        <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Spent today</dt>
+          <dd className="mt-1">
+            <span className="text-lg font-semibold text-slate-950">{usage.data ? formatUsd(usage.data.todayUsd) : "—"}</span>
+            <span className="text-sm text-slate-500"> of {formatUsd(initial.dailyLimitUsd)}</span>
+            <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+              <span className={cn("block h-full rounded-full", spentShare >= 1 ? "bg-rose-500" : spentShare >= 0.8 ? "bg-amber-500" : "bg-indigo-500")} style={{ width: `${spentShare * 100}%` }} />
+            </span>
+          </dd>
+        </div>
+        <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Calls today</dt>
+          <dd className="mt-1 text-lg font-semibold text-slate-950">{usage.data ? usage.data.callsToday : "—"}</dd>
+        </div>
+        <div className="px-5 py-3">
+          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">This month</dt>
+          <dd className="mt-1 text-lg font-semibold text-slate-950">
+            {usage.data ? formatUsd(usage.data.monthUsd) : "—"}
+            <span className="block text-xs font-normal text-slate-500">Daily total resets at 00:00 UTC</span>
+          </dd>
+        </div>
+      </dl>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="ai-model">Model</Label>
-            <select
-              id="ai-model"
-              className={selectClassName}
-              value={model ?? ""}
-              disabled={provider === null || models.isLoading}
-              onChange={(event) => setModel(event.target.value || null)}
-            >
-              <option value="">{models.isLoading ? "Loading models…" : "Choose a model"}</option>
-              {(models.data ?? []).map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                  {option.free ? " · Free" : ""}
-                </option>
-              ))}
-            </select>
-            {models.isError ? (
-              <p className="text-xs text-rose-600">{describeAiError(models.error, "Could not load models.")}</p>
-            ) : selectedModel ? (
-              <div className="space-y-0.5 text-xs text-slate-500">
-                <p className="font-medium text-slate-600">{formatPrice(selectedModel)}</p>
-                {selectedModel.description ? <p>{selectedModel.description}</p> : null}
+      <form onSubmit={submit}>
+        <div className="space-y-6 p-5">
+          <section aria-labelledby="ai-model-title" className="space-y-3">
+            <h4 id="ai-model-title" className="text-sm font-semibold text-slate-900">
+              Model and limits
+            </h4>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-provider">Provider</Label>
+                <select
+                  id="ai-provider"
+                  className={selectClassName}
+                  value={provider ?? ""}
+                  onChange={(event) => {
+                    const next = (event.target.value || null) as AiProvider | null;
+                    setProvider(next);
+                    setModel(null);
+                  }}
+                >
+                  <option value="">AI checks off</option>
+                  {(["CLAUDE", "OPENROUTER", "OPENCODE"] as const).map((option) => (
+                    <option key={option} value={option} disabled={!providersWithKeys.includes(option)}>
+                      {PROVIDER_INFO[option].name}
+                      {providersWithKeys.includes(option) ? "" : " (add a key first)"}
+                    </option>
+                  ))}
+                </select>
+                {providersWithKeys.length === 0 ? <p className="text-xs text-slate-500">Add an AI provider key above to turn AI checks on.</p> : null}
               </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-model">Model</Label>
+                <select
+                  id="ai-model"
+                  className={selectClassName}
+                  value={model ?? ""}
+                  disabled={provider === null || models.isLoading}
+                  onChange={(event) => setModel(event.target.value || null)}
+                >
+                  <option value="">{models.isLoading ? "Loading models…" : "Choose a model"}</option>
+                  {(models.data ?? []).map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                      {option.free ? " · Free" : ""}
+                    </option>
+                  ))}
+                </select>
+                {models.isError ? (
+                  <p className="text-xs text-rose-600">{describeAiError(models.error, "Could not load models.")}</p>
+                ) : selectedModel ? (
+                  <div className="space-y-0.5 text-xs text-slate-500">
+                    <p>
+                      <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-medium text-slate-700">{formatPrice(selectedModel)}</span>
+                    </p>
+                    {selectedModel.description ? <p>{selectedModel.description}</p> : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-effort">Effort</Label>
+                <select
+                  id="ai-effort"
+                  className={selectClassName}
+                  value={efforts.length === 0 ? "" : efforts.includes(effort) ? effort : (efforts[0] ?? "")}
+                  disabled={efforts.length === 0}
+                  onChange={(event) => setEffort(event.target.value as AiEffort)}
+                >
+                  {efforts.length === 0 ? <option value="">{selectedModel ? "Not adjustable" : "Choose a model first"}</option> : null}
+                  {efforts.map((option) => (
+                    <option key={option} value={option}>
+                      {EFFORT_LABELS[option].label} · {EFFORT_LABELS[option].hint}
+                    </option>
+                  ))}
+                </select>
+                {selectedModel && efforts.length === 0 ? <p className="text-xs text-slate-500">This model doesn't offer an effort setting.</p> : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ai-limit">Daily spend limit (USD)</Label>
+                <div className="relative">
+                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">
+                    $
+                  </span>
+                  <Input id="ai-limit" type="number" min={0} max={100} step={0.5} className="pl-7" value={limit} onChange={(event) => setLimit(event.target.value)} />
+                </div>
+                <p className="text-xs text-slate-500">Checks pause once today's spend reaches this. 0 = free models only.</p>
+              </div>
+            </div>
+          </section>
+
+          {needsConsent ? (
+            <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />
+              <span>
+                <strong>Data notice:</strong> free models are served by providers that may store or train on what they receive. Ticket titles,
+                descriptions and comments would be sent to them. I confirm this is allowed for my projects.
+              </span>
+            </label>
+          ) : null}
+
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-h-5 text-xs">
+            {message ? (
+              <span role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-sm text-rose-600" : "text-sm text-emerald-700"}>
+                {message.text}
+              </span>
+            ) : changed && !save.isPending ? (
+              <span className="text-amber-700">{valid ? "Unsaved changes" : "Unsaved changes: choose a model, accept the data notice if shown, and use a limit from 0 to 100"}</span>
+            ) : !changed && initial.updatedAt ? (
+              <span className="text-slate-500">Saved {formatDateTime(initial.updatedAt)}</span>
             ) : null}
           </div>
-        </div>
-
-        {provider !== null && selectedModel ? (
-          <fieldset>
-            <legend className="text-sm font-medium text-slate-700">Effort</legend>
-            {efforts.length === 0 ? (
-              <p className="mt-1 text-xs text-slate-500">This model doesn't offer an effort setting.</p>
-            ) : (
-              <div role="radiogroup" className="mt-1.5 grid gap-2 sm:grid-cols-3">
-                {efforts.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={effort === option}
-                    onClick={() => setEffort(option)}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-left transition",
-                      effort === option
-                        ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20"
-                        : "border-slate-200 bg-surface hover:border-slate-300"
-                    )}
-                  >
-                    <span className="block text-sm font-semibold text-slate-900">{EFFORT_LABELS[option].label}</span>
-                    <span className="block text-xs text-slate-500">{EFFORT_LABELS[option].hint}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </fieldset>
-        ) : null}
-
-        {needsConsent ? (
-          <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4 shrink-0"
-              checked={accepted}
-              onChange={(event) => setAccepted(event.target.checked)}
-            />
-            <span>
-              <strong>Data notice:</strong> free models are served by providers that may store or train on what they
-              receive. Ticket titles, descriptions and comments would be sent to them. I confirm this is allowed for
-              my projects.
-            </span>
-          </label>
-        ) : null}
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="ai-limit">Daily spend limit (USD)</Label>
-            <Input
-              id="ai-limit"
-              type="number"
-              min={0}
-              max={100}
-              step={0.5}
-              value={limit}
-              onChange={(event) => setLimit(event.target.value)}
-            />
-            <p className="text-xs text-slate-500">Automatic checks pause once today's spend reaches this. 0 = only free models.</p>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Usage</p>
-            {usage.data ? (
-              <p className="mt-1 text-slate-800">
-                Today <strong>{formatUsd(usage.data.todayUsd)}</strong> ({usage.data.callsToday} calls) · This month{" "}
-                <strong>{formatUsd(usage.data.monthUsd)}</strong>
-                <span className="block text-xs text-slate-500">Daily total resets at 00:00 UTC.</span>
-              </p>
-            ) : (
-              <p className="mt-1 text-slate-500">—</p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
           <Button type="submit" disabled={!canSave}>
             {save.isPending ? <Spinner className="size-4" /> : null}
             Save AI settings
           </Button>
-          {!message && changed && !save.isPending ? (
-            <span className="text-xs text-amber-700">
-              {valid ? "Unsaved changes" : "Unsaved changes: choose a model, accept the data notice if shown, and use a limit from 0 to 100"}
-            </span>
-          ) : null}
-          {!message && !changed && initial.updatedAt ? (
-            <span className="text-xs text-slate-500">Saved {formatDateTime(initial.updatedAt)}</span>
-          ) : null}
-          {message ? (
-            <span role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-sm text-rose-600" : "text-sm text-emerald-700"}>
-              {message.text}
-            </span>
-          ) : null}
         </div>
       </form>
     </Card>

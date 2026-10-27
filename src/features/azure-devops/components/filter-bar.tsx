@@ -28,9 +28,9 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
   const active = filters.filter((filter) => filter.value !== "").length + (search?.value ? 1 : 0);
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-2 lg:flex-row lg:items-center">
+    <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-2 sm:flex-row sm:flex-wrap sm:items-center">
       {search ? (
-        <div className="relative lg:w-64">
+        <div className="relative min-w-0 sm:min-w-56 sm:flex-1">
           <svg
             viewBox="0 0 20 20"
             fill="none"
@@ -48,41 +48,43 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
             placeholder={search.placeholder}
             value={search.value}
             onChange={(event) => search.onChange(event.target.value)}
-            className="h-9 pl-8"
+            className="h-9 w-full pl-8"
           />
         </div>
       ) : null}
 
-      <div className="grid flex-1 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-        {filters.map((filter) => (
-          <label key={filter.id} className="flex min-w-0 items-center">
-            <span className="sr-only">{filter.label}</span>
-            <select
-              value={filter.value}
-              onChange={(event) => filter.onChange(event.target.value)}
-              className={cn(
-                "h-9 w-full min-w-0 rounded-lg border bg-surface px-2.5 text-sm shadow-sm sm:w-auto sm:min-w-36 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
-                filter.value ? "border-indigo-300 font-medium text-indigo-700" : "border-slate-300 text-slate-700"
-              )}
-            >
-              <option value="">{filter.label}: All</option>
-              {filter.options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {filter.label}: {option.label}
-                  {option.count !== undefined ? ` (${option.count})` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
-      </div>
+      {filters.length > 0 ? (
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          {filters.map((filter) => (
+            <label key={filter.id} className="flex min-w-0 items-center">
+              <span className="sr-only">{filter.label}</span>
+              <select
+                value={filter.value}
+                onChange={(event) => filter.onChange(event.target.value)}
+                className={cn(
+                  "h-9 w-full min-w-0 truncate rounded-lg border bg-surface pl-2.5 pr-7 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:w-44",
+                  filter.value ? "border-indigo-300 font-medium text-indigo-700" : "border-slate-300 text-slate-700"
+                )}
+              >
+                <option value="">{filter.label}: All</option>
+                {filter.options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {filter.label}: {option.label}
+                    {option.count !== undefined ? ` (${option.count})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+      ) : null}
 
-      <div className="flex shrink-0 items-center gap-3 whitespace-nowrap text-xs text-slate-500">
+      <div className="flex shrink-0 items-center justify-between gap-3 whitespace-nowrap px-1 text-xs text-slate-500 sm:ml-auto sm:justify-end">
         <span aria-live="polite">
           {shown === total ? `${total} item${total === 1 ? "" : "s"}` : `${shown} of ${total}`}
         </span>
         {active > 0 ? (
-          <button type="button" onClick={onClear} className="font-medium text-indigo-600 hover:text-indigo-500">
+          <button type="button" onClick={onClear} className="rounded-md px-1.5 py-1 font-medium text-indigo-600 hover:bg-indigo-50 hover:text-indigo-500">
             Clear filters
           </button>
         ) : null}

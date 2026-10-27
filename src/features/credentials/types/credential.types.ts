@@ -18,13 +18,6 @@ export interface Credential {
   updatedAt: string;
 }
 
-export interface CreateCredentialInput {
-  platform: "AZURE";
-  organizationUrl: string;
-  label?: string;
-  patToken: string;
-}
-
 export interface UpdateCredentialInput {
   organizationUrl?: string;
   label?: string | null;

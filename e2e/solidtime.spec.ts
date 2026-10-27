@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { addAiKey, connectSolidtime } from "./helpers/credentials.js";
 
 const BACKEND = "http://localhost:3100";
 // Accepted by the fake Solidtime in backend/tests/support/fake-solidtime.ts (an Employee in one organization).
@@ -25,11 +26,7 @@ async function setUp(page: Page) {
   await page.getByRole("button", { name: "Save credential" }).click();
   await expect(page).toHaveURL("/credentials");
 
-  await page.getByRole("button", { name: "Connect Solidtime" }).click();
-  const form = page.getByRole("form", { name: "Connect Solidtime" });
-  await form.getByLabel("Solidtime address").fill(SOLIDTIME_URL);
-  await form.getByLabel("API token").fill(SOLIDTIME_TOKEN);
-  await form.getByRole("button", { name: "Connect" }).click();
+  await connectSolidtime(page, SOLIDTIME_URL, SOLIDTIME_TOKEN);
   await expect(page.getByText("Sifars · employee")).toBeVisible();
 }
 
@@ -95,8 +92,7 @@ test("drafts yesterday from Azure, fills the missing hours with AI, and saves th
   await setUp(page);
 
   // The developer's own AI model (the fake provider answers 1 h per ticket).
-  await page.locator("#ai-key-CLAUDE").fill("sk-ant-test-valid-key-0123456789abcdef");
-  await page.getByRole("button", { name: "Save & validate" }).first().click();
+  await addAiKey(page, "CLAUDE", "sk-ant-test-valid-key-0123456789abcdef");
   await expect(page.getByText(/Key works/)).toBeVisible();
   await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
   await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");

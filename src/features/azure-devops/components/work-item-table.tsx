@@ -61,7 +61,7 @@ function AiStatusBadge({ check }: { check: AiCheck | undefined }) {
   if (isAiCheckBusy(check)) {
     return (
       <StatusBadge tone="info" title="AI check running">
-        AI…
+        AI checking
       </StatusBadge>
     );
   }

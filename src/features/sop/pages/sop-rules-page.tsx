@@ -2,7 +2,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { ErrorCard } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, StatTile } from "@/features/azure-devops/components/feedback";
 import { cn } from "@/utils/cn";
 import { ProjectsTab } from "../components/projects-tab";
 import { RuleSummaryTable } from "../components/rule-summary-table";
@@ -13,11 +13,11 @@ import { rulebookVersionsLabel } from "../utils/rule-labels";
 
 type Tab = RulebookScope | "effective" | "projects";
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "projects", label: "Projects" },
-  { id: "personal", label: "My rules" },
-  { id: "default", label: "Default rules" },
-  { id: "effective", label: "Rules that apply to me" },
+const TABS: Array<{ id: Tab; label: string; description: string }> = [
+  { id: "projects", label: "Projects", description: "Set up how each Azure DevOps project maps onto the SOP, and choose which projects are checked for you." },
+  { id: "personal", label: "My rules", description: "Your own rule cards and changes to default rules. They only change your checks, never the team's." },
+  { id: "default", label: "Default rules", description: "The organization's rules, kept by SOP owners. Team reports use these." },
+  { id: "effective", label: "Rules that apply to me", description: "The default rules with your changes applied: exactly what your checks use." },
 ];
 
 function isTab(value: string | null): value is Tab {
@@ -76,19 +76,33 @@ function EffectiveTab() {
   const effective = useEffectiveRules();
 
   if (effective.isLoading) {
-    return <Spinner className="size-4" />;
+    return (
+      <p className="flex items-center gap-2 text-sm text-slate-500">
+        <Spinner className="size-4" /> Loading your rules…
+      </p>
+    );
   }
 
   if (effective.error || !effective.data) {
     return <ErrorCard error={effective.error} onRetry={() => void effective.refetch()} />;
   }
 
+  const cards = effective.data.cards;
+  const active = cards.filter((card) => card.severity !== "off");
+
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-slate-600">
-        {rulebookVersionsLabel(effective.data.defaultVersion, effective.data.personalVersion)}. Team reports always use the
-        default rules only.
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Rules in force" value={active.length} hint={`${cards.length - active.length} switched off`} />
+        <StatTile label="Gaps" value={cards.filter((card) => card.severity === "fail").length} hint="must be fixed" />
+        <StatTile label="Warnings & notices" value={cards.filter((card) => card.severity === "warn" || card.severity === "notice").length} hint="shown, not blocking" />
+        <StatTile label="Projects checked" value={effective.data.projects.length} hint={effective.data.projects.map((project) => project.project).join(", ") || "set them up on Projects"} />
+      </div>
+
+      <p className="rounded-lg border border-slate-200 bg-surface px-4 py-3 text-sm text-slate-600">
+        {rulebookVersionsLabel(effective.data.defaultVersion, effective.data.personalVersion)}. Team reports always use the default rules only.
       </p>
+
       {effective.data.issues.length > 0 ? (
         <ul className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           {effective.data.issues.map((issue, index) => (
@@ -98,12 +112,8 @@ function EffectiveTab() {
           ))}
         </ul>
       ) : null}
-      <p className="text-sm text-slate-600">
-        Projects checked for you:{" "}
-        {effective.data.projects.length ? effective.data.projects.map((project) => project.project).join(", ") : "none"}. Set projects
-        up and choose yours on the Projects tab.
-      </p>
-      <RuleSummaryTable cards={effective.data.cards} />
+
+      <RuleSummaryTable cards={cards} />
     </div>
   );
 }
@@ -116,7 +126,6 @@ export function SopRulesPage() {
   const tab: Tab = isTab(requested) ? requested : "personal";
   const setTab = (next: Tab) => setSearchParams(next === "personal" ? {} : { tab: next }, { replace: true });
   const isOwner = user?.isSopAdmin ?? false;
-
 
   return (
     <section className="flex w-full min-w-0 flex-col gap-6">
@@ -146,6 +155,8 @@ export function SopRulesPage() {
           </button>
         ))}
       </div>
+
+      <p className="-mt-2 text-sm text-slate-600">{TABS.find((item) => item.id === tab)?.description}</p>
 
       {tab === "projects" ? <ProjectsTab /> : null}
       {tab === "personal" ? <EditorTab scope="personal" canSave /> : null}
