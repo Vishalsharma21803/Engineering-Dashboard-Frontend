@@ -132,7 +132,7 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
         key={recommendation.id}
         className={cn(
           "relative flex flex-col gap-3 overflow-hidden rounded-lg border border-slate-200 py-3 pl-5 pr-4 transition hover:border-slate-300 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between",
-          muted ? "bg-slate-50" : "bg-white"
+          muted ? "bg-slate-50" : "bg-surface"
         )}
       >
         <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1", muted ? "bg-slate-200" : CATEGORY_BARS[recommendation.category])} />
@@ -141,7 +141,7 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
           <span
             className={cn(
               "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-              rank === null ? "bg-slate-200 text-slate-500" : "bg-slate-900 text-white"
+              rank === null ? "bg-slate-200 text-slate-500" : "bg-inverse text-on-inverse"
             )}
           >
             {rank ?? "–"}
@@ -244,15 +244,15 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
                     category === entry.value
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                      ? "border-inverse bg-inverse text-on-inverse"
+                      : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:text-slate-900"
                   )}
                 >
                   {entry.value ? (
                     <span aria-hidden="true" className={cn("size-2 rounded-full", CATEGORY_BARS[entry.value])} />
                   ) : null}
                   {entry.value ? CATEGORY_LABELS[entry.value].label : "All"}
-                  <span className={category === entry.value ? "text-white/70" : "text-slate-400"}>{entry.count}</span>
+                  <span className={category === entry.value ? "text-on-inverse/70" : "text-slate-400"}>{entry.count}</span>
                 </button>
               ))}
             </div>

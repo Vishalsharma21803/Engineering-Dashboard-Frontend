@@ -64,7 +64,7 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
       )}
       <form onSubmit={submit} className="flex flex-wrap gap-2" aria-label={`New ${kind.slice(0, -1)}`}>
         {kind === "tasks" ? (
-          <select aria-label="Project for the new task" className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+          <select aria-label="Project for the new task" className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
             <option value="">Choose a project</option>
             {(catalog.data?.projects ?? []).map((project) => (
               <option key={project.id} value={project.id}>

@@ -120,7 +120,7 @@ export function SectionCard({
 
 export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-surface p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
       {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
@@ -137,7 +137,7 @@ export function ErrorToast({ message, onDismiss }: { message: string | null; onD
   return (
     <div
       role="alert"
-      className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-rose-200 bg-white p-4 text-sm shadow-xl sm:left-auto sm:right-6 sm:mx-0"
+      className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-rose-200 bg-surface p-4 text-sm shadow-xl sm:left-auto sm:right-6 sm:mx-0"
     >
       <span aria-hidden="true" className="mt-0.5 size-2.5 shrink-0 rounded-full bg-rose-500" />
       <div className="flex-1">

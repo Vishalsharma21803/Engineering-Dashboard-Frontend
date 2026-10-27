@@ -99,7 +99,7 @@ export function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-surface px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
             {dashboard.identity.displayName
@@ -132,7 +132,7 @@ export function DashboardPage() {
       ) : null}
 
       {triage.projectMarks.length > 0 ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-surface px-4 py-3 sm:flex-row sm:items-center">
           <p className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Triaged projects</p>
           <ul className="flex flex-wrap gap-2">
             {triage.projectMarks.map((mark) => {
@@ -154,7 +154,7 @@ export function DashboardPage() {
                     onClick={() => triage.clear(mark)}
                     disabled={!triage.ready || triage.isSaving}
                     aria-label={`Restore project ${name}`}
-                    className="rounded-full bg-white px-2 py-0.5 font-medium text-indigo-600 ring-1 ring-slate-200 transition hover:text-indigo-800 disabled:opacity-50"
+                    className="rounded-full bg-surface px-2 py-0.5 font-medium text-indigo-600 ring-1 ring-slate-200 transition hover:text-indigo-800 disabled:opacity-50"
                   >
                     Restore
                   </button>

@@ -136,7 +136,7 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
               }}
               className={cn(
                 "rounded-md px-3 py-1 text-xs font-medium transition",
-                state === value ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-950"
+                state === value ? "bg-inverse text-on-inverse" : "text-slate-600 hover:text-slate-950"
               )}
             >
               {value === "open" ? "Open" : "Last 90 days"}

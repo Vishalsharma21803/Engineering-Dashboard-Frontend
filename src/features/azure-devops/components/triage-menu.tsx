@@ -181,7 +181,7 @@ export function TriageMenu({ triage, itemKey, projectName, label, resolved }: Tr
         aria-controls={open ? panelId : undefined}
         aria-label={`Triage ${label}`}
         title="Snooze, acknowledge or abandon"
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 outline-none transition hover:border-slate-300 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-surface text-slate-500 outline-none transition hover:border-slate-300 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="size-4">
           <path d="M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm5.5 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
@@ -196,7 +196,7 @@ export function TriageMenu({ triage, itemKey, projectName, label, resolved }: Tr
               role="dialog"
               aria-label={`Triage ${label}`}
               style={position}
-              className="z-50 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 text-left shadow-xl"
+              className="z-50 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-surface p-1.5 text-left shadow-xl"
             >
               {itemKey ? (
                 <Group title="This item">
@@ -228,7 +228,7 @@ export function TriageMenu({ triage, itemKey, projectName, label, resolved }: Tr
                     <button
                       type="submit"
                       disabled={!customUntil}
-                      className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-40"
+                      className="rounded-md bg-inverse px-2 py-1 text-xs font-medium text-on-inverse disabled:opacity-40"
                     >
                       Snooze
                     </button>
@@ -282,8 +282,8 @@ export function HiddenToggle({ count, shown, onToggle }: { count: number; shown:
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
         shown
-          ? "border-slate-900 bg-slate-900 text-white"
-          : "border-dashed border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:text-slate-900"
+          ? "border-inverse bg-inverse text-on-inverse"
+          : "border-dashed border-slate-300 bg-surface text-slate-600 hover:border-slate-400 hover:text-slate-900"
       )}
     >
       {shown ? "Hide snoozed & abandoned" : `Show snoozed & abandoned (${count})`}

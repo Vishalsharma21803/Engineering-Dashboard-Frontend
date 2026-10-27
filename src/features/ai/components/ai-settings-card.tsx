@@ -19,7 +19,7 @@ const EFFORT_LABELS: Record<AiEffort, { label: string; hint: string }> = {
 };
 
 const selectClassName =
-  "block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50";
+  "block h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50";
 
 /** Which provider, model and effort AI checks use, plus the daily spend guard. */
 export function AiSettingsCard() {
@@ -173,7 +173,7 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
                       "rounded-lg border px-3 py-2 text-left transition",
                       effort === option
                         ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20"
-                        : "border-slate-200 bg-white hover:border-slate-300"
+                        : "border-slate-200 bg-surface hover:border-slate-300"
                     )}
                   >
                     <span className="block text-sm font-semibold text-slate-900">{EFFORT_LABELS[option].label}</span>

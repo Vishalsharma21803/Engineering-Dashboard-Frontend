@@ -13,7 +13,7 @@ import { testRulesOnTicket } from "../api/sop.api";
 import type { RulebookScope } from "../types/sop.types";
 import { SopResultPanel } from "./sop-result-panel";
 
-const SELECT_CLASS = "h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm";
+const SELECT_CLASS = "h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm";
 
 /** Tries the rules in the editor (or the saved ones) on one real ticket. Reads only. */
 export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookScope; content: string; allowDraft: boolean }) {

@@ -135,6 +135,8 @@ export interface TimeVsEstimate {
   overEstimate: boolean;
   suggested: { completedWork: number; remainingWork: number | null };
   inSync: boolean;
+  /** "team": everyone's time; "mine": only my own (my Solidtime role cannot read others'). */
+  basis: "team" | "mine";
 }
 
 export type ProjectSource = "mapping" | "ticket" | "azure-project" | "name";

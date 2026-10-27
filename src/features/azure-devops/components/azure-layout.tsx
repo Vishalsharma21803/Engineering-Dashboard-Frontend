@@ -14,7 +14,7 @@ import {
 } from "../utils/last-project";
 
 const selectClassName =
-  "h-10 w-full min-w-44 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50";
+  "h-10 w-full min-w-44 rounded-lg border border-slate-300 bg-surface px-3 text-sm font-medium text-slate-900 shadow-sm transition hover:border-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50";
 
 const tabClassName = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -120,7 +120,7 @@ export function AzureLayout() {
 
   return (
     <section className="flex w-full flex-col gap-6">
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-surface shadow-sm">
         <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex items-center gap-4">
             <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-600 to-sky-500 text-white shadow-sm">

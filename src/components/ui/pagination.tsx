@@ -31,7 +31,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange, label 
       <div className="flex items-center gap-1">
         <button
           type="button"
-          className={cn(BUTTON, "border-slate-200 bg-white text-slate-700 hover:bg-slate-50")}
+          className={cn(BUTTON, "border-slate-200 bg-surface text-slate-700 hover:bg-slate-50")}
           disabled={disabled || page <= 1}
           onClick={() => onChange(page - 1)}
         >
@@ -52,7 +52,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange, label 
               onClick={() => onChange(value)}
               className={cn(
                 BUTTON,
-                value === page ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                value === page ? "border-indigo-600 bg-indigo-600 text-white" : "border-slate-200 bg-surface text-slate-700 hover:bg-slate-50"
               )}
             >
               {value}
@@ -61,7 +61,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange, label 
         )}
         <button
           type="button"
-          className={cn(BUTTON, "border-slate-200 bg-white text-slate-700 hover:bg-slate-50")}
+          className={cn(BUTTON, "border-slate-200 bg-surface text-slate-700 hover:bg-slate-50")}
           disabled={disabled || page >= totalPages}
           onClick={() => onChange(page + 1)}
         >

@@ -5,7 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 import { mockBackend, renderWithProviders } from "@/test/render";
 import { SolidtimeConnectionsSection } from "../components/solidtime-connections-section";
 import { TicketTimerButton } from "../components/ticket-timer-button";
+import { TimerBar } from "../components/timer-bar";
 import { DraftTab } from "../components/draft-tab";
+import { TicketTimeLookup } from "../components/ticket-time-lookup";
+import { TicketTimePanel } from "../components/ticket-time-panel";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { projectNameKey, solidtimeProjectFor } from "../utils/project-map";
 import { localDay, zonedClock, zonedInstant } from "../utils/time";
 import type { SolidtimeConnection } from "../types/solidtime.types";
@@ -176,6 +180,101 @@ describe("DraftTab", () => {
     await userEvent.click(screen.getByRole("button", { name: "Suggest hours with AI" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose an AI provider");
     expect(screen.getByRole("link", { name: "Open AI settings" })).toHaveAttribute("href", "/credentials");
+  });
+});
+
+describe("timer errors", () => {
+  it("says the timer is unavailable, with the reason, instead of offering Start", async () => {
+    mockBackend([
+      { path: `${base}/timer`, status: 424, body: { message: "Solidtime rejected the API token", reason: "SOLIDTIME_TOKEN_INVALID" } },
+      { path: `${base}/catalog`, body: catalog },
+    ]);
+    renderWithProviders(<TicketTimerButton connection={connection} ticket={{ id: 101, title: "Implement login", projectName: "Alpha" }} onPropose={vi.fn()} />);
+    const button = await screen.findByRole("button", { name: "Timer unavailable: Solidtime rejected the API token" });
+    expect(button).toBeDisabled();
+  });
+
+  it("shows why the timer could not be read on the Time page, with a retry", async () => {
+    mockBackend([
+      { path: `${base}/timer`, status: 503, body: { message: "Solidtime is rate limiting requests", reason: "SOLIDTIME_RATE_LIMITED" } },
+      { path: `${base}/catalog`, body: catalog },
+    ]);
+    renderWithProviders(<TimerBar connection={connection} onPropose={vi.fn()} isProposing={false} />);
+    expect(await screen.findByRole("alert", {}, { timeout: 5_000 })).toHaveTextContent("Your Solidtime timer could not be read: Solidtime is rate limiting requests");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start timer…" })).toBeDisabled();
+  });
+});
+
+describe("ticket time", () => {
+  const ticket = { id: 101, title: "Implement login", type: "Task", state: "Active", projectName: "Alpha", originalEstimate: 8, completedWork: 2, remainingWork: 6 };
+  const response = (basis: "team" | "mine") => ({
+    time: { ticketId: 101, mySeconds: 3 * 3600, teamSeconds: basis === "team" ? 5 * 3600 : null, people: null, running: false },
+    ticket,
+    comparison: { trackedHours: basis === "team" ? 5 : 3, estimateHours: 8, overEstimate: false, suggested: { completedWork: basis === "team" ? 5 : 3, remainingWork: basis === "team" ? 3 : 5 }, inSync: false, basis },
+  });
+
+  it("looks a ticket up by id on the Time page and proposes Azure's time fields from the total", async () => {
+    const calls = mockBackend([{ path: `${base}/tickets/101/time`, body: response("team") }]);
+    const onPropose = vi.fn();
+    renderWithProviders(<TicketTimeLookup connection={connection} onPropose={onPropose} isProposing={false} />);
+
+    await userEvent.type(screen.getByLabelText("Ticket ID"), "#101");
+    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect(await screen.findByRole("link", { name: "#101 Implement login" })).toBeInTheDocument();
+    expect(screen.getByText("Total in Solidtime")).toBeInTheDocument();
+    expect(screen.getByText("5h 00m")).toBeInTheDocument();
+    expect(calls[0]?.url).toContain("/tickets/101/time?refresh=true");
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Update Azure to 5 h…" }));
+    expect(onPropose).toHaveBeenCalledWith({
+      credentialId: connection.azureCredentialId,
+      kind: "WORK_ITEM_UPDATE_FIELDS",
+      source: "USER",
+      target: { projectId: "Alpha", workItemId: 101 },
+      params: { completedWork: 5, remainingWork: 3 },
+    });
+  });
+
+  it("warns when only my own time is known, and the ticket page reads nothing until I click Check", async () => {
+    const calls = mockBackend([
+      { path: "/api/solidtime/connections", body: { connections: [connection] } },
+      { path: `${base}/timer`, body: { timer: null } },
+      { path: `${base}/catalog`, body: catalog },
+      { path: `${base}/tickets/101/time`, body: response("mine") },
+    ]);
+    renderWithProviders(<TicketTimePanel azureCredentialId={connection.azureCredentialId!} ticket={{ id: 101, title: "Implement login", projectName: "Alpha" }} onPropose={vi.fn()} isProposing={false} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Check time in Solidtime" }));
+    expect(await screen.findByRole("note")).toHaveTextContent("Based on your own time only");
+    expect(screen.getByText("Total (your time)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Update Azure to 3 h…" })).toBeEnabled();
+    expect(calls.filter((call) => call.url.includes("/tickets/101/time"))).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
+  });
+
+  it("disables the update when Azure's Completed Work already equals the total, even if Remaining differs", async () => {
+    const same = response("team");
+    same.ticket = { ...ticket, completedWork: 5, remainingWork: 1 };
+    mockBackend([{ path: `${base}/tickets/101/time`, body: same }]);
+    renderWithProviders(<TicketTimeLookup connection={connection} onPropose={vi.fn()} isProposing={false} />);
+    await userEvent.type(screen.getByLabelText("Ticket ID"), "101");
+    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect(await screen.findByRole("button", { name: "Azure already up to date" })).toBeDisabled();
+    expect(screen.getByText("Azure Completed Work already matches Solidtime (5 h).")).toBeInTheDocument();
+  });
+});
+
+describe("ThemeToggle", () => {
+  it("switches between light and dark and remembers the choice", async () => {
+    document.documentElement.dataset.theme = "light";
+    renderWithProviders(<ThemeToggle />);
+    await userEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(window.localStorage.getItem("cockpit-theme")).toBe("dark");
+    await userEvent.click(screen.getByRole("button", { name: "Switch to light mode" }));
+    expect(document.documentElement.dataset.theme).toBe("light");
   });
 });
 

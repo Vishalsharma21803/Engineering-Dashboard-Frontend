@@ -78,7 +78,7 @@ export function CredentialForm({
           </p>
         </div>
 
-        <span className="ml-auto shrink-0 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600">
+        <span className="ml-auto shrink-0 rounded-full border border-slate-200 bg-surface px-2 py-1 text-xs font-medium text-slate-600">
           Platform
         </span>
       </div>

@@ -53,7 +53,7 @@ function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult
         value={text}
         rows={singleLine ? 1 : Math.min(12, Math.max(3, text.split("\n").length + 1))}
         onChange={(event) => setText(singleLine ? event.target.value.replace(/\n/g, " ") : event.target.value)}
-        className="w-full resize-y rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        className="w-full resize-y rounded-md border border-slate-300 bg-surface px-2 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
       />
       {gaps.length > 0 ? (
         <p className="text-xs text-amber-700">

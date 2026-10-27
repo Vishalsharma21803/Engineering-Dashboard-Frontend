@@ -145,7 +145,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
         </label>
         <select
           id={`versions-${scope}`}
-          className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+          className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm"
           value=""
           onChange={(event) => event.target.value && void loadVersion(Number(event.target.value))}
         >
@@ -176,7 +176,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
         ) : null}
       </div>
 
-      <div className="flex overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20">
+      <div className="flex overflow-hidden rounded-lg border border-slate-300 bg-surface shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20">
         <div
           ref={gutterRef}
           aria-hidden="true"

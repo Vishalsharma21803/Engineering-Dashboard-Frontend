@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { ApiError } from "@/lib/api-client";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { useCatalog, useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
@@ -21,6 +22,16 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
   const running = timer.data?.entry ?? null;
   // Only a timer in this organization can be stopped from here.
   const onThisTicket = running !== null && running.organization_id === connection.organizationId && mentionsTicket(running.description, ticket.id);
+
+  // The timer could not be read (bad token, Solidtime down or rate limiting): say so instead of offering Start.
+  if (timer.error && !timer.data) {
+    const reason = timer.error instanceof ApiError ? timer.error.message : "Solidtime could not be reached.";
+    return (
+      <Button size="sm" variant="secondary" disabled title={`Timer unavailable: ${reason}`} aria-label={`Timer unavailable: ${reason}`}>
+        Timer unavailable
+      </Button>
+    );
+  }
 
   if (onThisTicket && running) {
     return (

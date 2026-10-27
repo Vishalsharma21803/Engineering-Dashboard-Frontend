@@ -7,7 +7,7 @@ import { useCatalog } from "../hooks/use-solidtime";
 import type { SolidtimeConnection, TimesheetEntry } from "../types/solidtime.types";
 import { fromLocalInput, toLocalInput } from "../utils/time";
 
-const SELECT = "h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-sm shadow-sm";
+const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm";
 
 interface EntryFormProps {
   connection: SolidtimeConnection;

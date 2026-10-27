@@ -61,7 +61,7 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
               value={filter.value}
               onChange={(event) => filter.onChange(event.target.value)}
               className={cn(
-                "h-9 rounded-lg border bg-white px-2.5 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
+                "h-9 rounded-lg border bg-surface px-2.5 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20",
                 filter.value ? "border-indigo-300 font-medium text-indigo-700" : "border-slate-300 text-slate-700"
               )}
             >

@@ -30,7 +30,7 @@ function CheckIcon() {
 export function AuthLayout() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      <aside className="relative hidden overflow-hidden bg-slate-950 px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
+      <aside className="theme-fixed relative hidden overflow-hidden bg-slate-950 px-10 py-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.35),transparent_45%)]" />
         <div className="pointer-events-none absolute -bottom-24 -left-24 size-80 rounded-full bg-indigo-500/10 blur-3xl" />
 

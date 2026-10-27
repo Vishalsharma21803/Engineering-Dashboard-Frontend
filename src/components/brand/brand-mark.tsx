@@ -15,8 +15,8 @@ export function BrandMark({
       className={cn(
         "inline-flex size-9 shrink-0 items-center justify-center rounded-xl shadow-sm",
         inverted
-          ? "bg-white text-slate-950"
-          : "bg-slate-950 text-white",
+          ? "bg-surface text-slate-950"
+          : "bg-brand text-on-brand",
         className
       )}
     >

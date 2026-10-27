@@ -44,7 +44,7 @@ export function AzureEntryPage() {
       </div>
 
       {credentials.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 bg-surface p-10 text-center">
           <h2 className="text-lg font-semibold text-slate-950">No Azure DevOps credential yet</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
             Add an organization URL and PAT. The dashboard reads Azure DevOps through the backend only.

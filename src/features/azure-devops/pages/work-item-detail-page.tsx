@@ -49,7 +49,7 @@ export function WorkItemDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 pl-6 shadow-sm">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-surface p-5 pl-6 shadow-sm">
         <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", workItemTypeStyle(workItem.type).bar)} />
         <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
           <Link to={base} className="hover:text-indigo-600">

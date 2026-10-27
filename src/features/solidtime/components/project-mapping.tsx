@@ -39,7 +39,7 @@ export function ProjectMapping({ connection }: { connection: SolidtimeConnection
               <span className="text-slate-800">{project.name}</span>
               <select
                 aria-label={`Solidtime project for ${project.name}`}
-                className="h-8 rounded-md border border-slate-300 bg-white px-2 text-xs"
+                className="h-8 rounded-md border border-slate-300 bg-surface px-2 text-xs"
                 value={connection.projectMap[key] ?? ""}
                 disabled={save.isPending}
                 onChange={(event) => {

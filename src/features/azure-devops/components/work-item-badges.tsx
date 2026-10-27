@@ -59,7 +59,7 @@ export function WorkItemStateBadge({ state, category }: { state: string; categor
 const PRIORITY_STYLES: Record<number, string> = {
   1: "bg-rose-600 text-white",
   2: "bg-orange-500 text-white",
-  3: "bg-slate-500 text-white",
+  3: "bg-badge-muted text-white",
   4: "bg-slate-300 text-slate-700",
 };
 

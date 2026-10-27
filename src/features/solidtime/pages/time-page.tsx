@@ -10,6 +10,7 @@ import { DraftTab } from "../components/draft-tab";
 import { ManageTab } from "../components/manage-tab";
 import { ProjectMapping } from "../components/project-mapping";
 import { ReportsTab } from "../components/reports-tab";
+import { TicketTimeLookup } from "../components/ticket-time-lookup";
 import { TimerBar } from "../components/timer-bar";
 import { TimesheetTab } from "../components/timesheet-tab";
 import { UnlinkedTab } from "../components/unlinked-tab";
@@ -95,6 +96,8 @@ export function TimePage() {
       </div>
 
       <TimerBar {...props} />
+
+      <TicketTimeLookup connection={connection} onPropose={review.propose} isProposing={review.isProposing} />
 
       <div role="tablist" aria-label="Time sections" className="flex flex-wrap gap-1 border-b border-slate-200">
         {TABS.map((item) => (

@@ -138,3 +138,32 @@ test("drafts yesterday from Azure, fills the missing hours with AI, and saves th
   const { requests } = (await (await request.get(`${BACKEND}/__e2e/requests`)).json()) as { requests: Array<{ isWrite: boolean }> };
   expect(requests.filter((entry) => entry.isWrite)).toEqual([]);
 });
+
+test("looks up a ticket's total time on the Time page, updates Azure from it, and checks it again on the ticket page", async ({ page, request }) => {
+  await request.post(`${BACKEND}/__e2e/solidtime-entry`, { data: { description: "#101 Implement login", hours: 2 } });
+  await setUp(page);
+
+  await page.goto("/time");
+  const lookup = page.getByRole("form", { name: "Ticket time lookup" });
+  await lookup.getByLabel("Ticket ID").fill("101");
+  await lookup.getByRole("button", { name: "Check" }).click();
+  await expect(page.getByRole("link", { name: "#101 Implement login" })).toBeVisible();
+  // An Employee role sees only its own time: the update is offered with a warning.
+  await expect(page.getByText("Total (your time)")).toBeVisible();
+  await expect(page.getByRole("note")).toContainText("Based on your own time only");
+
+  await page.getByRole("button", { name: "Update Azure to 2 h…" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Approve & execute" }).click();
+  await expect(dialog.getByText("Executed in Azure DevOps.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+  const { workItem } = (await (await request.get(`${BACKEND}/__e2e/work-items/101`)).json()) as { workItem: { fields: Record<string, unknown> } };
+  expect(workItem.fields["Microsoft.VSTS.Scheduling.CompletedWork"]).toBe(2);
+  expect(workItem.fields["Microsoft.VSTS.Scheduling.RemainingWork"]).toBe(6);
+
+  // The ticket page reads the time when asked, and now matches.
+  await page.getByRole("link", { name: "#101 Implement login" }).click();
+  await page.getByRole("button", { name: "Check time in Solidtime" }).click();
+  await expect(page.getByText("Azure Completed Work already matches Solidtime (2 h).")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Azure already up to date" })).toBeDisabled();
+});

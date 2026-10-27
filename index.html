@@ -10,6 +10,16 @@
     />
     <meta name="theme-color" content="#020617" />
     <title>Engineer Cockpit</title>
+    <script>
+      (function () {
+        var theme = null;
+        try { theme = localStorage.getItem("cockpit-theme"); } catch (error) {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

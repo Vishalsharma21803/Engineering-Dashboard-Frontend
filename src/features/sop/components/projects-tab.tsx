@@ -25,7 +25,7 @@ import {
 import { sopKeys } from "../api/sop.keys";
 import { SOP_STAGE_OPTIONS, type AzureSopProject, type ProjectSettings, type SopStageName } from "../types/sop.types";
 
-const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm";
+const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm";
 
 const STAGE_LABELS: Record<SopStageName, string> = {
   ready: "Ready (new, not started)",
@@ -204,14 +204,14 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
           {allStates.map((state) => {
             const info = states.find((entry) => entry.name === state);
             return (
-              <label key={state} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-sm">
+              <label key={state} className="flex items-center justify-between gap-3 rounded-md bg-surface px-3 py-2 text-sm">
                 <span>
                   <span className="font-medium text-slate-900">{state}</span>
                   {info ? <span className="block text-xs text-slate-500">{info.types.join(", ")}</span> : <span className="block text-xs text-amber-600">not in Azure any more</span>}
                 </span>
                 <select
                   aria-label={`Stage for ${state}`}
-                  className="h-9 w-48 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                  className="h-9 w-48 rounded-lg border border-slate-300 bg-surface px-2 text-sm"
                   value={choice[state] ?? ""}
                   onChange={(event) => setChoice({ ...choice, [state]: event.target.value as SopStageName | "" })}
                 >
@@ -294,7 +294,7 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
         </fieldset>
       ) : null}
 
-      <details className="rounded-md bg-white p-3">
+      <details className="rounded-md bg-surface p-3">
         <summary className="cursor-pointer text-sm font-medium text-slate-800">Advanced: roles, tags, work item types, branch names</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm text-slate-700">

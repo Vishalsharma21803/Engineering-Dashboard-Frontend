@@ -60,7 +60,7 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
                 setMode(value);
                 updateParams({ entryPage: null, ticketPage: null }, { replace: true });
               }}
-              className={mode === value ? "rounded-md bg-slate-900 px-3 py-1 text-xs font-medium text-white" : "rounded-md px-3 py-1 text-xs font-medium text-slate-600"}
+              className={mode === value ? "rounded-md bg-inverse px-3 py-1 text-xs font-medium text-on-inverse" : "rounded-md px-3 py-1 text-xs font-medium text-slate-600"}
             >
               {value === "day" ? "Day" : "Week"}
             </button>

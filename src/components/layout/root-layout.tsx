@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { Spinner } from "@/components/ui/spinner";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { UserMenu } from "@/features/auth/components/user-menu";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { cn } from "@/utils/cn";
@@ -24,7 +25,7 @@ export function RootLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-surface/80 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <Link
@@ -61,31 +62,34 @@ export function RootLayout() {
             ) : null}
           </div>
 
-          {isLoading ? (
-            <Spinner className="size-4 text-slate-400" />
-          ) : user ? (
-            <UserMenu />
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link
-                to="/login"
-                className={buttonClassName({
-                  variant: "ghost",
-                  size: "sm",
-                })}
-              >
-                Sign in
-              </Link>
-              <span className="hidden sm:block">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <ThemeToggle />
+            {isLoading ? (
+              <Spinner className="size-4 text-slate-400" />
+            ) : user ? (
+              <UserMenu />
+            ) : (
+              <div className="flex items-center gap-2">
                 <Link
-                  to="/register"
-                  className={buttonClassName({ size: "sm" })}
+                  to="/login"
+                  className={buttonClassName({
+                    variant: "ghost",
+                    size: "sm",
+                  })}
                 >
-                  Create account
+                  Sign in
                 </Link>
-              </span>
-            </div>
-          )}
+                <span className="hidden sm:block">
+                  <Link
+                    to="/register"
+                    className={buttonClassName({ size: "sm" })}
+                  >
+                    Create account
+                  </Link>
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         {!isLoading && user ? (
           <nav

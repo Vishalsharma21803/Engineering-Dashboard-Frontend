@@ -74,8 +74,11 @@ export async function getUnlinked(credentialId: string, input: { from: string; t
   return (await apiRequest<{ entries: Page<TimesheetEntry> & { ticketsChecked: boolean } }>(read(credentialId, `/unlinked?${query.toString()}`))).entries;
 }
 
-export async function getTicketTime(credentialId: string, ticketId: number) {
-  return apiRequest<{ time: TicketTime; ticket: TicketInfo | null; comparison: TimeVsEstimate | null }>(read(credentialId, `/tickets/${ticketId}/time`));
+export type TicketTimeResponse = { time: TicketTime; ticket: TicketInfo | null; comparison: TimeVsEstimate | null };
+
+/** All the time ever tracked on a ticket, with its Azure fields; `refresh` reads both fresh. */
+export async function getTicketTime(credentialId: string, ticketId: number, options: { refresh?: boolean } = {}) {
+  return apiRequest<TicketTimeResponse>(read(credentialId, `/tickets/${ticketId}/time${options.refresh ? "?refresh=true" : ""}`));
 }
 
 export async function getTicketTimes(credentialId: string, ids: number[]) {

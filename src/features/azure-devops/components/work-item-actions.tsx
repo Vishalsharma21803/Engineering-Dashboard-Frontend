@@ -26,10 +26,10 @@ const FIELD_LABELS: Record<FieldKey, string> = {
 };
 
 const textareaClassName =
-  "block min-h-24 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-950 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
+  "block min-h-24 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm text-slate-950 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 const selectClassName =
-  "block h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
+  "block h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 function ActionBlock({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (

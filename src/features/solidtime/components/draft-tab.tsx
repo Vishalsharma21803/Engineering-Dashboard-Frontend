@@ -18,7 +18,7 @@ import { useCatalog } from "../hooks/use-solidtime";
 import type { DayDraft, DraftEstimate, DraftRow, ProjectSource, SolidtimeConnection } from "../types/solidtime.types";
 import { formatHours, shiftDay, zonedClock, zonedInstant } from "../utils/time";
 
-const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
+const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 const HOUR = 3_600_000;
 /** AI errors that are fixed on the Credentials page. */
 const AI_SETUP_REASONS = new Set(["AI_NOT_CONFIGURED", "AI_KEY_REQUIRED", "AI_MODEL_UNAVAILABLE", "DATA_COLLECTION_NOT_ACCEPTED", "AI_KEY_INVALID", "DAILY_LIMIT_REACHED"]);
@@ -322,7 +322,7 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                 : null;
 
               return (
-                <li key={row.ticketId} className={cn("rounded-xl border bg-white p-4 shadow-sm", edit.include ? "border-indigo-200" : "border-slate-200")}>
+                <li key={row.ticketId} className={cn("rounded-xl border bg-surface p-4 shadow-sm", edit.include ? "border-indigo-200" : "border-slate-200")}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <label className="flex min-w-0 items-start gap-3">
                       <input type="checkbox" className="mt-1 size-4 accent-indigo-600" checked={edit.include} onChange={(event) => set(row.ticketId, { include: event.target.checked, unticked: !event.target.checked })} aria-label={`Include #${row.ticketId}`} />
@@ -409,7 +409,7 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
           </ul>
           {data.truncated ? <p className="text-xs text-amber-700">Only the 50 most recently changed tickets are shown.</p> : null}
 
-          <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-surface/95 px-4 py-3 shadow-lg backdrop-blur">
             <p className="text-sm text-slate-700">
               {chosen.length} of {data.rows.length} tickets · {formatHours(plannedHours)}
               {invalid.length > 0 ? <span className="text-rose-600"> · {invalid.length} need attention</span> : null}

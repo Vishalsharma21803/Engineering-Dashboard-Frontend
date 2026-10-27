@@ -55,7 +55,7 @@ export function CredentialDeleteDialog({
           onClose();
         }
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-white p-0 text-slate-950 shadow-2xl backdrop:bg-slate-950/50"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-surface p-0 text-slate-950 shadow-2xl backdrop:bg-backdrop/50"
     >
       {credential ? (
         <div className="p-6">

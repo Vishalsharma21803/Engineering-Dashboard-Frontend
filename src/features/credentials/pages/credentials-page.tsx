@@ -283,7 +283,7 @@ export function CredentialsPage() {
           </Button>
         </Card>
       ) : credentialList.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <div className="rounded-xl border border-dashed border-slate-300 bg-surface p-10 text-center">
           <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
             <svg
               viewBox="0 0 24 24"
@@ -340,7 +340,7 @@ export function CredentialsPage() {
         </div>
       )}
 
-      <div className="flex gap-3 rounded-lg border border-slate-200 bg-white p-4 text-xs leading-5 text-slate-600">
+      <div className="flex gap-3 rounded-lg border border-slate-200 bg-surface p-4 text-xs leading-5 text-slate-600">
         <svg
           viewBox="0 0 20 20"
           fill="currentColor"
