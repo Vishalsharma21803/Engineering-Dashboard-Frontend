@@ -137,27 +137,60 @@ export interface TimeVsEstimate {
   inSync: boolean;
 }
 
+export type ProjectSource = "mapping" | "ticket" | "azure-project" | "name";
+
 export interface DraftRow {
   ticketId: number;
   title: string;
   projectName: string;
+  type: string;
+  state: string;
+  originalEstimate: number | null;
+  completedWork: number | null;
+  remainingWork: number | null;
   activity: Array<{ at: string; what: string }>;
   completedWorkAdded: number;
   completedWorkRemoved: number;
   alreadyTrackedHours: number;
   hours: number | null;
+  hoursSource: "completed-work" | null;
+  /** Where an entry would preferably end: my last Completed Work increase, else my last activity. */
+  anchor: string;
   start: string | null;
   end: string | null;
   description: string;
   solidtimeProjectId: string | null;
+  projectSource: ProjectSource | null;
+  /** Several Solidtime projects match the Azure project's name, so none was chosen. */
+  projectMatches: string[];
   note: string | null;
 }
 
 export interface DayDraft {
   day: string;
   timeZone: string;
+  targetHours: number;
+  trackedHours: number;
+  busy: Array<{ start: string; end: string }>;
   rows: DraftRow[];
   truncated: boolean;
+}
+
+export interface HoursEstimate {
+  ticketId: number;
+  hours: number;
+  confidence: "low" | "medium" | "high";
+  reason: string;
+  start: string | null;
+  end: string | null;
+}
+
+export interface DraftEstimate {
+  day: string;
+  availableHours: number;
+  estimates: HoursEstimate[];
+  model: string | null;
+  costUsd: number;
 }
 
 export interface AccuracyRow {

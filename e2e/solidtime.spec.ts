@@ -88,3 +88,53 @@ test("adds a manual entry and fixes an entry with no ticket", async ({ page, req
   expect(entries).toEqual([expect.objectContaining({ description: "#102 Fix flaky test" })]);
   await expect(page.getByText("Every entry names a ticket.")).toBeVisible();
 });
+
+test("drafts yesterday from Azure, fills the missing hours with AI, and saves the day through one approval", async ({ page, request }) => {
+  const { day } = (await (await request.post(`${BACKEND}/__e2e/draft-activity`)).json()) as { day: string };
+  await setUp(page);
+
+  // The developer's own AI model (the fake provider answers 1 h per ticket).
+  await page.locator("#ai-key-CLAUDE").fill("sk-ant-test-valid-key-0123456789abcdef");
+  await page.getByRole("button", { name: "Save & validate" }).first().click();
+  await expect(page.getByText(/Key works/)).toBeVisible();
+  await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
+  await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");
+  await page.getByRole("button", { name: "Save AI settings" }).click();
+  await expect(page.getByText(/^Saved /)).toBeVisible();
+
+  await page.goto("/time");
+  await page.getByRole("tab", { name: "Draft from Azure" }).click();
+  await page.getByRole("button", { name: "Previous day" }).click();
+  await expect(page.getByLabel("Day", { exact: true })).toHaveValue(day);
+  const list = page.getByRole("list", { name: "Drafted entries" });
+
+  // #102: hours from Completed Work, placed and ready; #103: activity only, waiting for hours.
+  await expect(list.getByText("Completed Work +2 h")).toBeVisible();
+  await expect(list.getByLabel("Hours for #102")).toHaveValue("2");
+  await expect(list.getByLabel("End for #102")).toHaveValue("11:00");
+  await expect(list.getByRole("checkbox", { name: "Include #103" })).not.toBeChecked();
+  await expect(page.getByLabel("Day summary")).toContainText("0.5 h already in Solidtime");
+
+  await page.getByRole("button", { name: "Suggest hours with AI" }).click();
+  await expect(page.getByRole("status")).toContainText("claude-haiku-5-5");
+  await expect(list.getByText("AI: Fake estimate for #103.")).toBeVisible();
+  await expect(list.getByRole("checkbox", { name: "Include #103" })).toBeChecked();
+  await expect(list.getByLabel("Hours for #103")).toHaveValue("1");
+  // Ends at the last change on #103 (15:00).
+  await expect(list.getByLabel("End for #103")).toHaveValue("15:00");
+
+  // Nothing reached Solidtime yet; one approval saves the chosen rows.
+  expect((await (await request.get(`${BACKEND}/__e2e/solidtime`)).json()).writes).toEqual([]);
+  await page.getByRole("button", { name: /^Propose \d entr/ }).click();
+  await approve(page);
+
+  const { entries } = (await (await request.get(`${BACKEND}/__e2e/solidtime`)).json()) as { entries: Array<{ description: string; start: string; end: string }> };
+  expect(entries).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ description: "#102 Fix flaky test", start: `${day}T09:00:00Z`, end: `${day}T11:00:00Z` }),
+      expect.objectContaining({ description: "#103 Crash on save", start: `${day}T14:00:00Z`, end: `${day}T15:00:00Z` }),
+    ])
+  );
+  const { requests } = (await (await request.get(`${BACKEND}/__e2e/requests`)).json()) as { requests: Array<{ isWrite: boolean }> };
+  expect(requests.filter((entry) => entry.isWrite)).toEqual([]);
+});

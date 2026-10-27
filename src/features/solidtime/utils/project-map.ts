@@ -1,6 +1,17 @@
 import type { SolidtimeConnection, SolidtimeProject } from "../types/solidtime.types";
 
-/** The Solidtime project for an Azure project: the saved mapping, else a project with the same name. */
+/** Same rule as the server: case, spaces, dashes (- – —), underscores and dots do not count. */
+export function projectNameKey(name: string): string {
+  return name.toLowerCase().replace(/[\s\-\u2013\u2014_.]+/g, "");
+}
+
+/** The Solidtime projects whose name equals the Azure project's (see `projectNameKey`). */
+export function sameNameProjects<T extends { name: string }>(azureProjectName: string, projects: T[]): T[] {
+  const key = projectNameKey(azureProjectName);
+  return key ? projects.filter((project) => projectNameKey(project.name) === key) : [];
+}
+
+/** The Solidtime project for an Azure project: the saved mapping, else the one project with the same name (none when several match). */
 export function solidtimeProjectFor(connection: SolidtimeConnection, projects: SolidtimeProject[], azureProjectName: string): string | null {
   const mapped = connection.projectMap[azureProjectName.toLowerCase()];
 
@@ -8,7 +19,8 @@ export function solidtimeProjectFor(connection: SolidtimeConnection, projects: S
     return mapped;
   }
 
-  return projects.find((project) => project.name.trim().toLowerCase() === azureProjectName.trim().toLowerCase())?.id ?? null;
+  const sameName = sameNameProjects(azureProjectName, projects);
+  return sameName.length === 1 ? sameName[0]!.id : null;
 }
 
 /** Same rule as the server: a standalone number in the description. */

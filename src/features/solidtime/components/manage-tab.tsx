@@ -73,7 +73,7 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
             ))}
           </select>
         ) : null}
-        <Input aria-label={`New ${kind.slice(0, -1)} name`} className="h-9 w-56" value={name} onChange={(event) => setName(event.target.value)} />
+        <Input aria-label={`New ${kind.slice(0, -1)} name`} placeholder={`New ${kind.slice(0, -1)} name`} className="h-9 w-56" value={name} onChange={(event) => setName(event.target.value)} />
         <Button size="sm" type="submit" variant="secondary" disabled={isProposing || !name.trim() || (kind === "tasks" && !projectId)}>
           Create…
         </Button>

@@ -4,6 +4,7 @@ import type {
   AccuracyReport,
   Catalog,
   DayDraft,
+  DraftEstimate,
   SolidtimeConnection,
   SolidtimeMembership,
   SolidtimeNamed,
@@ -83,6 +84,11 @@ export async function getTicketTimes(credentialId: string, ids: number[]) {
 
 export async function getDraft(credentialId: string, day: string) {
   return (await apiRequest<{ draft: DayDraft }>(read(credentialId, `/draft?day=${day}`))).draft;
+}
+
+/** Asks the user's AI model for hours on drafted rows. Writes nothing; spends AI credit. */
+export async function estimateDraft(credentialId: string, input: { day: string; ticketIds: number[]; plannedHours: number; planned: Array<{ start: string; end: string }> }) {
+  return (await apiRequest<{ estimate: DraftEstimate }>(read(credentialId, "/draft/estimate"), { method: "POST", body: input })).estimate;
 }
 
 export async function getAccuracy(credentialId: string, input: { from: string; to: string; personPage: number; typePage: number }) {

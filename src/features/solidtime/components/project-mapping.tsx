@@ -4,6 +4,7 @@ import { useProjects } from "@/features/azure-devops/hooks/use-projects";
 import { updateConnection } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import { useCatalog } from "../hooks/use-solidtime";
+import { sameNameProjects } from "../utils/project-map";
 import type { SolidtimeConnection } from "../types/solidtime.types";
 
 /** Which Solidtime project a ticket's time goes to, per Azure project (same name is used when not set). */
@@ -31,7 +32,7 @@ export function ProjectMapping({ connection }: { connection: SolidtimeConnection
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
         {(azure.data?.projects ?? []).map((project) => {
           const key = project.name.toLowerCase();
-          const byName = projects.find((candidate) => candidate.name.toLowerCase() === key);
+          const sameName = sameNameProjects(project.name, projects);
 
           return (
             <li key={project.id} className="flex items-center justify-between gap-2 px-3 py-2">
@@ -48,7 +49,7 @@ export function ProjectMapping({ connection }: { connection: SolidtimeConnection
                   save.mutate(next);
                 }}
               >
-                <option value="">{byName ? `Same name (${byName.name})` : "None"}</option>
+                <option value="">{sameName.length === 1 ? `Same name (${sameName[0]!.name})` : sameName.length > 1 ? `None (${sameName.length} projects match: choose one)` : "None"}</option>
                 {projects.map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
                     {candidate.name}

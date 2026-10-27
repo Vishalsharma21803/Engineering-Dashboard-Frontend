@@ -42,3 +42,31 @@ export function fromLocalInput(value: string): string | null {
   const at = new Date(value);
   return Number.isNaN(at.getTime()) ? null : at.toISOString();
 }
+
+function offsetMinutes(at: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(at);
+  const value = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const asUtc = Date.UTC(value("year"), value("month") - 1, value("day"), value("hour"), value("minute"), value("second"));
+  return Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 60_000);
+}
+
+/** "HH:MM" of an instant in the time zone. */
+export function zonedClock(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+}
+
+/** The instant (ISO, UTC) of `day` at "HH:MM" in the time zone; null for a bad clock. Same method as the backend's startOfZonedDay. */
+export function zonedInstant(day: string, clock: string, timeZone: string): string | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(clock);
+  const [year, month, date] = day.split("-").map(Number) as [number, number, number];
+
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59 || !year || !month || !date) {
+    return null;
+  }
+
+  const guess = Date.UTC(year, month - 1, date, Number(match[1]), Number(match[2]));
+  // Two passes settle the offset across daylight-saving changes.
+  let instant = guess - offsetMinutes(new Date(guess), timeZone) * 60_000;
+  instant = guess - offsetMinutes(new Date(instant), timeZone) * 60_000;
+  return new Date(instant).toISOString();
+}
