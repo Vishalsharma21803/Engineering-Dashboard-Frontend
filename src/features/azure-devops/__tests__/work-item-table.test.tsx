@@ -18,6 +18,7 @@ const ticket = (id: number, overrides: Partial<WorkItemSummary> = {}): WorkItemS
 const triage: DashboardTriage = {
   ready: true,
   version: 1,
+  savedVersion: 1,
   isLoading: false,
   loadError: null,
   isSaving: false,

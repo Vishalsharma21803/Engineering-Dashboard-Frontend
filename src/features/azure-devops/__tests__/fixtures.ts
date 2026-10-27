@@ -1,5 +1,7 @@
 import type { ProposedAction } from "../types/action.types";
 import type { Dashboard } from "../types/azure.types";
+import type { TriageMark } from "../types/triage.types";
+import { buildSignalIndex, isHidden, pipelineKey, pullRequestKey, recommendationKey, resolveTriage } from "../utils/triage";
 
 export const CREDENTIAL_ID = "9b2f6c1e-1111-4111-8111-111111111111";
 
@@ -125,3 +127,79 @@ export const dashboard: Dashboard = {
     },
   ],
 };
+
+/** An empty first page, as the server sends for an empty list. */
+export function pageOf<T>(items: T[]) {
+  return { items, page: 1, pageSize: 10, total: items.length, totalPages: Math.max(1, Math.ceil(items.length / 10)) };
+}
+
+/**
+ * What the server's dashboard list endpoints answer for these triage marks
+ * (it applies the same rules as utils/triage before paging). Null for other paths.
+ */
+export function dashboardListBody(url: string, marks: TriageMark[]): unknown {
+  const parsed = new URL(url, "http://test");
+  const base = `/api/azure/${CREDENTIAL_ID}/dashboard/`;
+
+  if (!parsed.pathname.startsWith(base)) {
+    return null;
+  }
+
+  const wantHidden = parsed.searchParams.get("hidden") === "1";
+  const byKey = new Map(marks.map((item) => [item.itemKey, item]));
+  const builds = dashboard.sections.pipelines.data ?? [];
+  const buildsById = new Map(builds.map((build) => [build.id, build]));
+  const signals = buildSignalIndex(dashboard.recommendations, builds);
+  const stateOf = (key: string | null, projectName: string | null) => resolveTriage(byKey, key, projectName, key ? (signals.get(key)?.signals ?? []) : []).state;
+  const split = <T,>(items: T[], hidden: (item: T) => boolean) => {
+    const hiddenCount = items.filter(hidden).length;
+    const showingHidden = wantHidden && hiddenCount > 0;
+    return { pool: items.filter((item) => hidden(item) === showingHidden), hiddenCount, showingHidden };
+  };
+
+  switch (parsed.pathname.slice(base.length)) {
+    case "recommendations": {
+      const entries = dashboard.recommendations.map((recommendation) => ({
+        recommendation,
+        state: stateOf(recommendationKey(recommendation, buildsById), recommendation.target.projectName),
+      }));
+      const { pool, hiddenCount, showingHidden } = split(entries, (entry) => isHidden(entry.state));
+      const category = parsed.searchParams.get("category") ?? "";
+      const matching = category ? pool.filter((entry) => entry.recommendation.category === category) : pool;
+      const active = matching.filter((entry) => entry.state === "active");
+      const acknowledged = matching.filter((entry) => entry.state === "acknowledged");
+      const ordered = showingHidden
+        ? matching.map((entry) => ({ ...entry, rank: null }))
+        : [...active.map((entry, index) => ({ ...entry, rank: index + 1 })), ...acknowledged.map((entry) => ({ ...entry, rank: null }))];
+      const categories = [...new Set(pool.map((entry) => entry.recommendation.category))].map((value) => ({
+        value,
+        label: value,
+        count: pool.filter((entry) => entry.recommendation.category === value).length,
+      }));
+
+      return {
+        recommendations: {
+          ...pageOf(ordered),
+          poolTotal: pool.length,
+          hiddenCount,
+          showingHidden,
+          activeTotal: showingHidden ? 0 : active.length,
+          acknowledgedTotal: showingHidden ? 0 : acknowledged.length,
+          facets: { categories },
+        },
+      };
+    }
+    case "pull-requests": {
+      const { pool, hiddenCount, showingHidden } = split(dashboard.sections.pullRequests.data ?? [], (pr) =>
+        isHidden(stateOf(pullRequestKey(pr.repositoryId, pr.pullRequestId), pr.projectName))
+      );
+      return { pullRequests: { ...pageOf(pool), poolTotal: pool.length, hiddenCount, showingHidden, facets: { person: [], review: [], repositories: [] } } };
+    }
+    case "pipeline-runs": {
+      const { pool, hiddenCount, showingHidden } = split(builds, (build) => isHidden(stateOf(pipelineKey(build), build.projectName)));
+      return { runs: { ...pageOf(pool), poolTotal: pool.length, hiddenCount, showingHidden, facets: { results: [] } } };
+    }
+    default:
+      return null;
+  }
+}

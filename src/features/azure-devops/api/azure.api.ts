@@ -5,11 +5,15 @@ import type {
   Capabilities,
   Dashboard,
   Deployments,
+  Page,
+  PipelineRunPage,
   PipelineSummary,
   ProjectOverview,
   ProjectSummary,
   PullRequestDetail,
-  PullRequestSummary,
+  PullRequestListFilters,
+  PullRequestPage,
+  RecommendationPage,
   RepositorySummary,
   MyWorkPage,
   TeamWorkPage,
@@ -71,13 +75,39 @@ export async function getProjectOverview(credentialId: string, projectId: string
   return response.project;
 }
 
-/** Every assignee's work items in one project (project overview). */
-/** Every active pull request in one project (project overview). */
-export async function listProjectPullRequests(credentialId: string, projectId: string) {
-  const response = await apiRequest<{ pullRequests: PullRequestSummary[] }>(
-    azurePath(credentialId, "/pull-requests", { projectId, role: "everyone" })
+/** Every active pull request in one project (project overview), filtered and paged by the server. */
+export async function listProjectPullRequests(credentialId: string, projectId: string, input: { page: number; filters: PullRequestListFilters }) {
+  const response = await apiRequest<{ pullRequests: PullRequestPage }>(
+    azurePath(credentialId, "/pull-requests", { projectId, role: "everyone", page: input.page, ...nonEmpty({ ...input.filters }) })
   );
   return response.pullRequests;
+}
+
+/* Dashboard lists: paged on the server from what the dashboard computed (snoozed/abandoned hidden first). */
+
+export async function listRecommendations(credentialId: string, projectId: string | undefined, input: { page: number; hidden: boolean; category: string }) {
+  const response = await apiRequest<{ recommendations: RecommendationPage }>(
+    azurePath(credentialId, "/dashboard/recommendations", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ category: input.category }) })
+  );
+  return response.recommendations;
+}
+
+export async function listDashboardPullRequests(
+  credentialId: string,
+  projectId: string | undefined,
+  input: { page: number; hidden: boolean; filters: PullRequestListFilters }
+) {
+  const response = await apiRequest<{ pullRequests: PullRequestPage }>(
+    azurePath(credentialId, "/dashboard/pull-requests", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ ...input.filters }) })
+  );
+  return response.pullRequests;
+}
+
+export async function listDashboardPipelineRuns(credentialId: string, projectId: string | undefined, input: { page: number; hidden: boolean; result: string }) {
+  const response = await apiRequest<{ runs: PipelineRunPage }>(
+    azurePath(credentialId, "/dashboard/pipeline-runs", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ result: input.result }) })
+  );
+  return response.runs;
 }
 
 export async function getWorkItem(credentialId: string, projectId: string, workItemId: number) {
@@ -102,9 +132,10 @@ export async function getPullRequest(
   return response.pullRequest;
 }
 
-export async function listPipelines(credentialId: string, projectId: string) {
-  const response = await apiRequest<{ pipelines: PipelineSummary[] }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/pipelines`)
+/** 10 per page; without a page, `build` asks for the page holding that run's pipeline. */
+export async function listPipelines(credentialId: string, projectId: string, input: { page: number | undefined; build: number | undefined }) {
+  const response = await apiRequest<{ pipelines: Page<PipelineSummary> }>(
+    azurePath(credentialId, `/projects/${segment(projectId)}/pipelines`, { page: input.page, build: input.build })
   );
   return response.pipelines;
 }
@@ -130,11 +161,27 @@ export async function getDeployments(credentialId: string, projectId: string) {
   return response.deployments;
 }
 
+/** Every repository, for pickers. */
 export async function listRepositories(credentialId: string, projectId: string) {
   const response = await apiRequest<{ repositories: RepositorySummary[] }>(
     azurePath(credentialId, `/projects/${segment(projectId)}/repos`)
   );
   return response.repositories;
+}
+
+/** One page of 10 repositories, for lists. */
+export async function listRepositoryPage(credentialId: string, projectId: string, page: number) {
+  const response = await apiRequest<{ repositoryPage: Page<RepositorySummary> }>(
+    azurePath(credentialId, `/projects/${segment(projectId)}/repos`, { page })
+  );
+  return response.repositoryPage;
+}
+
+export async function listTeams(credentialId: string, projectId: string, page: number) {
+  const response = await apiRequest<{ teams: Page<{ id: string; name: string }> }>(
+    azurePath(credentialId, `/projects/${segment(projectId)}/teams`, { page })
+  );
+  return response.teams;
 }
 
 

@@ -2,12 +2,15 @@ import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
+import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { EmptyState, ErrorCard, SectionCard, SkeletonRows } from "../components/feedback";
 import { StatusBadge } from "../components/status-badge";
 import { useActions, useAuditLogs } from "../hooks/use-actions";
 import { useProjects } from "../hooks/use-projects";
-import type { AuditEvent, ProposedAction } from "../types/action.types";
+import type { ActionListFilter, AuditEvent, ProposedAction } from "../types/action.types";
+import type { Page } from "../types/azure.types";
 import { formatDateTime, formatRelative } from "../utils/format";
 import { ACTION_STATUS_TONES, actionKindLabel, type Tone } from "../utils/labels";
 
@@ -52,14 +55,17 @@ function ActionRows({ actions, onReview }: { actions: ProposedAction[]; onReview
   );
 }
 
+function ListPager({ label, page, disabled, onChange }: { label: string; page: Page<unknown> | undefined; disabled: boolean; onChange: (page: number) => void }) {
+  return page ? (
+    <Pagination label={label} page={page.page} totalPages={page.totalPages} total={page.total} pageSize={page.pageSize} disabled={disabled} onChange={onChange} />
+  ) : null;
+}
+
 /** embedded: rendered inside the cockpit layout, which already shows the page header. */
 export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
   const { credentialId } = useParams();
   const [searchParams] = useSearchParams();
   const projects = useProjects(credentialId ?? "");
-  const pending = useActions("PENDING");
-  const all = useActions();
-  const audit = useAuditLogs();
   const [reviewing, setReviewing] = useState<ProposedAction | null>(null);
 
   // Inside the cockpit, show only the selected organization (and project, if one is chosen).
@@ -70,19 +76,24 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
         name: projectParam,
       }
     : null;
-  const inScope = (action: ProposedAction) =>
-    (!embedded || action.credentialId === credentialId) &&
-    (!project ||
-      action.projectId === project.id ||
-      action.projectId.toLowerCase() === project.name.toLowerCase());
-
-  const pendingActions = (pending.data ?? []).filter(inScope);
-  const scopedActions = (all.data ?? []).filter(inScope);
-  const history = scopedActions.filter((action) => action.status !== "PENDING");
-  const summaries = new Map(scopedActions.map((action) => [action.id, action.summary]));
-  const auditEntries = (audit.data ?? []).filter(
-    (entry) => !embedded || (entry.actionId !== null && summaries.has(entry.actionId))
-  );
+  // The server filters and pages; actions on a project are matched by its id or name.
+  const scope: ActionListFilter = {
+    ...(embedded && credentialId ? { credentialId } : {}),
+    ...(project ? { projectId: project.id, projectName: project.name } : {}),
+  };
+  // Each list keeps its own page in the URL.
+  const pendingList = usePageParam("pendingPage");
+  const historyList = usePageParam("historyPage");
+  const auditList = usePageParam("auditPage");
+  const pending = useActions({ ...scope, status: "PENDING", page: pendingList.page });
+  const all = useActions({ ...scope, history: true, page: historyList.page });
+  const audit = useAuditLogs({ ...scope, page: auditList.page });
+  useSyncServedPage(pendingList, pending.data && !pending.isPlaceholderData ? pending.data.page : undefined);
+  useSyncServedPage(historyList, all.data && !all.isPlaceholderData ? all.data.page : undefined);
+  useSyncServedPage(auditList, audit.data && !audit.isPlaceholderData ? audit.data.page : undefined);
+  const pendingActions = pending.data?.items ?? [];
+  const history = all.data?.items ?? [];
+  const auditEntries = audit.data?.items ?? [];
 
   return (
     <section className="flex w-full flex-col gap-6">
@@ -115,6 +126,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
         ) : (
           <ActionRows actions={pendingActions} onReview={setReviewing} />
         )}
+        <ListPager label="Awaiting approval pages" page={pending.data} disabled={pending.isFetching} onChange={(page) => pendingList.setPage(page)} />
       </SectionCard>
 
       <SectionCard title="History">
@@ -127,6 +139,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
         ) : (
           <ActionRows actions={history} onReview={setReviewing} />
         )}
+        <ListPager label="History pages" page={all.data} disabled={all.isFetching} onChange={(page) => historyList.setPage(page)} />
       </SectionCard>
 
       <SectionCard title="Audit log" description="Append-only record of proposals, approvals, rejections and executions.">
@@ -155,9 +168,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
                       <StatusBadge tone={AUDIT_TONES[entry.event]}>{entry.event.replace(/_/g, " ").toLowerCase()}</StatusBadge>
                     </td>
                     <td className="px-3 py-2 text-slate-700">
-                      {(entry.actionId && summaries.get(entry.actionId)) ?? (
-                        <span className="font-mono text-xs text-slate-500">{entry.actionId?.slice(0, 8) ?? "—"}</span>
-                      )}
+                      {entry.actionSummary ?? <span className="font-mono text-xs text-slate-500">{entry.actionId?.slice(0, 8) ?? "—"}</span>}
                     </td>
                     <td className="px-3 py-2 text-xs text-slate-500">{entry.ipAddress ?? "—"}</td>
                   </tr>
@@ -166,6 +177,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
             </table>
           </div>
         )}
+        <ListPager label="Audit log pages" page={audit.data} disabled={audit.isFetching} onChange={(page) => auditList.setPage(page)} />
       </SectionCard>
 
       <ActionReviewDialog action={reviewing} onClose={() => setReviewing(null)} />

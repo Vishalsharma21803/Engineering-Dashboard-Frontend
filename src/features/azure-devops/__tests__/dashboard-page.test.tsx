@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { mockBackend, renderWithProviders } from "@/test/render";
 import { DashboardPage } from "../pages/dashboard-page";
-import { CREDENTIAL_ID, dashboard, pendingAction } from "./fixtures";
+import { CREDENTIAL_ID, dashboard, dashboardListBody, pageOf, pendingAction } from "./fixtures";
 
 const base = `/api/azure/${CREDENTIAL_ID}`;
 
@@ -30,7 +30,10 @@ function setup() {
         },
       },
     },
-    { path: "/api/actions", body: { actions: [] } },
+    { path: "/api/actions", body: { actions: pageOf([]) } },
+    { path: `${base}/dashboard/recommendations`, body: dashboardListBody(`${base}/dashboard/recommendations`, []) },
+    { path: `${base}/dashboard/pull-requests`, body: dashboardListBody(`${base}/dashboard/pull-requests`, []) },
+    { path: `${base}/dashboard/pipeline-runs`, body: dashboardListBody(`${base}/dashboard/pipeline-runs`, []) },
     { path: "/api/triage", body: { marks: [] } },
     {
       path: `${base}/capabilities`,

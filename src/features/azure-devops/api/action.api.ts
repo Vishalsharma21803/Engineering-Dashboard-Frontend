@@ -1,7 +1,8 @@
 import { apiRequest } from "@/lib/api-client";
+import type { Page } from "../types/azure.types";
 import type {
+  ActionListFilter,
   ActionResponse,
-  ActionStatus,
   ApproveActionResponse,
   AuditLogEntry,
   ProposeActionInput,
@@ -32,19 +33,25 @@ export async function rejectAction(actionId: string, reason?: string) {
   return response.action;
 }
 
-export async function listActions(filter: { status?: ActionStatus; credentialId?: string } = {}) {
+function listQuery(filter: ActionListFilter): string {
   const search = new URLSearchParams();
 
   if (filter.status) search.set("status", filter.status);
+  if (filter.history) search.set("history", "true");
   if (filter.credentialId) search.set("credentialId", filter.credentialId);
+  if (filter.projectId) search.set("projectId", filter.projectId);
+  if (filter.projectName) search.set("projectName", filter.projectName);
+  if (filter.page && filter.page > 1) search.set("page", String(filter.page));
 
-  const suffix = search.size > 0 ? `?${search.toString()}` : "";
-  const response = await apiRequest<{ actions: ProposedAction[] }>(`/api/actions${suffix}`);
-  return response.actions;
+  return search.size > 0 ? `?${search.toString()}` : "";
 }
 
-export async function listAuditLogs(actionId?: string) {
-  const suffix = actionId ? `?actionId=${encodeURIComponent(actionId)}` : "";
-  const response = await apiRequest<{ auditLogs: AuditLogEntry[] }>(`/api/audit-logs${suffix}`);
-  return response.auditLogs;
+/** Newest first, 10 per page. */
+export async function listActions(filter: ActionListFilter = {}) {
+  return (await apiRequest<{ actions: Page<ProposedAction> }>(`/api/actions${listQuery(filter)}`)).actions;
+}
+
+/** Newest first, 10 per page. */
+export async function listAuditLogs(filter: Omit<ActionListFilter, "status" | "history"> = {}) {
+  return (await apiRequest<{ auditLogs: Page<AuditLogEntry> }>(`/api/audit-logs${listQuery(filter)}`)).auditLogs;
 }

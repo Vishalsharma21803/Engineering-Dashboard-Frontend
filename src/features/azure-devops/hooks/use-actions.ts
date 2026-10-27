@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   approveAction,
@@ -8,21 +8,24 @@ import {
   rejectAction,
 } from "../api/action.api";
 import { actionKeys, azureKeys } from "../api/azure.keys";
-import type { ActionStatus, ProposedAction } from "../types/action.types";
+import type { ActionListFilter, ProposedAction } from "../types/action.types";
 import { retryUnlessClientError } from "../utils/query-retry";
 
-export function useActions(status?: ActionStatus) {
+/** One page of actions; `total` counts every match (e.g. the pending badge). */
+export function useActions(filter: ActionListFilter = {}) {
   return useQuery({
-    queryKey: actionKeys.list(status),
-    queryFn: () => listActions(status ? { status } : {}),
+    queryKey: actionKeys.list(filter),
+    queryFn: () => listActions(filter),
+    placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
   });
 }
 
-export function useAuditLogs(actionId?: string) {
+export function useAuditLogs(filter: Omit<ActionListFilter, "status" | "history"> = {}) {
   return useQuery({
-    queryKey: actionKeys.audit(actionId),
-    queryFn: () => listAuditLogs(actionId),
+    queryKey: actionKeys.audit(filter),
+    queryFn: () => listAuditLogs(filter),
+    placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
   });
 }

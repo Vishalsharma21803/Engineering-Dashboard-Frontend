@@ -22,6 +22,8 @@ export interface DashboardTriage {
   ready: boolean;
   /** Changes whenever marks change (also optimistically), so server-filtered lists can refresh. */
   version: number;
+  /** Changes only once the server has saved (or failed to save) a change, so paged lists reload once, with the saved state. */
+  savedVersion: number;
   isLoading: boolean;
   loadError: unknown;
   isSaving: boolean;
@@ -43,6 +45,7 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
   const queryClient = useQueryClient();
   const queryKey = triageKeys.list(credentialId);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedVersion, setSavedVersion] = useState(0);
 
   const query = useQuery({
     queryKey,
@@ -90,6 +93,7 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
       setSaveError(errorMessage(error, "Could not save that change. Please try again."));
     },
     onSettled: () => {
+      setSavedVersion((current) => current + 1);
       void queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -105,6 +109,7 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
       setSaveError(errorMessage(error, "Could not restore that item. Please try again."));
     },
     onSettled: () => {
+      setSavedVersion((current) => current + 1);
       void queryClient.invalidateQueries({ queryKey });
     },
   });
@@ -154,6 +159,7 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
   return {
     ready: query.isSuccess,
     version: query.dataUpdatedAt,
+    savedVersion,
     isLoading: query.isLoading,
     loadError: query.error,
     isSaving: upsert.isPending || remove.isPending,

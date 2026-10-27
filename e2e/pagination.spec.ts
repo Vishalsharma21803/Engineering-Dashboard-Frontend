@@ -80,7 +80,7 @@ test("Project overview and the team SOP report page their tickets", async ({ pag
   await expect(team.getByText("Showing 21–28 of 28")).toBeVisible();
   await expect(page).toHaveURL(/[?&]page=3/);
 
-  await page.getByRole("button", { name: "Build report" }).click();
+  await page.getByRole("button", { name: "Run report" }).click();
   await page.getByText(/^Tickets with gaps \(\d+\)$/).click();
   const gaps = page.getByRole("navigation", { name: "Tickets with gaps pages" });
   await expect(gaps.getByText(/Showing 1–10 of \d+/)).toBeVisible({ timeout: 30_000 });

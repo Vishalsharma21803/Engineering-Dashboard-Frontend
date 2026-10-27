@@ -140,6 +140,14 @@ export function resolveTriage(
 
 export const isHidden = (state: TriageState) => state === "snoozed" || state === "abandoned";
 
+/**
+ * Server-paged lists already leave out hidden items; this only drops an item the
+ * user just snoozed or restored (an unsaved, optimistic mark) until the list reloads.
+ */
+export function movedByPendingMark(resolved: ResolvedTriage, showingHidden: boolean): boolean {
+  return Boolean(resolved.mark?.id.startsWith("pending:")) && isHidden(resolved.state) !== showingHidden;
+}
+
 function atNine(date: Date): Date {
   const result = new Date(date);
   result.setHours(9, 0, 0, 0);

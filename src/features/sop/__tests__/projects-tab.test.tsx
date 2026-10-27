@@ -47,10 +47,17 @@ function setup() {
     {
       path: "/api/sop/azure-projects/c1",
       body: {
-        projects: [
-          { id: "a", name: "Alpha", setUp: true, checkedForMe: true },
-          { id: "b", name: "Beta", setUp: false, checkedForMe: false },
-        ],
+        projects: {
+          items: [
+            { id: "a", name: "Alpha", setUp: true, checkedForMe: true },
+            { id: "b", name: "Beta", setUp: false, checkedForMe: false },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 2,
+          totalPages: 1,
+        },
+        elsewhere: { items: [], page: 1, pageSize: 10, total: 0, totalPages: 1 },
       },
     },
     {

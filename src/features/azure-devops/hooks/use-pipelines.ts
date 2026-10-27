@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import {
   getBuildTimeline,
@@ -9,10 +9,12 @@ import {
 import { azureKeys } from "../api/azure.keys";
 import { retryUnlessClientError } from "../utils/query-retry";
 
-export function usePipelines(credentialId: string, projectId: string) {
+/** One page of pipelines; with no page chosen, `build` opens the page holding that run's pipeline. */
+export function usePipelines(credentialId: string, projectId: string, input: { page: number | undefined; build: number | undefined }) {
   return useQuery({
-    queryKey: azureKeys.pipelines(credentialId, projectId),
-    queryFn: () => listPipelines(credentialId, projectId),
+    queryKey: [...azureKeys.pipelines(credentialId, projectId), input],
+    queryFn: () => listPipelines(credentialId, projectId, input),
+    placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
   });
 }

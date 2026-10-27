@@ -59,3 +59,34 @@ export function useSyncServedPage(pageParam: ReturnType<typeof usePageParam>, se
     }
   }, [raw, servedPage, setPage]);
 }
+
+/**
+ * Changes several URL params in one navigation. Separate setSearchParams calls in
+ * the same click each start from the same old URL, so only the last would stick.
+ * A null value removes the param (e.g. back to page 1).
+ */
+export function useSearchParamsUpdate() {
+  const [, setSearchParams] = useSearchParams();
+
+  return useCallback(
+    (changes: Record<string, string | null>, options: { replace?: boolean } = {}) => {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+
+          for (const [name, value] of Object.entries(changes)) {
+            if (value === null) {
+              params.delete(name);
+            } else {
+              params.set(name, value);
+            }
+          }
+
+          return params;
+        },
+        { replace: options.replace ?? false }
+      );
+    },
+    [setSearchParams]
+  );
+}

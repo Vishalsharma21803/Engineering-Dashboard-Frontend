@@ -83,6 +83,19 @@ export interface AuditLogEntry {
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: string;
+  /** Summary of the action the entry is about (null once that action is gone). */
+  actionSummary: string | null;
+}
+
+/** Narrows approvals and audit entries to one organization and, optionally, one project. */
+export interface ActionListFilter {
+  status?: ActionStatus;
+  /** Decided actions only (everything except PENDING). */
+  history?: boolean;
+  credentialId?: string;
+  projectId?: string;
+  projectName?: string;
+  page?: number;
 }
 
 export interface ActionResponse {

@@ -60,7 +60,6 @@ export interface ProjectOverview extends ProjectSummary {
   processTemplate: string | null;
   sourceControlType: string | null;
   defaultTeam: { id: string; name: string } | null;
-  teams: Section<Array<{ id: string; name: string }>>;
   currentIteration: Section<IterationSummary | null>;
   counts: {
     repositories: Section<number>;
@@ -464,6 +463,39 @@ export interface MyWorkPage extends Page<{ workItem: WorkItemSummary; compliance
   hiddenCount: number;
   showingHidden: boolean;
   facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; sop: FacetOption[] };
+}
+
+/** Filters for pull request lists; the server applies them before paging. */
+export interface PullRequestListFilters {
+  search: string;
+  /** Mine: "author" | "reviewer"; team: the creator's display name. */
+  person: string;
+  review: string;
+  repository: string;
+}
+
+export interface PullRequestPage extends Page<PullRequestSummary> {
+  poolTotal: number;
+  /** Dashboard only: snoozed or abandoned pull requests, listed only with `hidden`. */
+  hiddenCount?: number;
+  showingHidden?: boolean;
+  facets: { person: FacetOption[]; review: FacetOption[]; repositories: FacetOption[] };
+}
+
+export interface RecommendationPage extends Page<{ recommendation: Recommendation; state: "active" | "acknowledged" | "snoozed" | "abandoned"; rank: number | null }> {
+  poolTotal: number;
+  hiddenCount: number;
+  showingHidden: boolean;
+  activeTotal: number;
+  acknowledgedTotal: number;
+  facets: { categories: Array<{ value: RecommendationCategory; label: string; count: number }> };
+}
+
+export interface PipelineRunPage extends Page<BuildSummary> {
+  poolTotal: number;
+  hiddenCount: number;
+  showingHidden: boolean;
+  facets: { results: FacetOption[] };
 }
 
 export interface TeamWorkPage extends Page<WorkItemSummary> {

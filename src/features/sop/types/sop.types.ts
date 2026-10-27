@@ -116,17 +116,44 @@ export interface EnqueueAiResult {
   skipped: Array<{ workItemId: number; reason: string }>;
 }
 
-export interface SopReport {
+/** One page of saved runs, plus the newest run (shown by default). */
+export type SopReportRunList = Page<SopReportRunSummary> & { latestId: string | null };
+
+/** A saved run of the team SOP report; private to the person who ran it. */
+export interface SopReportRunSummary {
+  id: string;
   projectName: string;
-  configured: boolean;
   defaultVersion: number;
-  generatedAt: string;
+  itemsChecked: number;
+  itemsWithGaps: number;
+  createdAt: string;
+}
+
+export type SopReportRole = "tl" | "qa" | "po" | "developer";
+
+export interface SopReportFilters {
+  person: string;
+  role: SopReportRole | "";
+  rule: string;
+  type: string;
+  state: string;
+}
+
+export interface SopReportFacet {
+  value: string;
+  label: string;
+  count: number;
+}
+
+/** One saved run, filtered and paged by the server; the numbers cover the matching tickets. */
+export interface SopReport {
+  run: SopReportRunSummary;
   itemsChecked: number;
   itemsWithGaps: number;
   compliantShare: number | null;
-  byRule: Array<{ ruleId: string; ruleTitle: string; severity: "high" | "medium"; failing: number; checked: number }>;
-  byPerson: Array<{ assignee: IdentityRef | null; items: number; itemsWithGaps: number; gaps: number }>;
-  /** Tickets with gaps, 10 per page (the totals above cover all of them). */
+  byRule: Page<{ ruleId: string; ruleTitle: string; severity: "high" | "medium"; failing: number; checked: number }>;
+  byPerson: Page<{ personKey: string; assignee: IdentityRef | null; roles: SopReportRole[]; items: number; itemsWithGaps: number; gaps: number }>;
+  /** Tickets with gaps. */
   items: Page<{
     workItemId: number;
     title: string;
@@ -135,6 +162,7 @@ export interface SopReport {
     assignee: IdentityRef | null;
     violations: Array<{ ruleId: string; ruleTitle: string; severity: "high" | "medium" | "low"; message: string }>;
   }>;
+  facets: { people: SopReportFacet[]; roles: SopReportFacet[]; rules: SopReportFacet[]; types: SopReportFacet[]; states: SopReportFacet[] };
 }
 
 export const SOP_STAGE_OPTIONS = ["ready", "estimation", "active", "review", "testing", "qa", "uat", "done"] as const;
@@ -170,6 +198,12 @@ export interface AzureSopProject {
   name: string;
   setUp: boolean;
   checkedForMe: boolean;
+}
+
+/** The organization's projects (10 per page) and set-ups for projects not in it (10 per page). */
+export interface AzureSopProjectPages {
+  projects: Page<AzureSopProject>;
+  elsewhere: Page<{ projectName: string; checkedForMe: boolean }>;
 }
 
 export interface ProjectSuggestion {

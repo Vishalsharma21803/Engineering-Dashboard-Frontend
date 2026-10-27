@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   getCapabilities,
   getProjectOverview,
-  listProjectPullRequests,
   listProjects,
   listRepositories,
 } from "../api/azure.api";
@@ -23,14 +22,6 @@ export function useProjectOverview(credentialId: string, projectId: string) {
   return useQuery({
     queryKey: azureKeys.project(credentialId, projectId),
     queryFn: () => getProjectOverview(credentialId, projectId),
-    retry: retryUnlessClientError,
-  });
-}
-
-export function useProjectPullRequests(credentialId: string, projectId: string) {
-  return useQuery({
-    queryKey: azureKeys.projectPullRequests(credentialId, projectId),
-    queryFn: () => listProjectPullRequests(credentialId, projectId),
     retry: retryUnlessClientError,
   });
 }

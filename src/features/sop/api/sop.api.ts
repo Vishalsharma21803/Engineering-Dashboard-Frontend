@@ -1,7 +1,7 @@
 import { apiRequest } from "@/lib/api-client";
 import type {
   AiCheck,
-  AzureSopProject,
+  AzureSopProjectPages,
   ProjectChange,
   ProjectSettings,
   ProjectSetUp,
@@ -12,6 +12,9 @@ import type {
   RulebookScope,
   RulebookVersionInfo,
   SopReport,
+  SopReportFilters,
+  SopReportRunList,
+  SopReportRunSummary,
   SopTestInput,
   SopTestResult,
   ValidationResult,
@@ -68,15 +71,36 @@ export async function listAiChecks(credentialId: string, workItemIds: number[]) 
   return (await apiRequest<{ checks: AiCheck[] }>(`/api/sop/ai/${encodeURIComponent(credentialId)}/results?ids=${ids}`)).checks;
 }
 
-/** Team report for one project: default rules, code rules, whole team. */
-/** The report with its tickets-with-gaps list paged (10 per page). `refresh` rebuilds it on the server. */
-export async function getSopReport(credentialId: string, projectId: string, page: number, refresh = false) {
-  const query = new URLSearchParams({ page: String(page), ...(refresh ? { refresh: "1" } : {}) });
-  return (
-    await apiRequest<{ report: SopReport }>(
-      `/api/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(projectId)}/sop-report?${query.toString()}`
-    )
-  ).report;
+/** Team report runs for one project: default rules, code rules, whole team; saved privately per person. */
+const reportsPath = (credentialId: string, projectId: string) =>
+  `/api/sop/reports/${encodeURIComponent(credentialId)}/${encodeURIComponent(projectId)}`;
+
+/** Runs the team report now (reads Azure) and saves it for the signed-in user. */
+export async function runSopReport(credentialId: string, projectId: string) {
+  return (await apiRequest<{ run: SopReportRunSummary }>(reportsPath(credentialId, projectId), { method: "POST", body: {} })).run;
+}
+
+export async function listSopReportRuns(credentialId: string, projectId: string, page: number) {
+  return (await apiRequest<{ runs: SopReportRunList }>(`${reportsPath(credentialId, projectId)}?page=${page}`)).runs;
+}
+
+export async function getSopReportRun(
+  credentialId: string,
+  projectId: string,
+  runId: string,
+  input: { filters: SopReportFilters; page: number; rulePage: number; personPage: number }
+) {
+  const query = new URLSearchParams({
+    page: String(input.page),
+    rulePage: String(input.rulePage),
+    personPage: String(input.personPage),
+    ...Object.fromEntries(Object.entries(input.filters).filter(([, value]) => value !== "")),
+  });
+  return (await apiRequest<{ report: SopReport }>(`${reportsPath(credentialId, projectId)}/${encodeURIComponent(runId)}?${query.toString()}`)).report;
+}
+
+export async function deleteSopReportRun(credentialId: string, projectId: string, runId: string) {
+  await apiRequest(`${reportsPath(credentialId, projectId)}/${encodeURIComponent(runId)}`, { method: "DELETE" });
 }
 
 /* Projects: anyone may set one up; each user chooses which are checked for them. */
@@ -85,8 +109,9 @@ export async function listSopProjects() {
   return (await apiRequest<{ projects: ProjectSetUp[] }>("/api/sop/projects")).projects;
 }
 
-export async function listAzureProjectsForSop(credentialId: string) {
-  return (await apiRequest<{ projects: AzureSopProject[] }>(`/api/sop/azure-projects/${encodeURIComponent(credentialId)}`)).projects;
+export async function listAzureProjectsForSop(credentialId: string, input: { page: number; elsewherePage: number }) {
+  const query = new URLSearchParams({ page: String(input.page), elsewherePage: String(input.elsewherePage) });
+  return apiRequest<AzureSopProjectPages>(`/api/sop/azure-projects/${encodeURIComponent(credentialId)}?${query.toString()}`);
 }
 
 export async function getProjectSuggestion(credentialId: string, projectId: string) {

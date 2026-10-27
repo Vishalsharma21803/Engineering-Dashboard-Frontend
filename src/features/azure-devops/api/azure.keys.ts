@@ -24,6 +24,12 @@ export const azureKeys = {
     ["azure", credentialId, "deployments", projectId] as const,
   repositories: (credentialId: string, projectId: string) =>
     ["azure", credentialId, "repositories", projectId] as const,
+  repositoryPage: (credentialId: string, projectId: string) => ["azure", credentialId, "repository-page", projectId] as const,
+  teams: (credentialId: string, projectId: string) => ["azure", credentialId, "teams", projectId] as const,
+  recommendations: (credentialId: string, projectId: string | undefined) => ["azure", credentialId, "recommendations", projectId ?? "all"] as const,
+  dashboardPullRequests: (credentialId: string, projectId: string | undefined) =>
+    ["azure", credentialId, "dashboard-pull-requests", projectId ?? "all"] as const,
+  dashboardRuns: (credentialId: string, projectId: string | undefined) => ["azure", credentialId, "dashboard-runs", projectId ?? "all"] as const,
 };
 
 export const triageKeys = {
@@ -33,6 +39,6 @@ export const triageKeys = {
 
 export const actionKeys = {
   all: ["actions"] as const,
-  list: (status: string | undefined) => ["actions", "list", status ?? "all"] as const,
-  audit: (actionId: string | undefined) => ["actions", "audit", actionId ?? "all"] as const,
+  list: (filter: object) => ["actions", "list", filter] as const,
+  audit: (filter: object) => ["actions", "audit", filter] as const,
 };

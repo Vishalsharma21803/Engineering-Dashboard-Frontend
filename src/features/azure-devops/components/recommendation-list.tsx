@@ -1,16 +1,23 @@
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+
+import { Pagination } from "@/components/ui/pagination";
+import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { cn } from "@/utils/cn";
+import { listRecommendations } from "../api/azure.api";
+import { azureKeys } from "../api/azure.keys";
 import type { DashboardTriage } from "../hooks/use-triage";
 import type { ActionKind, ProposeActionInput } from "../types/action.types";
 import type { Recommendation } from "../types/azure.types";
 import type { ResolvedTriage } from "../types/triage.types";
 import { CATEGORY_LABELS, actionKindLabel } from "../utils/labels";
-import { UNTRIAGED, isHidden } from "../utils/triage";
-import { EmptyState } from "./feedback";
+import { movedByPendingMark } from "../utils/triage";
+import { retryUnlessClientError } from "../utils/query-retry";
+import { EmptyState, ErrorCard, SkeletonRows } from "./feedback";
 import { StatusBadge } from "./status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
 import { PriorityBadge, WorkItemTypeBadge } from "./work-item-badges";
@@ -18,12 +25,14 @@ import { workItemTypeStyle } from "../utils/work-item-types";
 
 interface RecommendationListProps {
   credentialId: string;
-  recommendations: Recommendation[];
+  projectId: string | undefined;
+  /** Changes whenever the dashboard reloads, so the page reloads with it. */
+  dashboardToken: string;
   /** Type and priority of work items referenced by recommendations. */
   workItems: Map<number, { type: string; priority: number | null }>;
   isProposing: boolean;
   onPropose: (input: ProposeActionInput) => void;
-  triage?: DashboardTriage;
+  triage: DashboardTriage;
 }
 
 interface Entry {
@@ -61,42 +70,51 @@ function targetPath(credentialId: string, recommendation: Recommendation): strin
   }
 }
 
-export function RecommendationList({
-  credentialId,
-  recommendations,
-  workItems,
-  isProposing,
-  onPropose,
-  triage,
-}: RecommendationListProps) {
+/** Highest priority first, 10 per page, filtered by the server. The page lives in the URL (?actionsPage=). */
+export function RecommendationList({ credentialId, projectId, dashboardToken, workItems, isProposing, onPropose, triage }: RecommendationListProps) {
+  const pageParam = usePageParam("actionsPage");
+  const { page, setPage } = pageParam;
   const [category, setCategory] = useState<Recommendation["category"] | "">("");
   const [showHiddenChoice, setShowHidden] = useState(false);
+  const query = useQuery({
+    queryKey: [...azureKeys.recommendations(credentialId, projectId), { page, category, showHidden: showHiddenChoice, token: dashboardToken, triage: triage.savedVersion }],
+    queryFn: () => listRecommendations(credentialId, projectId, { page, hidden: showHiddenChoice, category }),
+    placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
+  });
+  useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
 
-  if (recommendations.length === 0) {
+  if (query.isLoading) {
+    return <SkeletonRows rows={4} />;
+  }
+
+  if (query.error || !query.data) {
+    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+  }
+
+  const data = query.data;
+
+  if (data.poolTotal === 0 && data.hiddenCount === 0) {
     return <EmptyState>Nothing needs your attention right now.</EmptyState>;
   }
 
-  const entries: Entry[] = recommendations.map((recommendation) => {
-    const itemKey = triage?.keyFor(recommendation) ?? null;
-    return {
-      recommendation,
-      itemKey,
-      resolved: triage ? triage.resolve(itemKey, recommendation.target.projectName) : UNTRIAGED,
-    };
-  });
-  const hiddenCount = entries.filter((entry) => isHidden(entry.resolved.state)).length;
-  // Fall back to the normal list once the last hidden item is restored.
-  const showHidden = showHiddenChoice && hiddenCount > 0;
-  const pool = entries.filter((entry) => isHidden(entry.resolved.state) === showHidden);
+  const showHidden = data.showingHidden;
+  const hiddenCount = data.hiddenCount;
+  const entries: Array<Entry & { rank: number | null }> = data.items
+    .map(({ recommendation, rank }) => {
+      const itemKey = triage.keyFor(recommendation);
+      return { recommendation, itemKey, rank, resolved: triage.resolve(itemKey, recommendation.target.projectName) };
+    })
+    .filter((entry) => !movedByPendingMark(entry.resolved, showHidden));
+  const categories = data.facets.categories;
+  const active = entries.filter((entry) => entry.rank !== null);
+  const acknowledged = entries.filter((entry) => entry.rank === null);
+  const choose = (value: Recommendation["category"] | "") => {
+    setCategory(value);
+    setPage(1, { replace: true });
+  };
 
-  const categories = (Object.keys(CATEGORY_LABELS) as Array<Recommendation["category"]>)
-    .map((value) => ({ value, count: pool.filter((entry) => entry.recommendation.category === value).length }))
-    .filter((entry) => entry.count > 0);
-  const visible = category ? pool.filter((entry) => entry.recommendation.category === category) : pool;
-  const active = visible.filter((entry) => entry.resolved.state === "active");
-  const acknowledged = visible.filter((entry) => entry.resolved.state === "acknowledged");
-
-  function renderItem({ recommendation, itemKey, resolved }: Entry, index: number | null) {
+  function renderItem({ recommendation, itemKey, resolved }: Entry, rank: number | null) {
     const category = CATEGORY_LABELS[recommendation.category];
     const suggestion = recommendation.suggestedAction;
     const workItem =
@@ -119,10 +137,10 @@ export function RecommendationList({
           <span
             className={cn(
               "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-              index === null ? "bg-slate-200 text-slate-500" : "bg-slate-900 text-white"
+              rank === null ? "bg-slate-200 text-slate-500" : "bg-slate-900 text-white"
             )}
           >
-            {index === null ? "–" : index + 1}
+            {rank ?? "–"}
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -189,15 +207,13 @@ export function RecommendationList({
           <Link to={path} className={buttonClassName({ size: "sm", variant: "secondary" })}>
             Open
           </Link>
-          {triage ? (
-            <TriageMenu
-              triage={triage}
-              itemKey={itemKey}
-              projectName={recommendation.target.projectName}
-              label={recommendation.title}
-              resolved={resolved}
-            />
-          ) : null}
+          <TriageMenu
+            triage={triage}
+            itemKey={itemKey}
+            projectName={recommendation.target.projectName}
+            label={recommendation.title}
+            resolved={resolved}
+          />
           <span
             className="hidden w-8 text-right text-xs tabular-nums text-slate-400 sm:inline"
             title="Priority score"
@@ -211,16 +227,16 @@ export function RecommendationList({
 
   return (
     <div className="space-y-3">
-      {categories.length > 1 || hiddenCount > 0 ? (
+      {categories.length > 1 || category || hiddenCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          {categories.length > 1 ? (
+          {categories.length > 1 || category ? (
             <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-1.5">
-              {[{ value: "" as const, count: pool.length }, ...categories].map((entry) => (
+              {[{ value: "" as const, count: data.poolTotal }, ...categories].map((entry) => (
                 <button
                   key={entry.value || "all"}
                   type="button"
                   aria-pressed={category === entry.value}
-                  onClick={() => setCategory(entry.value)}
+                  onClick={() => choose(entry.value)}
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
                     category === entry.value
@@ -239,35 +255,50 @@ export function RecommendationList({
           ) : (
             <span />
           )}
-          <HiddenToggle count={hiddenCount} shown={showHidden} onToggle={() => setShowHidden(!showHidden)} />
+          <HiddenToggle
+            count={hiddenCount}
+            shown={showHidden}
+            onToggle={() => {
+              setShowHidden(!showHidden);
+              setPage(1, { replace: true });
+            }}
+          />
         </div>
       ) : null}
 
       {showHidden ? (
         <ol aria-label="Snoozed and abandoned" className="space-y-2">
-          {visible.map((entry) => renderItem(entry, null))}
+          {entries.map((entry) => renderItem(entry, null))}
         </ol>
       ) : (
         <>
           {active.length > 0 ? (
-            <ol className="space-y-2">{active.map((entry, index) => renderItem(entry, index))}</ol>
-          ) : (
+            <ol className="space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
+          ) : data.activeTotal === 0 ? (
             <EmptyState>
               Nothing needs your attention right now
-              {acknowledged.length > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
+              {data.acknowledgedTotal > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
             </EmptyState>
-          )}
+          ) : null}
 
           {acknowledged.length > 0 ? (
             <section aria-label="Acknowledged" className="space-y-2 pt-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Acknowledged · {acknowledged.length}
-              </h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Acknowledged · {data.acknowledgedTotal}</h3>
               <ol className="space-y-2">{acknowledged.map((entry) => renderItem(entry, null))}</ol>
             </section>
           ) : null}
         </>
       )}
+
+      <Pagination
+        label="Prioritized action pages"
+        page={data.page}
+        totalPages={data.totalPages}
+        total={data.total}
+        pageSize={data.pageSize}
+        disabled={query.isFetching}
+        onChange={(next) => setPage(next)}
+      />
     </div>
   );
 }

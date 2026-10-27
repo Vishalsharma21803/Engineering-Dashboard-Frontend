@@ -1,33 +1,43 @@
-import { useMemo, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { Pagination } from "@/components/ui/pagination";
+import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 
+import { listDashboardPullRequests, listProjectPullRequests } from "../api/azure.api";
+import { azureKeys } from "../api/azure.keys";
 import type { DashboardTriage } from "../hooks/use-triage";
-import type { PullRequestSummary } from "../types/azure.types";
+import type { PullRequestListFilters, PullRequestSummary } from "../types/azure.types";
 import { formatRelative } from "../utils/format";
 import { voteFromValue } from "../utils/labels";
-import { UNTRIAGED, isHidden, pullRequestKey } from "../utils/triage";
-import {
-  EMPTY_PR_FILTERS,
-  matchesPullRequest,
-  pullRequestFilterOptions,
-  type PullRequestFilters,
-} from "../utils/pull-request-filters";
-import { EmptyState } from "./feedback";
+import { retryUnlessClientError } from "../utils/query-retry";
+import { UNTRIAGED, movedByPendingMark, pullRequestKey } from "../utils/triage";
+import { EmptyState, ErrorCard, SkeletonRows } from "./feedback";
 import { FilterBar } from "./filter-bar";
 import { StatusBadge } from "./status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
 
-interface PullRequestListProps {
-  credentialId: string;
-  pullRequests: PullRequestSummary[];
-  emptyMessage?: string;
-  /** team: filter by author instead of my role. */
-  scope?: "mine" | "team";
-  /** Dashboard snooze / acknowledge / abandon state; omitted for team lists. */
-  triage?: DashboardTriage;
-}
+const EMPTY_FILTERS: PullRequestListFilters = { search: "", person: "", review: "", repository: "" };
+const SEARCH_DELAY_MS = 300;
+
+type PullRequestListProps =
+  | {
+      /** My pull requests and reviews on the dashboard, with snooze / acknowledge / abandon. */
+      scope: "mine";
+      credentialId: string;
+      projectId: string | undefined;
+      /** Changes whenever the dashboard reloads, so the page reloads with it. */
+      dashboardToken: string;
+      triage: DashboardTriage;
+    }
+  | {
+      /** Every active pull request in one project. */
+      scope: "team";
+      credentialId: string;
+      projectId: string;
+    };
 
 function mergeBadge(pr: PullRequestSummary) {
   if (pr.isDraft) return <StatusBadge tone="neutral">Draft</StatusBadge>;
@@ -37,55 +47,101 @@ function mergeBadge(pr: PullRequestSummary) {
   return <StatusBadge tone="info">Awaiting review</StatusBadge>;
 }
 
-export function PullRequestList({
-  credentialId,
-  pullRequests,
-  emptyMessage = "No active pull requests authored by you or awaiting your review.",
-  scope = "mine",
-  triage,
-}: PullRequestListProps) {
+/** Pull requests, 10 per page, filtered by the server. The page lives in the URL (?prPage=). */
+export function PullRequestList(props: PullRequestListProps) {
+  const { credentialId, scope } = props;
   const team = scope === "team";
-  const [filters, setFilters] = useState<PullRequestFilters>(EMPTY_PR_FILTERS);
-  const [showHiddenChoice, setShowHidden] = useState(false);
-  const options = useMemo(() => pullRequestFilterOptions(pullRequests, team), [pullRequests, team]);
+  const triage = scope === "mine" ? props.triage : undefined;
+  const pageParam = usePageParam("prPage");
+  const { page, setPage } = pageParam;
+  const toFirstPage = () => setPage(1, { replace: true });
+  const [filters, setFilters] = useState<PullRequestListFilters>(EMPTY_FILTERS);
+  const [searchInput, setSearchInput] = useState("");
+  const [showHidden, setShowHidden] = useState(false);
 
-  if (pullRequests.length === 0) {
-    return <EmptyState>{emptyMessage}</EmptyState>;
+  // The search box waits for typing to pause before asking the server.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setFilters((current) => (current.search === searchInput.trim() ? current : { ...current, search: searchInput.trim() }));
+    }, SEARCH_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const query = useQuery({
+    queryKey:
+      props.scope === "mine"
+        ? [...azureKeys.dashboardPullRequests(credentialId, props.projectId), { page, filters, showHidden, token: props.dashboardToken, triage: props.triage.savedVersion }]
+        : [...azureKeys.projectPullRequests(credentialId, props.projectId), { page, filters }],
+    queryFn: () =>
+      props.scope === "mine"
+        ? listDashboardPullRequests(credentialId, props.projectId, { page, hidden: showHidden, filters })
+        : listProjectPullRequests(credentialId, props.projectId, { page, filters }),
+    placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
+  });
+  useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
+
+  if (query.isLoading) {
+    return <SkeletonRows rows={3} />;
   }
 
-  const keyOf = (pr: PullRequestSummary) => pullRequestKey(pr.repositoryId, pr.pullRequestId);
-  const resolved = new Map(
-    pullRequests.map((pr) => [keyOf(pr), triage ? triage.resolve(keyOf(pr), pr.projectName) : UNTRIAGED])
-  );
-  const triageOf = (pr: PullRequestSummary) => resolved.get(keyOf(pr)) ?? UNTRIAGED;
-  const hiddenCount = pullRequests.filter((pr) => isHidden(triageOf(pr).state)).length;
-  const showHidden = showHiddenChoice && hiddenCount > 0;
-  const pool = pullRequests.filter((pr) => isHidden(triageOf(pr).state) === showHidden);
-  const visible = pool.filter((pr) => matchesPullRequest(pr, filters, team));
-  const set = (key: keyof PullRequestFilters) => (value: string) => setFilters({ ...filters, [key]: value });
+  if (query.error || !query.data) {
+    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+  }
+
+  const data = query.data;
+  const hiddenCount = data.hiddenCount ?? 0;
+
+  if (data.poolTotal === 0 && hiddenCount === 0) {
+    return <EmptyState>{team ? "No active pull requests in this project." : "No active pull requests authored by you or awaiting your review."}</EmptyState>;
+  }
+
+  const set = (key: keyof PullRequestListFilters) => (value: string) => {
+    setFilters({ ...filters, [key]: value });
+    toFirstPage();
+  };
+  const triageOf = (pr: PullRequestSummary) => (triage ? triage.resolve(pullRequestKey(pr.repositoryId, pr.pullRequestId), pr.projectName) : UNTRIAGED);
 
   return (
     <div className="space-y-3">
       <FilterBar
-        search={{ value: filters.search, onChange: set("search"), placeholder: "Search PR, title or branch" }}
+        search={{
+          value: searchInput,
+          onChange: (value) => {
+            setSearchInput(value);
+            toFirstPage();
+          },
+          placeholder: "Search PR, title or branch",
+        }}
         filters={[
-          { id: "person", label: team ? "Author" : "Role", value: filters.person, options: options.person, onChange: set("person") },
-          { id: "review", label: "Review", value: filters.review, options: options.review, onChange: set("review") },
-          ...(options.repositories.length > 1
-            ? [{ id: "repository", label: "Repo", value: filters.repository, options: options.repositories, onChange: set("repository") }]
+          { id: "person", label: team ? "Author" : "Role", value: filters.person, options: data.facets.person, onChange: set("person") },
+          { id: "review", label: "Review", value: filters.review, options: data.facets.review, onChange: set("review") },
+          ...(data.facets.repositories.length > 1
+            ? [{ id: "repository", label: "Repo", value: filters.repository, options: data.facets.repositories, onChange: set("repository") }]
             : []),
         ]}
-        shown={visible.length}
-        total={pool.length}
-        onClear={() => setFilters(EMPTY_PR_FILTERS)}
+        shown={data.total}
+        total={data.poolTotal}
+        onClear={() => {
+          setFilters(EMPTY_FILTERS);
+          setSearchInput("");
+          toFirstPage();
+        }}
       />
       {hiddenCount > 0 ? (
         <div className="flex justify-end">
-          <HiddenToggle count={hiddenCount} shown={showHidden} onToggle={() => setShowHidden(!showHidden)} />
+          <HiddenToggle
+            count={hiddenCount}
+            shown={data.showingHidden ?? false}
+            onToggle={() => {
+              setShowHidden(!data.showingHidden);
+              toFirstPage();
+            }}
+          />
         </div>
       ) : null}
       <ul className="divide-y divide-slate-100">
-        {visible.map((pr) => (
+        {data.items.filter((pr) => !movedByPendingMark(triageOf(pr), data.showingHidden ?? false)).map((pr) => (
           <li
             key={`${pr.repositoryId}:${pr.pullRequestId}`}
             className={cn("flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between", triageOf(pr).state !== "active" && "opacity-75")}
@@ -101,38 +157,31 @@ export function PullRequestList({
                 {pr.repositoryName} · {pr.sourceBranch} → {pr.targetBranch} · {pr.myRole === "author" ? "You authored" : `by ${pr.createdBy.displayName}`} · {formatRelative(pr.creationDate)}
                 {pr.myRole === "reviewer" ? " · you're a reviewer" : ""}
               </p>
-              {pr.myRole === "reviewer" && pr.myVote !== null ? (
-                <p className="mt-1 text-xs text-slate-600">
-                  Your vote: {voteFromValue(pr.myVote).label}
-                </p>
-              ) : null}
+              {pr.myRole === "reviewer" && pr.myVote !== null ? <p className="mt-1 text-xs text-slate-600">Your vote: {voteFromValue(pr.myVote).label}</p> : null}
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               <TriageBadge resolved={triageOf(pr)} />
               {mergeBadge(pr)}
-              {pr.unresolvedThreads ? (
-                <StatusBadge tone="warning">{pr.unresolvedThreads} unresolved</StatusBadge>
-              ) : null}
+              {pr.unresolvedThreads ? <StatusBadge tone="warning">{pr.unresolvedThreads} unresolved</StatusBadge> : null}
               {triage ? (
-                <TriageMenu
-                  triage={triage}
-                  itemKey={keyOf(pr)}
-                  projectName={pr.projectName}
-                  label={`!${pr.pullRequestId} ${pr.title}`}
-                  resolved={triageOf(pr)}
-                />
+                <TriageMenu triage={triage} itemKey={pullRequestKey(pr.repositoryId, pr.pullRequestId)} projectName={pr.projectName} label={`!${pr.pullRequestId} ${pr.title}`} resolved={triageOf(pr)} />
               ) : null}
             </div>
           </li>
         ))}
       </ul>
-      {visible.length === 0 ? (
-        <EmptyState>
-          {pool.length === 0 && !showHidden
-            ? "All your pull requests are snoozed or abandoned."
-            : "No pull requests match these filters."}
-        </EmptyState>
+      {data.total === 0 ? (
+        <EmptyState>{data.poolTotal === 0 && !data.showingHidden ? "All your pull requests are snoozed or abandoned." : "No pull requests match these filters."}</EmptyState>
       ) : null}
+      <Pagination
+        label="Pull request pages"
+        page={data.page}
+        totalPages={data.totalPages}
+        total={data.total}
+        pageSize={data.pageSize}
+        disabled={query.isFetching}
+        onChange={(next) => setPage(next)}
+      />
     </div>
   );
 }

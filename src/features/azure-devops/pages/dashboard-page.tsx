@@ -1,26 +1,22 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
 import { withAiViolations } from "@/features/sop/utils/ai-check";
-import { cn } from "@/utils/cn";
 import { ActionReviewDialog } from "../components/action-review-dialog";
-import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
-import { FilterBar } from "../components/filter-bar";
+import { ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
+import { PipelineRunList } from "../components/pipeline-run-list";
 import { PullRequestList } from "../components/pull-request-list";
 import { RecommendationList } from "../components/recommendation-list";
 import { ScopesCard } from "../components/scopes-card";
-import { StatusBadge } from "../components/status-badge";
-import { HiddenToggle, TriageBadge, TriageMenu } from "../components/triage-menu";
 import { MyWorkTable } from "../components/work-item-table";
 import { useActionReview } from "../hooks/use-action-review";
 import { useActions } from "../hooks/use-actions";
 import { useDashboard } from "../hooks/use-dashboard";
 import { useDashboardTriage } from "../hooks/use-triage";
 import type { ComplianceResult, Dashboard } from "../types/azure.types";
-import { formatDateTime, formatRelative, stripRef } from "../utils/format";
-import { buildLabel, buildTone } from "../utils/labels";
+import { formatDateTime, formatRelative } from "../utils/format";
 import { isHidden, pipelineKey, pullRequestKey, workItemKey } from "../utils/triage";
 
 /** Original-case project names, since project triage keys are lower-cased. */
@@ -43,9 +39,7 @@ export function DashboardPage() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("project") ?? undefined;
   const { data: dashboard, isLoading, error, refetch, refresh, isRefreshing } = useDashboard(credentialId, projectId);
-  const pendingActions = useActions("PENDING");
-  const [runFilter, setRunFilter] = useState("");
-  const [showHiddenRuns, setShowHiddenRuns] = useState(false);
+  const pendingActions = useActions({ status: "PENDING" });
   const review = useActionReview();
   const triage = useDashboardTriage(credentialId, dashboard);
 
@@ -98,7 +92,7 @@ export function DashboardPage() {
     (build) => build.status === "completed" && build.result === "failed"
   );
   const failedBuilds = failed.filter((build) => !hidden(pipelineKey(build), build.projectName)).length;
-  const pending = pendingActions.data?.length ?? 0;
+  const pending = pendingActions.data?.total ?? 0;
   const names = projectNames(dashboard);
 
   return (
@@ -203,7 +197,8 @@ export function DashboardPage() {
       >
         <RecommendationList
           credentialId={credentialId}
-          recommendations={dashboard.recommendations}
+          projectId={projectId}
+          dashboardToken={dashboard.generatedAt}
           workItems={workItemKinds}
           isProposing={review.isProposing}
           onPropose={(input) => review.propose(input)}
@@ -228,89 +223,17 @@ export function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <SectionCard title="Pull requests & reviews">
           <SectionView section={dashboard.sections.pullRequests} label="pull requests">
-            {(pullRequests) => (
-              <PullRequestList credentialId={credentialId} pullRequests={pullRequests} triage={triage} />
+            {() => (
+              <PullRequestList scope="mine" credentialId={credentialId} projectId={projectId} dashboardToken={dashboard.generatedAt} triage={triage} />
             )}
           </SectionView>
         </SectionCard>
 
         <SectionCard title="My recent pipeline runs" description="Latest run per pipeline and branch, last 7 days.">
           <SectionView section={dashboard.sections.pipelines} label="pipelines">
-            {(builds) => {
-              const label = (build: (typeof builds)[number]) => buildLabel(build.status, build.result);
-              const triageOf = (build: (typeof builds)[number]) => triage.resolve(pipelineKey(build), build.projectName);
-              const hiddenRuns = builds.filter((build) => isHidden(triageOf(build).state)).length;
-              const showHidden = showHiddenRuns && hiddenRuns > 0;
-              const pool = builds.filter((build) => isHidden(triageOf(build).state) === showHidden);
-              const results = [...new Set(pool.map(label))];
-              const visibleBuilds = runFilter ? pool.filter((build) => label(build) === runFilter) : pool;
-
-              return builds.length === 0 ? (
-                <EmptyState>No pipeline runs requested by you in the last week.</EmptyState>
-              ) : (
-                <div className="space-y-3">
-                  {results.length > 1 ? (
-                    <FilterBar
-                      filters={[
-                        {
-                          id: "result",
-                          label: "Result",
-                          value: runFilter,
-                          options: results.map((value) => ({
-                            value,
-                            label: value,
-                            count: pool.filter((build) => label(build) === value).length,
-                          })),
-                          onChange: setRunFilter,
-                        },
-                      ]}
-                      shown={visibleBuilds.length}
-                      total={pool.length}
-                      onClear={() => setRunFilter("")}
-                    />
-                  ) : null}
-                  {hiddenRuns > 0 ? (
-                    <div className="flex justify-end">
-                      <HiddenToggle count={hiddenRuns} shown={showHidden} onToggle={() => setShowHiddenRuns(!showHidden)} />
-                    </div>
-                  ) : null}
-                  {visibleBuilds.length === 0 ? (
-                    <EmptyState>
-                      {pool.length === 0 && !showHidden
-                        ? "All your recent pipeline runs are snoozed or abandoned."
-                        : "No pipeline runs match this filter."}
-                    </EmptyState>
-                  ) : null}
-                  <ul className="divide-y divide-slate-100">
-                    {visibleBuilds.map((build) => (
-                      <li
-                        key={build.id}
-                        className={cn("flex items-center justify-between gap-2 py-2.5", triageOf(build).state !== "active" && "opacity-75")}
-                      >
-                        <Link
-                          to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(build.projectName ?? "")}?build=${build.id}`}
-                          className="min-w-0 truncate text-sm text-slate-800 hover:text-indigo-600"
-                        >
-                          <span className="font-medium">{build.definitionName}</span> #{build.buildNumber} · {stripRef(build.sourceBranch)} ·{" "}
-                          {formatRelative(build.queueTime)}
-                        </Link>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <TriageBadge resolved={triageOf(build)} />
-                          <StatusBadge tone={buildTone(build.status, build.result)}>{buildLabel(build.status, build.result)}</StatusBadge>
-                          <TriageMenu
-                            triage={triage}
-                            itemKey={pipelineKey(build)}
-                            projectName={build.projectName}
-                            label={`${build.definitionName} on ${stripRef(build.sourceBranch)}`}
-                            resolved={triageOf(build)}
-                          />
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            }}
+            {() => (
+              <PipelineRunList credentialId={credentialId} projectId={projectId} dashboardToken={dashboard.generatedAt} triage={triage} />
+            )}
           </SectionView>
         </SectionCard>
       </div>

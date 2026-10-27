@@ -7,7 +7,7 @@ import { DashboardPage } from "../pages/dashboard-page";
 import type { MyWorkPage } from "../types/azure.types";
 import type { TriageMark } from "../types/triage.types";
 import { buildSignalIndex, isHidden, resolveTriage, workItemKey } from "../utils/triage";
-import { CREDENTIAL_ID, dashboard } from "./fixtures";
+import { CREDENTIAL_ID, dashboard, dashboardListBody, pageOf } from "./fixtures";
 
 const base = `/api/azure/${CREDENTIAL_ID}`;
 
@@ -73,7 +73,9 @@ function setup(initial: TriageMark[] = []) {
 
       if (path === `${base}/dashboard`) return json({ dashboard });
       if (path === `${base}/my-work`) return json({ myWork: myWorkFor(marks, new URL(url, "http://x").searchParams.get("hidden") === "1") });
-      if (path === "/api/actions") return json({ actions: [] });
+      if (path === "/api/actions") return json({ actions: pageOf([]) });
+      const list = dashboardListBody(url, marks);
+      if (list) return json(list);
       if (path === "/api/triage" && method === "GET") return json({ marks });
       if (path === "/api/triage" && method === "PUT") {
         const saved = mark(body.itemKey, body.status, { signals: body.signals, snoozedUntil: body.snoozedUntil ?? null });
@@ -182,14 +184,17 @@ describe("dashboard triage", () => {
         const path = String(input).split("?")[0];
         if (path === `${base}/dashboard`) return json({ dashboard });
         if (path === `${base}/my-work`) return json({ myWork: myWorkFor([], false) });
-        if (path === "/api/actions") return json({ actions: [] });
+        if (path === "/api/actions") return json({ actions: pageOf([]) });
+        const list = dashboardListBody(String(input), []);
+        if (list) return json(list);
         return json({ message: "Credential not found" }, 404);
       })
     );
     renderWithProviders(<DashboardPage />, { path: "/azure/:credentialId", route: `/azure/${CREDENTIAL_ID}` });
 
     expect(await screen.findByText(/could not be loaded, so everything is shown/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    // The prioritized list arrives from its own (server-paged) request.
+    expect(await screen.findByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Triage #103 Crash on save" })).toBeDisabled();
   });
 });

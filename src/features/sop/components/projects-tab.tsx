@@ -1,7 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
+import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -376,11 +378,18 @@ export function ProjectsTab() {
   const [editing, setEditing] = useState<AzureSopProject | null>(null);
   const [showHistory, setShowHistory] = useState<string | null>(null);
 
+  const projectsPage = usePageParam("projectsPage");
+  const elsewherePage = usePageParam("elsewherePage");
+  const updateParams = useSearchParamsUpdate();
   const projects = useQuery({
-    queryKey: sopKeys.azureProjects(credentialId),
-    queryFn: () => listAzureProjectsForSop(credentialId),
+    queryKey: [...sopKeys.azureProjects(credentialId), projectsPage.page, elsewherePage.page],
+    queryFn: () => listAzureProjectsForSop(credentialId, { page: projectsPage.page, elsewherePage: elsewherePage.page }),
     enabled: credentialId !== "",
+    placeholderData: keepPreviousData,
   });
+  const served = projects.data && !projects.isPlaceholderData ? projects.data : undefined;
+  useSyncServedPage(projectsPage, served?.projects.page);
+  useSyncServedPage(elsewherePage, served?.elsewhere.page);
   const setUps = useQuery({ queryKey: sopKeys.projects, queryFn: listSopProjects });
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: sopKeys.all });
@@ -406,8 +415,7 @@ export function ProjectsTab() {
   }
 
   const setUpByName = new Map((setUps.data ?? []).map((setUp) => [setUp.projectName.toLowerCase(), setUp]));
-  const inThisOrganization = new Set((projects.data ?? []).map((project) => project.name.toLowerCase()));
-  const elsewhere = projects.data ? (setUps.data ?? []).filter((setUp) => !inThisOrganization.has(setUp.projectName.toLowerCase())) : [];
+  const elsewhere = projects.data?.elsewhere;
   const error = toggle.error ?? remove.error;
 
   return (
@@ -420,7 +428,14 @@ export function ProjectsTab() {
       {azure.length > 1 ? (
         <label className="flex max-w-xs flex-col gap-1 text-sm text-slate-700">
           Organization
-          <select className={SELECT} value={credentialId} onChange={(event) => setChosen(event.target.value)}>
+          <select
+            className={SELECT}
+            value={credentialId}
+            onChange={(event) => {
+              setChosen(event.target.value);
+              updateParams({ projectsPage: null, elsewherePage: null }, { replace: true });
+            }}
+          >
             {azure.map((credential) => (
               <option key={credential.id} value={credential.id}>
                 {getCredentialDisplayName(credential)}
@@ -456,7 +471,7 @@ export function ProjectsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {projects.data.map((project) => {
+              {projects.data.projects.items.map((project) => {
                 const setUp = setUpByName.get(project.name.toLowerCase());
                 return (
                   <tr key={project.id} className="align-top">
@@ -524,14 +539,26 @@ export function ProjectsTab() {
         </div>
       )}
 
-      {elsewhere.length > 0 ? (
+      {projects.data ? (
+        <Pagination
+          label="SOP project pages"
+          page={projects.data.projects.page}
+          totalPages={projects.data.projects.totalPages}
+          total={projects.data.projects.total}
+          pageSize={projects.data.projects.pageSize}
+          disabled={projects.isFetching}
+          onChange={(next) => projectsPage.setPage(next)}
+        />
+      ) : null}
+
+      {elsewhere && elsewhere.total > 0 ? (
         <div className="rounded-lg border border-slate-200 p-3">
           <h3 className="text-sm font-medium text-slate-800">Set up, but not in this organization</h3>
           <p className="text-xs text-slate-500">
             From another organization, renamed, or moved from the old rulebook. Edit them from an organization that has the project.
           </p>
           <ul className="mt-2 divide-y divide-slate-100 text-sm">
-            {elsewhere.map((setUp) => (
+            {elsewhere.items.map((setUp) => (
               <li key={setUp.projectName} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span className="font-medium text-slate-900">{setUp.projectName}</span>
                 <span className="flex items-center gap-3">
@@ -565,6 +592,15 @@ export function ProjectsTab() {
               </li>
             ))}
           </ul>
+          <Pagination
+            label="Set-ups elsewhere pages"
+            page={elsewhere.page}
+            totalPages={elsewhere.totalPages}
+            total={elsewhere.total}
+            pageSize={elsewhere.pageSize}
+            disabled={projects.isFetching}
+            onChange={(next) => elsewherePage.setPage(next)}
+          />
         </div>
       ) : null}
 

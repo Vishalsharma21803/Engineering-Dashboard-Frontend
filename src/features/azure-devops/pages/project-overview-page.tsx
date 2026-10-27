@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SopReportCard } from "@/features/sop/components/sop-report-card";
-import { usePageParam } from "@/hooks/use-page-param";
+import { Pagination } from "@/components/ui/pagination";
+import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
@@ -12,13 +14,11 @@ import { PipelinesPanel } from "../components/pipelines-panel";
 import { PullRequestList } from "../components/pull-request-list";
 import { TeamWorkTable } from "../components/work-item-table";
 import { useActionReview } from "../hooks/use-action-review";
-import {
-  useCapabilities,
-  useProjectOverview,
-  useProjectPullRequests,
-  useRepositories,
-} from "../hooks/use-projects";
-import type { Section } from "../types/azure.types";
+import { listRepositoryPage, listTeams } from "../api/azure.api";
+import { azureKeys } from "../api/azure.keys";
+import { useCapabilities, useProjectOverview } from "../hooks/use-projects";
+import type { Page, Section } from "../types/azure.types";
+import { retryUnlessClientError } from "../utils/query-retry";
 import { formatDateTime } from "../utils/format";
 
 function countValue(section: Section<number>) {
@@ -27,16 +27,63 @@ function countValue(section: Section<number>) {
   return section.data;
 }
 
-function RepositoriesList({ credentialId, projectId }: { credentialId: string; projectId: string }) {
-  const { data: repositories, isLoading, error } = useRepositories(credentialId, projectId);
+/** A small list paged on the server (10 per page), its page kept in the URL as ?{param}=. */
+function PagedList<T>({
+  credentialId,
+  param,
+  label,
+  empty,
+  load,
+  queryKey,
+  render,
+}: {
+  credentialId: string;
+  param: string;
+  label: string;
+  empty: string;
+  queryKey: readonly unknown[];
+  load: (page: number) => Promise<Page<T>>;
+  render: (item: T) => ReactNode;
+}) {
+  const pageParam = usePageParam(param);
+  const query = useQuery({
+    queryKey: [...queryKey, pageParam.page],
+    queryFn: () => load(pageParam.page),
+    placeholderData: keepPreviousData,
+    retry: retryUnlessClientError,
+  });
+  useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
 
-  if (isLoading) return <SkeletonRows rows={2} />;
-  if (error || !repositories) return <ErrorCard error={error} credentialId={credentialId} />;
-  if (repositories.length === 0) return <EmptyState>No repositories.</EmptyState>;
+  if (query.isLoading) return <SkeletonRows rows={2} />;
+  if (query.error || !query.data) return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+  if (query.data.total === 0) return <EmptyState>{empty}</EmptyState>;
 
   return (
-    <ul className="divide-y divide-slate-100">
-      {repositories.map((repository) => (
+    <>
+      <ul className="divide-y divide-slate-100">{query.data.items.map(render)}</ul>
+      <Pagination
+        label={label}
+        page={query.data.page}
+        totalPages={query.data.totalPages}
+        total={query.data.total}
+        pageSize={query.data.pageSize}
+        disabled={query.isFetching}
+        onChange={(next) => pageParam.setPage(next)}
+      />
+    </>
+  );
+}
+
+function RepositoriesList({ credentialId, projectId }: { credentialId: string; projectId: string }) {
+  return (
+    <PagedList
+      credentialId={credentialId}
+      param="repoPage"
+      label="Repository pages"
+      empty="No repositories."
+      queryKey={azureKeys.repositoryPage(credentialId, projectId)}
+      load={(page) => listRepositoryPage(credentialId, projectId, page)}
+      render={(repository) => (
         <li key={repository.id} className="flex items-center justify-between gap-2 py-2 text-sm">
           <span className="font-medium text-slate-900">{repository.name}</span>
           <span className="text-xs text-slate-500">
@@ -44,8 +91,26 @@ function RepositoriesList({ credentialId, projectId }: { credentialId: string; p
             {repository.isDisabled ? " · disabled" : ""}
           </span>
         </li>
-      ))}
-    </ul>
+      )}
+    />
+  );
+}
+
+function TeamsList({ credentialId, projectId }: { credentialId: string; projectId: string }) {
+  return (
+    <PagedList
+      credentialId={credentialId}
+      param="teamPage"
+      label="Team pages"
+      empty="No teams."
+      queryKey={azureKeys.teams(credentialId, projectId)}
+      load={(page) => listTeams(credentialId, projectId, page)}
+      render={(team) => (
+        <li key={team.id} className="py-1.5 text-sm text-slate-700">
+          {team.name}
+        </li>
+      )}
+    />
   );
 }
 
@@ -86,22 +151,9 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
 }
 
 function ProjectPullRequests({ credentialId, projectId }: { credentialId: string; projectId: string }) {
-  const { data: pullRequests, isLoading, error, refetch } = useProjectPullRequests(credentialId, projectId);
-
   return (
-    <SectionCard title="Active pull requests" description="Every open pull request in this project.">
-      {isLoading ? (
-        <SkeletonRows rows={3} />
-      ) : error || !pullRequests ? (
-        <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />
-      ) : (
-        <PullRequestList
-          credentialId={credentialId}
-          pullRequests={pullRequests}
-          emptyMessage="No active pull requests in this project."
-          scope="team"
-        />
-      )}
+    <SectionCard title="Active pull requests" description="Every open pull request in this project, 10 per page.">
+      <PullRequestList scope="team" credentialId={credentialId} projectId={projectId} />
     </SectionCard>
   );
 }
@@ -178,19 +230,7 @@ export function ProjectOverviewPage() {
           <RepositoriesList credentialId={credentialId} projectId={project.id} />
         </SectionCard>
         <SectionCard title="Teams">
-          <SectionView section={project.teams} label="teams">
-            {(teams) =>
-              teams.length === 0 ? (
-                <EmptyState>No teams.</EmptyState>
-              ) : (
-                <ul className="space-y-1 text-sm text-slate-700">
-                  {teams.map((team) => (
-                    <li key={team.id}>{team.name}</li>
-                  ))}
-                </ul>
-              )
-            }
-          </SectionView>
+          <TeamsList credentialId={credentialId} projectId={project.id} />
         </SectionCard>
       </div>
 

@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
+import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { usePipelineRuns, usePipelines } from "../hooks/use-pipelines";
 import type { ProposeActionInput } from "../types/action.types";
 import type { BuildSummary, PipelineSummary } from "../types/azure.types";
@@ -130,15 +132,23 @@ function PipelineRuns({
 
 export function PipelinesPanel(props: PipelinesPanelProps) {
   const { credentialId, projectId, focusBuildId, isProposing, onPropose } = props;
-  const { data: pipelines, isLoading, error, refetch } = usePipelines(credentialId, projectId);
+  const pageParam = usePageParam("pipelinePage");
+  // Until a page is chosen, a linked run opens the page holding its pipeline.
+  const query = usePipelines(credentialId, projectId, {
+    page: pageParam.raw === null ? undefined : pageParam.page,
+    build: pageParam.raw === null ? (focusBuildId ?? undefined) : undefined,
+  });
+  useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
   // null = follow focusBuildId; -1 = user collapsed everything.
   const [expanded, setExpanded] = useState<number | null>(null);
 
-  if (isLoading) return <SkeletonRows />;
-  if (error || !pipelines) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+  if (query.isLoading) return <SkeletonRows />;
+  if (query.error || !query.data) {
+    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
   }
-  if (pipelines.length === 0) return <EmptyState>This project has no pipelines.</EmptyState>;
+  if (query.data.total === 0) return <EmptyState>This project has no pipelines.</EmptyState>;
+
+  const pipelines = query.data.items;
 
   const focusedPipeline =
     focusBuildId === null
@@ -150,56 +160,67 @@ export function PipelinesPanel(props: PipelinesPanelProps) {
   const open = expanded ?? focusedPipeline;
 
   return (
-    <ul className="divide-y divide-slate-100">
-      {pipelines.map((pipeline) => (
-        <li key={pipeline.id} className="py-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <button
-              type="button"
-              className="flex items-center gap-2 text-left"
-              aria-expanded={open === pipeline.id}
-              onClick={() => setExpanded(open === pipeline.id ? -1 : pipeline.id)}
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-                className={`size-4 text-slate-400 transition ${open === pipeline.id ? "rotate-90" : ""}`}
+    <div>
+      <ul className="divide-y divide-slate-100">
+        {pipelines.map((pipeline) => (
+          <li key={pipeline.id} className="py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                className="flex items-center gap-2 text-left"
+                aria-expanded={open === pipeline.id}
+                onClick={() => setExpanded(open === pipeline.id ? -1 : pipeline.id)}
               >
-                <path d="M7.5 5 13 10l-5.5 5V5Z" />
-              </svg>
-              <StatusBadge tone={HEALTH_TONES[pipeline.health]}>{pipeline.health}</StatusBadge>
-              <span className="font-medium text-slate-950">{pipeline.name}</span>
-              {pipeline.health === "running" && pipeline.latestCompletedBuild ? (
-                <StatusBadge
-                  tone={buildTone("completed", pipeline.latestCompletedBuild.result)}
-                  title="Result of the last completed run"
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                  className={`size-4 text-slate-400 transition ${open === pipeline.id ? "rotate-90" : ""}`}
                 >
-                  last: {pipeline.latestCompletedBuild.result ?? "completed"}
-                </StatusBadge>
-              ) : null}
-              <span className="text-xs text-slate-500">
-                last run {formatRelative(pipeline.latestBuild?.queueTime)}
-              </span>
-            </button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={isProposing}
-              onClick={() =>
-                onPropose({ credentialId, kind: "PIPELINE_QUEUE_RUN", target: { projectId, definitionId: pipeline.id }, params: {} })
-              }
-            >
-              Queue run…
-            </Button>
-          </div>
-          {open === pipeline.id ? (
-            <div className="mt-3">
-              <PipelineRuns {...props} pipeline={pipeline} focusBuildId={focusBuildId} />
+                  <path d="M7.5 5 13 10l-5.5 5V5Z" />
+                </svg>
+                <StatusBadge tone={HEALTH_TONES[pipeline.health]}>{pipeline.health}</StatusBadge>
+                <span className="font-medium text-slate-950">{pipeline.name}</span>
+                {pipeline.health === "running" && pipeline.latestCompletedBuild ? (
+                  <StatusBadge
+                    tone={buildTone("completed", pipeline.latestCompletedBuild.result)}
+                    title="Result of the last completed run"
+                  >
+                    last: {pipeline.latestCompletedBuild.result ?? "completed"}
+                  </StatusBadge>
+                ) : null}
+                <span className="text-xs text-slate-500">
+                  last run {formatRelative(pipeline.latestBuild?.queueTime)}
+                </span>
+              </button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={isProposing}
+                onClick={() =>
+                  onPropose({ credentialId, kind: "PIPELINE_QUEUE_RUN", target: { projectId, definitionId: pipeline.id }, params: {} })
+                }
+              >
+                Queue run…
+              </Button>
             </div>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+            {open === pipeline.id ? (
+              <div className="mt-3">
+                <PipelineRuns {...props} pipeline={pipeline} focusBuildId={focusBuildId} />
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      <Pagination
+        label="Pipeline pages"
+        page={query.data.page}
+        totalPages={query.data.totalPages}
+        total={query.data.total}
+        pageSize={query.data.pageSize}
+        disabled={query.isFetching}
+        onChange={(next) => pageParam.setPage(next)}
+      />
+    </div>
   );
 }

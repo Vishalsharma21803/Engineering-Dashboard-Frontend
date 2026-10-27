@@ -8,6 +8,7 @@ export const sopKeys = {
   projectSuggestion: (credentialId: string, projectId: string) => ["sop", "projects", "suggestion", credentialId, projectId] as const,
   projectHistory: (projectName: string) => ["sop", "projects", "history", projectName] as const,
   ai: (credentialId: string) => ["sop", "ai", credentialId] as const,
-  report: (credentialId: string, projectId: string) => ["sop", "report", credentialId, projectId] as const,
+  reportRuns: (credentialId: string, projectId: string) => ["sop", "report", credentialId, projectId, "runs"] as const,
+  reportRun: (credentialId: string, projectId: string, runId: string) => ["sop", "report", credentialId, projectId, "run", runId] as const,
   aiResults: (credentialId: string, ids: string) => ["sop", "ai", credentialId, ids] as const,
 };

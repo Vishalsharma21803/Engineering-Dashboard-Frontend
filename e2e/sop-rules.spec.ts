@@ -115,13 +115,27 @@ test("the team SOP report uses the default rules for everyone in the project", a
   await expect(page).toHaveURL(/\/projects\//);
   await page.getByLabel("Project").selectOption({ label: "Alpha" });
   await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Build report" }).click();
+  await expect(page.getByText(/No saved reports yet/)).toBeVisible();
+  await page.getByRole("button", { name: "Run report" }).click();
 
   const byRule = page.getByRole("table", { name: "Gaps by rule" });
   // #106 is still New, so only the 4 started tickets are checked.
   await expect(byRule.getByRole("row", { name: /T-01 Estimate exists 3 4/ })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("table", { name: "Gaps by person" }).getByRole("row", { name: /Reviewer Two 1 1 2/ })).toBeVisible();
+  const byPerson = page.getByRole("table", { name: "Gaps by person" });
+  await expect(byPerson.getByRole("row", { name: /Reviewer Two Developer 1 1 2/ })).toBeVisible();
   await expect(page.getByText("Tickets checked").locator("..")).toContainText("5");
+
+  // Filters run on the server: one person's tickets only.
+  await page.getByRole("combobox").filter({ hasText: "Person: All" }).selectOption({ label: "Person: Reviewer Two (1)" });
+  await expect(page.getByText("Tickets checked").locator("..")).toContainText("1");
+  await expect(byPerson.getByRole("row")).toHaveCount(2);
+
+  // The run is saved for me and kept after a reload; deleting it removes it.
+  await page.reload();
+  await page.getByText(/^Your saved reports \(1\)$/).click();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("button", { name: /^Delete the report from/ }).click();
+  await expect(page.getByText(/No saved reports yet/)).toBeVisible();
 });
 
 test("projects are set up from Azure and each developer chooses theirs; new tickets are not flagged", async ({ page, request }) => {

@@ -38,7 +38,7 @@ export function AzureLayout() {
   const navigate = useNavigate();
   const credentials = useCredentials();
   const projects = useProjects(credentialId);
-  const pending = useActions("PENDING");
+  const pending = useActions({ status: "PENDING", credentialId });
   const location = useLocation();
   const onMyWork = useMatch("/azure/:credentialId") !== null;
   const onApprovals = useMatch("/azure/:credentialId/actions") !== null;
@@ -85,7 +85,7 @@ export function AzureLayout() {
   const project = projects.data?.projects.find(
     (candidate) => candidate.id === selectedProject || candidate.name === selectedProject
   );
-  const pendingCount = (pending.data ?? []).filter((action) => action.credentialId === credentialId).length;
+  const pendingCount = pending.data?.total ?? 0;
   const overviewProject = resolveDefaultProject(credentialId, selectedProject, projects.data?.projects ?? []);
 
   /** Switching organization keeps the current tab; that organization's own project selection applies. */
