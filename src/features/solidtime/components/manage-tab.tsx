@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Updating } from "@/components/ui/updating";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
-import { ErrorCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
@@ -14,6 +14,7 @@ import { solidtimeKeys } from "../api/solidtime.keys";
 import { useCatalog } from "../hooks/use-solidtime";
 import type { SolidtimeConnection, SolidtimeProject, SolidtimeTask } from "../types/solidtime.types";
 import { formatDuration } from "../utils/time";
+import { LoadErrorNotice } from "./load-error-notice";
 
 type Kind = "projects" | "tasks" | "tags" | "clients";
 
@@ -47,10 +48,11 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
       </h3>
       {list.isLoading ? (
         <SkeletonRows rows={2} />
-      ) : list.error || !list.data ? (
-        <ErrorCard error={list.error} onRetry={() => void list.refetch()} />
+      ) : !list.data ? (
+        <ErrorCard error={list.error} onRetry={() => void list.refetch()} isRetrying={list.isFetching} />
       ) : (
         <>
+          {list.error ? <StaleDataBanner error={list.error} onRetry={() => void list.refetch()} isRetrying={list.isFetching} /> : null}
           <Updating active={list.isPlaceholderData}>
             <ul aria-label={TITLES[kind]} className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
               {list.data.items.length === 0 ? <li className="px-3 py-2 text-slate-500">None yet.</li> : null}
@@ -86,6 +88,7 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
           </Button>
         </form>
       )}
+      {kind === "tasks" && catalog.isError && !catalog.data ? <LoadErrorNotice what="Projects for new tasks" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
     </section>
   );
 }

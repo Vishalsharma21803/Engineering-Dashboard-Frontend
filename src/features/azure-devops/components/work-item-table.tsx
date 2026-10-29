@@ -21,7 +21,7 @@ import { SEVERITY_TONES } from "../utils/labels";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { UNTRIAGED, workItemKey } from "../utils/triage";
 import { workItemTypeStyle } from "../utils/work-item-types";
-import { EmptyState, ErrorCard, SkeletonRows } from "./feedback";
+import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "./feedback";
 import { FilterBar, type FilterDefinition } from "./filter-bar";
 import { StatusBadge } from "./status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
@@ -342,7 +342,7 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, triage, t
   // Triage marks change which tickets match, so they refresh the page too.
 
   const query = useQuery({
-    queryKey: [...azureKeys.myWork(credentialId, projectId ?? "all"), { page, showHidden, filters: list.filters, dashboardToken, triage: triage.version }],
+    queryKey: [...azureKeys.myWork(credentialId, projectId ?? "all"), { page, showHidden, filters: list.filters, dashboardToken, triage: triage.savedVersion }],
     queryFn: () => getMyWorkPage(credentialId, { projectId, page, hidden: showHidden, filters: list.filters }),
     placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
@@ -361,14 +361,20 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, triage, t
     return <SkeletonRows rows={5} />;
   }
 
-  if (query.error || !query.data) {
+  if (!query.data) {
     return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
   }
 
+  const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   const data = query.data;
 
   if (data.poolTotal === 0 && data.hiddenCount === 0) {
-    return <EmptyState>No open work items are assigned to you.</EmptyState>;
+    return (
+      <>
+        {stale}
+        <EmptyState>No open work items are assigned to you.</EmptyState>
+      </>
+    );
   }
 
   const definitions: FilterDefinition[] = [
@@ -379,67 +385,78 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, triage, t
   ];
 
   return (
-    <div className="space-y-3">
-      <FilterBar
-        search={{ value: list.searchInput, onChange: list.setSearchInput, placeholder: "Search ID, title or tag" }}
-        filters={definitions}
-        shown={data.total}
-        total={data.poolTotal}
-        onClear={list.clear}
-      />
-      {data.hiddenCount > 0 ? (
-        <div className="flex justify-end">
-          <HiddenToggle
-            count={data.hiddenCount}
-            shown={data.showingHidden}
-            onToggle={() => {
-              setShowHidden(!data.showingHidden);
-              toFirstPage();
-            }}
-          />
-        </div>
-      ) : null}
-      <Updating active={query.isPlaceholderData}>
-        <WorkItemRows
-          credentialId={credentialId}
-          rows={data.items}
-          team={false}
-          myId={null}
-          triage={triage}
-          timeCell={
-            time
-              ? (item) => (
-                  <>
-                    <span className="text-xs text-slate-500" title="Your time tracked in Solidtime">
-                      <span aria-hidden="true">⏱</span> {timeById.has(item.id) ? formatDuration(timeById.get(item.id)?.mySeconds ?? 0) : "…"}
-                    </span>
-                    <TicketTimerButton
-                      connection={time.connection}
-                      ticket={{ id: item.id, title: item.title, projectName: item.projectName }}
-                      onPropose={time.onPropose}
-                      disabled={time.isProposing}
-                    />
-                  </>
-                )
-              : undefined
-          }
+    <>
+      {stale}
+      <div className="space-y-3">
+        <FilterBar
+          search={{ value: list.searchInput, onChange: list.setSearchInput, placeholder: "Search ID, title or tag" }}
+          filters={definitions}
+          shown={data.total}
+          total={data.poolTotal}
+          onClear={list.clear}
         />
-        {data.total === 0 ? (
-          <EmptyState className="mt-3">
-            {data.poolTotal === 0 && !data.showingHidden ? "All your open work items are snoozed or abandoned." : "No work items match these filters."}
-          </EmptyState>
+        {times.error ? (
+          <p role="alert" className="text-xs text-amber-700">
+            Tracked time could not be loaded from Solidtime.{" "}
+            <button type="button" className="font-medium underline" onClick={() => void times.refetch()}>
+              Try again
+            </button>
+          </p>
         ) : null}
-      </Updating>
-      <Pagination
-        label="My work pages"
-        page={data.page}
-        totalPages={data.totalPages}
-        total={data.total}
-        pageSize={data.pageSize}
-        disabled={query.isFetching}
-        onChange={(next) => setPage(next)}
-      />
-    </div>
+        {data.hiddenCount > 0 ? (
+          <div className="flex justify-end">
+            <HiddenToggle
+              count={data.hiddenCount}
+              shown={data.showingHidden}
+              onToggle={() => {
+                setShowHidden(!data.showingHidden);
+                toFirstPage();
+              }}
+            />
+          </div>
+        ) : null}
+        <Updating active={query.isPlaceholderData}>
+          <WorkItemRows
+            credentialId={credentialId}
+            rows={data.items}
+            team={false}
+            myId={null}
+            triage={triage}
+            timeCell={
+              time
+                ? (item) => (
+                    <>
+                      <span className="text-xs text-slate-500" title={times.error ? "Tracked time could not be loaded" : "Your time tracked in Solidtime"}>
+                        <span aria-hidden="true">⏱</span> {timeById.has(item.id) ? formatDuration(timeById.get(item.id)?.mySeconds ?? 0) : times.error ? "—" : "…"}
+                      </span>
+                      <TicketTimerButton
+                        connection={time.connection}
+                        ticket={{ id: item.id, title: item.title, projectName: item.projectName }}
+                        onPropose={time.onPropose}
+                        disabled={time.isProposing}
+                      />
+                    </>
+                  )
+                : undefined
+            }
+          />
+          {data.total === 0 ? (
+            <EmptyState className="mt-3">
+              {data.poolTotal === 0 && !data.showingHidden ? "All your open work items are snoozed or abandoned." : "No work items match these filters."}
+            </EmptyState>
+          ) : null}
+        </Updating>
+        <Pagination
+          label="My work pages"
+          page={data.page}
+          totalPages={data.totalPages}
+          total={data.total}
+          pageSize={data.pageSize}
+          disabled={query.isFetching}
+          onChange={(next) => setPage(next)}
+        />
+      </div>
+    </>
   );
 }
 
@@ -468,14 +485,20 @@ export function TeamWorkTable({ credentialId, projectId, scope, myId }: TeamWork
     return <SkeletonRows rows={4} />;
   }
 
-  if (query.error || !query.data) {
+  if (!query.data) {
     return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
   }
 
+  const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   const data = query.data;
 
   if (data.poolTotal === 0) {
-    return <EmptyState>No work items in this project match.</EmptyState>;
+    return (
+      <>
+        {stale}
+        <EmptyState>No work items in this project match.</EmptyState>
+      </>
+    );
   }
 
   const definitions: FilterDefinition[] = [
@@ -486,27 +509,30 @@ export function TeamWorkTable({ credentialId, projectId, scope, myId }: TeamWork
   ];
 
   return (
-    <div className="space-y-3">
-      <FilterBar
-        search={{ value: list.searchInput, onChange: list.setSearchInput, placeholder: "Search ID, title or tag" }}
-        filters={definitions}
-        shown={data.total}
-        total={data.poolTotal}
-        onClear={list.clear}
-      />
-      <Updating active={query.isPlaceholderData}>
-        <WorkItemRows credentialId={credentialId} rows={data.items.map((workItem) => ({ workItem, compliance: null }))} team myId={myId} />
-        {data.total === 0 ? <EmptyState className="mt-3">No work items match these filters.</EmptyState> : null}
-      </Updating>
-      <Pagination
-        label="Team work item pages"
-        page={data.page}
-        totalPages={data.totalPages}
-        total={data.total}
-        pageSize={data.pageSize}
-        disabled={query.isFetching}
-        onChange={(next) => setPage(next)}
-      />
-    </div>
+    <>
+      {stale}
+      <div className="space-y-3">
+        <FilterBar
+          search={{ value: list.searchInput, onChange: list.setSearchInput, placeholder: "Search ID, title or tag" }}
+          filters={definitions}
+          shown={data.total}
+          total={data.poolTotal}
+          onClear={list.clear}
+        />
+        <Updating active={query.isPlaceholderData}>
+          <WorkItemRows credentialId={credentialId} rows={data.items.map((workItem) => ({ workItem, compliance: null }))} team myId={myId} />
+          {data.total === 0 ? <EmptyState className="mt-3">No work items match these filters.</EmptyState> : null}
+        </Updating>
+        <Pagination
+          label="Team work item pages"
+          page={data.page}
+          totalPages={data.totalPages}
+          total={data.total}
+          pageSize={data.pageSize}
+          disabled={query.isFetching}
+          onChange={(next) => setPage(next)}
+        />
+      </div>
+    </>
   );
 }

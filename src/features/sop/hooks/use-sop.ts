@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { azureKeys } from "@/features/azure-devops/api/azure.keys";
 import { ApiError } from "@/lib/api-client";
 import { editRules, getEffectiveRules, getRulebook, getRulesList, listRulebookVersions, saveRulebook } from "../api/sop.api";
 import { sopKeys } from "../api/sop.keys";
@@ -23,7 +24,8 @@ export function useSaveRulebook(scope: RulebookScope) {
 
   return useMutation({
     mutationFn: ({ content, note }: { content: string; note?: string }) => saveRulebook(scope, content, note),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: sopKeys.all }),
+    // Every SOP result on tickets, My work and the dashboard follows the new rules.
+    onSuccess: () => Promise.all([queryClient.invalidateQueries({ queryKey: sopKeys.all }), queryClient.invalidateQueries({ queryKey: azureKeys.all })]),
   });
 }
 
@@ -40,10 +42,13 @@ export function useEditRules(scope: RulebookScope) {
 
   return useMutation({
     mutationFn: (input: RuleEditsInput) => editRules(scope, input),
-    onSuccess: () =>
-      Promise.all(
+    onSuccess: () => {
+      // SOP results on tickets, My work and the dashboard follow the new rules (not awaited: the list must not wait for them).
+      void queryClient.invalidateQueries({ queryKey: azureKeys.all });
+      return Promise.all(
         [sopKeys.rulesList, sopKeys.effective, sopKeys.rulebook(scope), sopKeys.versions(scope)].map((queryKey) => queryClient.invalidateQueries({ queryKey }))
-      ),
+      );
+    },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 409) {
         void queryClient.invalidateQueries({ queryKey: sopKeys.rulesList });

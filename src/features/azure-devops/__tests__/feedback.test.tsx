@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
-import { ErrorCard, SectionView } from "../components/feedback";
+import { ErrorCard, SectionView, StaleDataBanner } from "../components/feedback";
 import { describeError } from "../utils/error-message";
 
 describe("SectionView", () => {
@@ -14,6 +15,16 @@ describe("SectionView", () => {
       </SectionView>
     );
     expect(screen.getByText(/does not grant access to pipelines/)).toBeInTheDocument();
+  });
+
+  it("treats a successful empty read as data, not as a failure (no current iteration)", () => {
+    render(
+      <SectionView<{ name: string } | null> section={{ status: "ok", data: null, reason: null }} label="iterations">
+        {(iteration) => iteration?.name ?? "None"}
+      </SectionView>
+    );
+    expect(screen.getByText("None")).toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
   it("renders data when ok", () => {
@@ -39,5 +50,16 @@ describe("describeError", () => {
       </MemoryRouter>
     );
     expect(screen.getByRole("link", { name: "Update credential" })).toHaveAttribute("href", "/credentials/abc/edit");
+  });
+});
+
+describe("StaleDataBanner", () => {
+  it("says the data on screen is the last loaded and retries", async () => {
+    const onRetry = vi.fn();
+    render(<StaleDataBanner error={new ApiError(502, "Azure DevOps could not be reached.")} onRetry={onRetry} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not refresh");
+    expect(screen.getByRole("alert")).toHaveTextContent("Showing the last loaded data.");
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetry).toHaveBeenCalled();
   });
 });

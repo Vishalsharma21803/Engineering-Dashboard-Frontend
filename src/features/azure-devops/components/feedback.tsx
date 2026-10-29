@@ -40,6 +40,35 @@ export function ErrorCard({ error, credentialId, onRetry, isRetrying }: ErrorCar
   );
 }
 
+/**
+ * A refetch failed but earlier data is still on screen: say so above it,
+ * instead of replacing the page (and anything typed into it) with an error.
+ */
+export function StaleDataBanner({ error, onRetry, isRetrying, credentialId }: { error: unknown; onRetry: () => void; isRetrying?: boolean; credentialId?: string }) {
+  const description = describeError(error);
+
+  return (
+    <div role="alert" className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+      <span>
+        Could not refresh: {description.message} Showing the last loaded data.
+      </span>
+      <span className="flex shrink-0 gap-2">
+        {description.fixCredential && credentialId ? (
+          <Link
+            to={`/credentials/${encodeURIComponent(credentialId)}/edit`}
+            className="inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+          >
+            Update credential
+          </Link>
+        ) : null}
+        <Button variant="secondary" size="sm" onClick={onRetry} disabled={isRetrying}>
+          {isRetrying ? "Retrying..." : "Try again"}
+        </Button>
+      </span>
+    </div>
+  );
+}
+
 export function EmptyState({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <p
@@ -81,7 +110,8 @@ export function SectionView<T>({ section, label, children }: SectionViewProps<T>
     );
   }
 
-  if (section.status === "error" || section.data === null) {
+  // Only a failed read is an error: a successful read may legitimately be empty (no current iteration).
+  if (section.status === "error") {
     return (
       <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
         {label.charAt(0).toUpperCase() + label.slice(1)} could not be loaded
@@ -90,7 +120,7 @@ export function SectionView<T>({ section, label, children }: SectionViewProps<T>
     );
   }
 
-  return <>{children(section.data)}</>;
+  return <>{children(section.data as T)}</>;
 }
 
 export function SectionCard({
@@ -122,7 +152,8 @@ export function StatTile({ label, value, hint }: { label: string; value: ReactNo
   return (
     <div className="rounded-xl border border-slate-200 bg-surface p-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{value}</p>
+      {/* A div: the value may be a whole section (with its own paragraphs), not just a number. */}
+      <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{value}</div>
       {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
     </div>
   );

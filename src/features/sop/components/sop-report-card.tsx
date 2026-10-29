@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
-import { EmptyState, ErrorCard, SectionCard, StatTile } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, SectionCard, StaleDataBanner, StatTile } from "@/features/azure-devops/components/feedback";
 import { FilterBar } from "@/features/azure-devops/components/filter-bar";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { formatDateTime, formatRelative } from "@/features/azure-devops/utils/format";
@@ -106,7 +106,10 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
         ) : null}
         {run.isPending ? <p className="text-sm text-slate-500">Checking every ticket in the project; this can take a minute.</p> : null}
 
-        {runs.error ? (
+        {runs.error && runs.data ? (
+          <StaleDataBanner credentialId={credentialId} error={runs.error} onRetry={() => void runs.refetch()} isRetrying={runs.isFetching} />
+        ) : null}
+        {runs.error && !runs.data ? (
           <ErrorCard error={runs.error} credentialId={credentialId} onRetry={() => void runs.refetch()} />
         ) : !runs.data ? (
           <p className="flex items-center gap-2 text-sm text-slate-500">

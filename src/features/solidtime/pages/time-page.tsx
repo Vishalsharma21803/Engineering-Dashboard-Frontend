@@ -1,8 +1,9 @@
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { ActionReviewDialog } from "@/features/azure-devops/components/action-review-dialog";
-import { EmptyState, ErrorCard, ErrorToast, SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useActionReview } from "@/features/azure-devops/hooks/use-action-review";
 import { useActions } from "@/features/azure-devops/hooks/use-actions";
 import { cn } from "@/utils/cn";
@@ -14,7 +15,7 @@ import { TicketTimeLookup } from "../components/ticket-time-lookup";
 import { TimerBar } from "../components/timer-bar";
 import { TimesheetTab } from "../components/timesheet-tab";
 import { UnlinkedTab } from "../components/unlinked-tab";
-import { useSolidtimeConnections, useSolidtimeTimeZone } from "../hooks/use-solidtime";
+import { useSolidtimeConnections, useSolidtimeProfile } from "../hooks/use-solidtime";
 import { localDay } from "../utils/time";
 
 const TABS = [
@@ -32,21 +33,24 @@ export function TimeIndexPage() {
   const connections = useSolidtimeConnections();
 
   if (connections.isLoading) return <SkeletonRows rows={3} />;
-  if (connections.error) return <ErrorCard error={connections.error} onRetry={() => void connections.refetch()} />;
+  if (!connections.data) return <ErrorCard error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} />;
 
-  const ready = (connections.data ?? []).find((connection) => connection.organizationId !== null);
+  const ready = connections.data.find((connection) => connection.organizationId !== null);
 
   if (ready) {
     return <Navigate to={`/time/${encodeURIComponent(ready.credentialId)}`} replace />;
   }
 
   return (
-    <EmptyState>
-      Connect Solidtime (and choose its organization) to track time here.{" "}
-      <Link to="/credentials" className="font-medium text-indigo-700 hover:underline">
-        Credentials
-      </Link>
-    </EmptyState>
+    <div className="flex flex-col gap-3">
+      {connections.error ? <StaleDataBanner error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} /> : null}
+      <EmptyState>
+        Connect Solidtime (and choose its organization) to track time here.{" "}
+        <Link to="/credentials" className="font-medium text-indigo-700 hover:underline">
+          Credentials
+        </Link>
+      </EmptyState>
+    </div>
   );
 }
 
@@ -57,14 +61,14 @@ export function TimePage() {
   const connections = useSolidtimeConnections();
   const review = useActionReview();
   const pending = useActions({ status: "PENDING", credentialId });
-  const timeZone = useSolidtimeTimeZone(credentialId);
+  const profile = useSolidtimeProfile(credentialId);
   const requested = searchParams.get("tab");
   const tab: Tab = TABS.some((item) => item.id === requested) ? (requested as Tab) : "timesheet";
 
   if (connections.isLoading) return <SkeletonRows rows={4} />;
-  if (connections.error) return <ErrorCard error={connections.error} onRetry={() => void connections.refetch()} />;
+  if (!connections.data) return <ErrorCard error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} />;
 
-  const connection = (connections.data ?? []).find((item) => item.credentialId === credentialId);
+  const connection = connections.data.find((item) => item.credentialId === credentialId);
 
   if (!connection || !connection.organizationId) {
     return (
@@ -77,11 +81,15 @@ export function TimePage() {
     );
   }
 
-  // "Today" is counted in my Solidtime time zone, like on the server.
+  // "Today" is counted in my Solidtime time zone, like on the server. Without
+  // the profile, the browser's zone is used (and said so below).
+  const timeZone = profile.data?.timeZone ?? null;
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const props = { connection, onPropose: review.propose, isProposing: review.isProposing, today: localDay(undefined, timeZone) };
 
   return (
     <section className="flex w-full flex-col gap-6">
+      {connections.error ? <StaleDataBanner error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Solidtime · {connection.organizationName}</p>
@@ -117,17 +125,35 @@ export function TimePage() {
         ))}
       </div>
 
-      <div id="time-panel" role="tabpanel" aria-labelledby={`time-tab-${tab}`}>
-        {tab === "timesheet" ? <TimesheetTab {...props} /> : null}
-        {tab === "draft" ? <DraftTab {...props} /> : null}
-        {tab === "unlinked" ? <UnlinkedTab {...props} /> : null}
-        {tab === "reports" ? <ReportsTab connection={connection} today={props.today} /> : null}
-        {tab === "manage" ? (
-          <div className="flex flex-col gap-6">
-            <ProjectMapping connection={connection} />
-            <ManageTab {...props} />
-          </div>
-        ) : null}
+      {/* The tabs start from "today", so they wait for the time zone it is counted in. */}
+      <div id="time-panel" role="tabpanel" aria-labelledby={`time-tab-${tab}`} className="flex flex-col gap-4">
+        {profile.isLoading ? (
+          <SkeletonRows rows={4} />
+        ) : (
+          <>
+            {profile.isError && !profile.data ? (
+              <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                Your Solidtime time zone could not be loaded, so days follow this browser's time zone ({browserTimeZone}).
+                <Button size="sm" variant="ghost" disabled={profile.isFetching} onClick={() => void profile.refetch()}>
+                  {profile.isFetching ? "Retrying..." : "Retry"}
+                </Button>
+              </p>
+            ) : null}
+            {/* Keyed on the zone: once it loads (after a retry), the tabs start again from the right "today". */}
+            <div key={timeZone ?? "browser"}>
+              {tab === "timesheet" ? <TimesheetTab {...props} /> : null}
+              {tab === "draft" ? <DraftTab {...props} /> : null}
+              {tab === "unlinked" ? <UnlinkedTab {...props} /> : null}
+              {tab === "reports" ? <ReportsTab connection={connection} today={props.today} /> : null}
+              {tab === "manage" ? (
+                <div className="flex flex-col gap-6">
+                  <ProjectMapping connection={connection} />
+                  <ManageTab {...props} />
+                </div>
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />

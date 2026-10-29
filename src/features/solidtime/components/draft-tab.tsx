@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { EmptyState, ErrorCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
@@ -17,6 +17,7 @@ import { solidtimeKeys } from "../api/solidtime.keys";
 import { useCatalog } from "../hooks/use-solidtime";
 import type { DayDraft, DraftEstimate, DraftRow, ProjectSource, SolidtimeConnection } from "../types/solidtime.types";
 import { formatDayLabel, formatHours, shiftDay, zonedClock, zonedInstant } from "../utils/time";
+import { LoadErrorNotice } from "./load-error-notice";
 
 const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 const HOUR = 3_600_000;
@@ -99,6 +100,7 @@ function aiErrorText(error: unknown): { text: string; setup: boolean } {
  */
 export function DraftTab({ connection, onPropose, isProposing, today }: { connection: SolidtimeConnection; onPropose: (input: ProposeActionInput) => void; isProposing: boolean; today: string }) {
   const [day, setDay] = useState(today);
+  const queryClient = useQueryClient();
   const catalog = useCatalog(connection.credentialId);
   const draft = useQuery({
     queryKey: solidtimeKeys.draft(connection.credentialId, day),
@@ -107,6 +109,12 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
     // A rebuilt draft replaces the edits made on it: only rebuild when asked.
     staleTime: Infinity,
   });
+  /** Rebuild reads Azure DevOps and Solidtime fresh (refresh=true), into the same cache entry the tab shows. */
+  const rebuild = () =>
+    void queryClient
+      .fetchQuery({ queryKey: solidtimeKeys.draft(connection.credentialId, day), queryFn: () => getDraft(connection.credentialId, day, { refresh: true }), retry: retryUnlessClientError, staleTime: 0 })
+      // The failure is shown from the query's own error state.
+      .catch(() => undefined);
   const data = draft.data;
   const timeZone = data?.timeZone ?? "UTC";
   const initial = useMemo(() => Object.fromEntries((data?.rows ?? []).map((row) => [row.ticketId, editableFrom(row, data?.timeZone ?? "UTC")])) as Record<number, Editable>, [data]);
@@ -251,7 +259,7 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                 Today
               </Button>
             ) : null}
-            <Button size="sm" variant="secondary" disabled={draft.isFetching} onClick={() => void draft.refetch()} title="Read Azure DevOps and Solidtime again (your edits on this day are replaced)">
+            <Button size="sm" variant="secondary" disabled={draft.isFetching} onClick={rebuild} title="Read Azure DevOps and Solidtime again (your edits on this day are replaced)">
               {draft.isFetching && !draft.isLoading ? <Spinner className="size-4" /> : null}
               Rebuild
             </Button>
@@ -312,10 +320,14 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
         ) : null}
       </Card>
 
+      {/* A failed Rebuild keeps the draft and the edits made on it. */}
+      {draft.error && data ? <StaleDataBanner error={draft.error} onRetry={rebuild} isRetrying={draft.isFetching} /> : null}
+      {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
+
       {draft.isLoading ? (
         <SkeletonRows rows={4} />
-      ) : draft.error || !data ? (
-        <ErrorCard error={draft.error} onRetry={() => void draft.refetch()} />
+      ) : !data ? (
+        <ErrorCard error={draft.error} onRetry={() => void draft.refetch()} isRetrying={draft.isFetching} />
       ) : data.rows.length === 0 ? (
         <EmptyState>
           You made no changes in Azure DevOps on {formatDayLabel(day, { weekday: "long", day: "numeric", month: "long" })}, so there is nothing to draft. Pick another day, or add time on the Timesheet tab.

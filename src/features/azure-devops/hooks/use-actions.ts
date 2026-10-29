@@ -18,6 +18,8 @@ export function useActions(filter: ActionListFilter = {}) {
     queryFn: () => listActions(filter),
     placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
+    // Pending changes expire on the server after a while; counts and lists follow without a reload.
+    ...(filter.status === "PENDING" ? { refetchInterval: 60_000 } : {}),
   });
 }
 

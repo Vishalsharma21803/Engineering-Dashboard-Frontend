@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useOpenRouterAllowlist, useSetOpenRouterAllowlist } from "../hooks/use-ai";
 import type { AiModelOption } from "../types/ai.types";
 import { formatPrice } from "../utils/ai-display";
@@ -23,12 +24,23 @@ export function OpenRouterAllowlistCard() {
         <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
           <Spinner className="size-4" /> Loading models…
         </p>
-      ) : allowlist.isError || !allowlist.data ? (
-        <p role="alert" className="mt-3 text-sm text-rose-600">
+      ) : !allowlist.data ? (
+        <p role="alert" className="mt-3 flex flex-wrap items-center gap-2 text-sm text-rose-600">
           {describeAiError(allowlist.error, "Could not load OpenRouter models.")}
+          <Button size="sm" variant="ghost" disabled={allowlist.isFetching} onClick={() => void allowlist.refetch()}>
+            {allowlist.isFetching ? "Retrying..." : "Retry"}
+          </Button>
         </p>
       ) : (
-        <AllowlistEditor initialIds={allowlist.data.modelIds} options={allowlist.data.models} />
+        <>
+          {/* A failed background refresh keeps the editor (and unsaved choices) on screen. */}
+          {allowlist.error ? (
+            <div className="mt-3">
+              <StaleDataBanner error={allowlist.error} onRetry={() => void allowlist.refetch()} isRetrying={allowlist.isFetching} />
+            </div>
+          ) : null}
+          <AllowlistEditor initialIds={allowlist.data.modelIds} options={allowlist.data.models} />
+        </>
       )}
     </Card>
   );

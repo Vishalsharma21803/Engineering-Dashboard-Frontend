@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,8 @@ import { TimesheetTab } from "../components/timesheet-tab";
 import { DraftTab } from "../components/draft-tab";
 import { TicketTimeLookup } from "../components/ticket-time-lookup";
 import { TicketTimePanel } from "../components/ticket-time-panel";
+import { ReportsTab } from "../components/reports-tab";
+import { TimePage } from "../pages/time-page";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { projectNameKey, solidtimeProjectFor } from "../utils/project-map";
 import { localDay, shiftDay, weekStart, zonedClock, zonedInstant } from "../utils/time";
@@ -353,5 +355,104 @@ describe("Solidtime on the Credentials page", () => {
     renderWithProviders(<SolidtimeConnectionsSection onNotice={vi.fn()} />);
     expect(await screen.findByRole("link", { name: "Add one" })).toHaveAttribute("href", "/credentials/new?platform=solidtime");
     expect(screen.queryByRole("button", { name: /Connect/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("load failures are not empty states", () => {
+  it("shows an error with a retry on the ticket page, not \"Connect Solidtime\", when connections fail to load", async () => {
+    mockBackend([{ path: "/api/solidtime/connections", status: 500, body: { message: "Database unavailable" } }]);
+    renderWithProviders(<TicketTimePanel azureCredentialId={connection.azureCredentialId!} ticket={{ id: 101, title: "Implement login", projectName: "Alpha" }} onPropose={vi.fn()} isProposing={false} />);
+
+    // The connections query retries once before giving up.
+    const alert = await screen.findByRole("alert", {}, { timeout: 4000 });
+    expect(screen.queryByText(/Connect Solidtime/)).not.toBeInTheDocument();
+
+    mockBackend([
+      { path: "/api/solidtime/connections", body: { connections: [connection] } },
+      { path: `${base}/timer`, body: { timer: null } },
+      { path: `${base}/catalog`, body: catalog },
+    ]);
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Check time in Solidtime" })).toBeInTheDocument();
+  });
+
+  it("shows an error on the Credentials page, not \"No Solidtime account connected\", when connections fail to load", async () => {
+    mockBackend([{ path: "/api/solidtime/connections", status: 500, body: { message: "Database unavailable" } }]);
+    renderWithProviders(<SolidtimeConnectionsSection onNotice={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Try again" }, { timeout: 4000 })).toBeInTheDocument();
+    expect(screen.queryByText(/No Solidtime account connected/)).not.toBeInTheDocument();
+  });
+
+  it("rebuilds the draft from fresh data", async () => {
+    const day = localDay(undefined, "UTC");
+    const draft = { day, timeZone: "UTC", targetHours: 8, trackedHours: 0, busy: [], truncated: false, rows: [] };
+    const calls = mockBackend([
+      { path: `${base}/catalog`, body: catalog },
+      { path: `${base}/draft`, body: { draft } },
+    ]);
+    renderWithProviders(<DraftTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+
+    await screen.findByText(/nothing to draft/);
+    expect(calls.filter((call) => call.url.includes("/draft"))).toHaveLength(1);
+    expect(calls.find((call) => call.url.includes("/draft"))?.url).not.toContain("refresh");
+
+    await userEvent.click(screen.getByRole("button", { name: "Rebuild" }));
+    await waitFor(() => expect(calls.filter((call) => call.url.includes("/draft"))).toHaveLength(2));
+    expect(calls.filter((call) => call.url.includes("/draft"))[1]?.url).toContain(`/draft?day=${day}&refresh=true`);
+  });
+});
+
+describe("TimePage time zone", () => {
+  it("waits for the Solidtime time zone, and says when the browser's is used instead, with a retry", async () => {
+    mockBackend([
+      { path: "/api/solidtime/connections", body: { connections: [connection] } },
+      { path: `${base}/profile`, status: 500, body: { message: "Solidtime unavailable" } },
+      { path: `${base}/timer`, body: { timer: null } },
+      { path: `${base}/catalog`, body: catalog },
+    ]);
+    renderWithProviders(<TimePage />, { path: "/time/:credentialId", route: `/time/${connection.credentialId}` });
+
+    // The profile query retries once before giving up; the tabs wait meanwhile.
+    expect(await screen.findByRole("tabpanel")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add entry" })).not.toBeInTheDocument();
+
+    const notice = await screen.findByText(/time zone could not be loaded/, {}, { timeout: 4000 });
+    expect(notice).toHaveTextContent(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    expect(within(notice).getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "+ Add entry" })).toBeInTheDocument();
+  });
+});
+
+describe("ReportsTab", () => {
+  const today = "2026-10-29";
+  const page = { items: [], page: 1, pageSize: 10, total: 0, totalPages: 0 };
+  const report = {
+    from: shiftDay(today, -29),
+    to: today,
+    team: false,
+    totals: { tickets: 3, trackedHours: 12, estimateHours: 10, ratio: 1.2, overEstimate: 1 },
+    byTicket: page,
+    byPerson: page,
+    byType: page,
+    ticketsWithoutEstimate: 0,
+  };
+
+  it("says a start after the end is invalid and shows no figures from the previous range", async () => {
+    const calls = mockBackend([{ path: `${base}/reports/accuracy`, body: { accuracy: report } }]);
+    renderWithProviders(<ReportsTab connection={connection} today={today} />);
+
+    expect(await screen.findByText("Tickets compared")).toBeInTheDocument();
+    const reads = calls.length;
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: shiftDay(today, 1) } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("is after the end date");
+    expect(screen.queryByText("Tickets compared")).not.toBeInTheDocument();
+    expect(calls).toHaveLength(reads);
+
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: shiftDay(today, -6) } });
+    expect(await screen.findByText("Tickets compared")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

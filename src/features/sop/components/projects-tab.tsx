@@ -8,7 +8,7 @@ import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import { ErrorCard } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { formatRelative } from "@/features/azure-devops/utils/format";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
@@ -98,12 +98,14 @@ function SetUpForm({ credentialId, project, onDone }: SetUpFormProps) {
     );
   }
 
-  if (suggestion.error || !suggestion.data) {
+  if (!suggestion.data) {
     return <ErrorCard error={suggestion.error} credentialId={credentialId} onRetry={() => void suggestion.refetch()} />;
   }
 
   return (
-    <SetUpFields
+    <>
+      {suggestion.error ? <StaleDataBanner credentialId={credentialId} error={suggestion.error} onRetry={() => void suggestion.refetch()} isRetrying={suggestion.isFetching} /> : null}
+      <SetUpFields
       key={project.id}
       projectName={suggestion.data.projectName}
       initial={suggestion.data.settings}
@@ -118,6 +120,7 @@ function SetUpForm({ credentialId, project, onDone }: SetUpFormProps) {
       }}
       onCancel={onDone}
     />
+    </>
   );
 }
 
@@ -356,6 +359,16 @@ function History({ projectName }: { projectName: string }) {
   const history = useQuery({ queryKey: sopKeys.projectHistory(projectName), queryFn: () => listProjectChanges(projectName) });
 
   if (history.isLoading) return <Spinner className="size-4" />;
+  if (history.error) {
+    return (
+      <p role="alert" className="text-xs text-rose-600">
+        Could not load the history.{" "}
+        <button type="button" className="font-medium underline" onClick={() => void history.refetch()}>
+          Try again
+        </button>
+      </p>
+    );
+  }
   if (!history.data?.length) return <p className="text-xs text-slate-500">No changes recorded.</p>;
 
   return (
@@ -411,6 +424,10 @@ export function ProjectsTab() {
   const [pendingChoice, setPendingChoice] = useState<Record<string, boolean>>({});
   const remove = useMutation({ mutationFn: (name: string) => removeProjectSetUp(name), onSettled: invalidate });
 
+  if (credentials.error && !credentials.data) {
+    return <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} />;
+  }
+
   if (!credentials.isLoading && azure.length === 0) {
     return <p className="text-sm text-slate-500">Add an Azure DevOps connection to choose SOP projects.</p>;
   }
@@ -452,12 +469,19 @@ export function ProjectsTab() {
         </p>
       ) : null}
 
-      {projects.isLoading || setUps.isLoading ? (
+      {projects.error && projects.data ? (
+        <StaleDataBanner credentialId={credentialId} error={projects.error} onRetry={() => void projects.refetch()} isRetrying={projects.isFetching} />
+      ) : null}
+
+      {projects.isLoading || setUps.isLoading || credentials.isLoading ? (
         <p className="flex items-center gap-2 text-sm text-slate-500">
           <Spinner className="size-4" /> Loading projects…
         </p>
-      ) : projects.error || !projects.data ? (
+      ) : !projects.data ? (
         <ErrorCard error={projects.error} credentialId={credentialId} onRetry={() => void projects.refetch()} />
+      ) : setUps.error && !setUps.data ? (
+        // Without the set-ups every project would look "Not set up".
+        <ErrorCard error={setUps.error} onRetry={() => void setUps.refetch()} />
       ) : (
         <Updating active={projects.isPlaceholderData}>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-surface shadow-sm">

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { ErrorCard } from "@/features/azure-devops/components/feedback";
 import { useProjects } from "@/features/azure-devops/hooks/use-projects";
 import { getLastCredential, resolveDefaultProject } from "@/features/azure-devops/utils/last-project";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
@@ -36,6 +37,10 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
         ...(useDraft && allowDraft ? { draft: { scope, content } } : {}),
       }),
   });
+
+  if (credentials.error && !credentials.data) {
+    return <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} />;
+  }
 
   if (!credentials.isLoading && azure.length === 0) {
     return <p className="text-sm text-slate-500">Add an Azure DevOps connection to try rules on a real ticket.</p>;
@@ -76,6 +81,8 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
           <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium text-slate-700 sm:w-56 sm:flex-none">
             Project
             <select className={SELECT_CLASS} value={projectId} onChange={(event) => setChosenProject(event.target.value)}>
+              {projects.isLoading ? <option value="">Loading projects…</option> : null}
+              {projects.error && !projects.data ? <option value="">Projects could not be loaded</option> : null}
               {(projects.data?.projects ?? []).map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}

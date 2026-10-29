@@ -47,10 +47,21 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
   const supportedFields = (Object.keys(FIELD_LABELS) as FieldKey[]).filter((key) => workItem.supportedFields[key]);
 
   const [comment, setComment] = useState("");
-  const [fields, setFields] = useState<Partial<Record<FieldKey, string>>>(() =>
-    Object.fromEntries(supportedFields.map((key) => [key, workItem[key] === null ? "" : String(workItem[key])]))
-  );
+  const current = Object.fromEntries(supportedFields.map((key) => [key, workItem[key] === null ? "" : String(workItem[key])])) as Partial<Record<FieldKey, string>>;
+  const [fields, setFields] = useState<Partial<Record<FieldKey, string>>>(current);
+  /** The ticket's values the inputs were last filled from. */
+  const [seeded, setSeeded] = useState({ rev: workItem.rev, values: current });
   const [state, setState] = useState("");
+
+  // The ticket changed (in Azure, or by an approved change): untouched inputs take the new values, typed ones are kept.
+  if (seeded.rev !== workItem.rev) {
+    setSeeded({ rev: workItem.rev, values: current });
+    setFields(Object.fromEntries(supportedFields.map((key) => [key, fields[key] === seeded.values[key] ? current[key] : fields[key]])));
+
+    if (state !== "" && !workItem.allowedStates.some((candidate) => candidate.name === state && candidate.name !== workItem.state)) {
+      setState("");
+    }
+  }
   const [repositoryId, setRepositoryId] = useState("");
   const [pullRequestId, setPullRequestId] = useState("");
   const repositories = useRepositories(credentialId, workItem.projectName);
@@ -188,7 +199,7 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
             value={repositoryId}
             onChange={(event) => setRepositoryId(event.target.value)}
           >
-            <option value="">{repositories.isLoading ? "Loading..." : "Repository"}</option>
+            <option value="">{repositories.isLoading ? "Loading..." : repositories.error && !repositories.data ? "Repositories could not be loaded" : "Repository"}</option>
             {(repositories.data ?? []).map((repository) => (
               <option key={repository.id} value={repository.id}>
                 {repository.name}

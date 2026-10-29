@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Spinner } from "@/components/ui/spinner";
-import { ErrorCard } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { usePlatforms } from "@/features/credentials/api/platform.api";
 import { PlatformForm } from "@/features/credentials/components/platform-form";
 import { useValidateAiCredential } from "../hooks/use-ai";
@@ -41,10 +41,12 @@ export function AddAiProviderForm({ existing, onDone, onCancel }: { existing: Se
         <p className="flex items-center gap-2 text-sm text-slate-500">
           <Spinner className="size-4" /> Loading providers…
         </p>
-      ) : platforms.error || !platform ? (
+      ) : !platforms.data || !platform ? (
         <ErrorCard error={platforms.error} onRetry={() => void platforms.refetch()} />
       ) : (
         <div className="space-y-6">
+          {/* A failed background refresh keeps the form (and the typed key) on screen. */}
+          {platforms.error ? <StaleDataBanner error={platforms.error} onRetry={() => void platforms.refetch()} isRetrying={platforms.isFetching} /> : null}
           <FormField id="new-ai-provider" label="Provider" hint={platform.description}>
             <select id="new-ai-provider" className={SELECT} value={platform.id} disabled={saving || validate.isPending} onChange={(event) => setChosen(event.target.value)}>
               {providers.map((option) => (

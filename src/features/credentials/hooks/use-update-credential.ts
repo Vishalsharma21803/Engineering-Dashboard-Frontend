@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { azureKeys, triageKeys } from "@/features/azure-devops/api/azure.keys";
 import { updateCredential } from "../api/credential.api";
 import { credentialKeys } from "../api/credential.keys";
 import type {
@@ -18,7 +19,16 @@ export function useUpdateCredential() {
   return useMutation({
     mutationFn: ({ id, input }: UpdateCredentialVariables) =>
       updateCredential(id, input),
-    onSuccess: (credential) => {
+    onSuccess: (credential, { id }) => {
+      // A new PAT or organization can change everything read with it, so
+      // nothing cached under the old one is trusted.
+      void queryClient.invalidateQueries({
+        queryKey: [...azureKeys.all, id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: triageKeys.list(id),
+      });
+
       const current = queryClient.getQueryData<Credential[]>(
         credentialKeys.list
       );

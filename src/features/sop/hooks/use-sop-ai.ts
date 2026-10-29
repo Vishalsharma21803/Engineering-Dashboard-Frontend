@@ -8,6 +8,7 @@ import type { AiCheck } from "../types/sop.types";
 
 const POLL_MS = 3_000;
 const PAUSED_POLL_MS = 60_000;
+const SLOW_AFTER_MS = 15 * 60_000;
 
 /** Waiting out a provider rate limit; it retries by itself at `notBefore`. */
 export function isAiCheckPaused(check: AiCheck | undefined): boolean {
@@ -42,7 +43,9 @@ export function useSopAiReview(credentialId: string, workItem: { id: number; rev
     enabled: configured && id !== null,
     refetchInterval: (query) => {
       const checks = query.state.data ?? [];
-      return checks.some(isAiCheckBusy) ? POLL_MS : checks.some(isAiCheckPaused) ? PAUSED_POLL_MS : false;
+      // Waiting a long time (a long queue, an abandoned run the server re-queues): keep asking, but only once a minute.
+      const recent = checks.filter((check) => Date.now() - new Date(check.updatedAt).getTime() < SLOW_AFTER_MS);
+      return recent.some(isAiCheckBusy) ? POLL_MS : checks.some(isAiCheckBusy) || checks.some(isAiCheckPaused) ? PAUSED_POLL_MS : false;
     },
   });
 
@@ -61,7 +64,8 @@ export function useSopAiReview(credentialId: string, workItem: { id: number; rev
 
   const check = results.data?.find((row) => row.workItemId === id);
   const finished = check?.status === "DONE" ? check.finishedAt : null;
-  const seen = useRef<string | null | undefined>(undefined);
+  /** The ticket and finish time of the review already on screen; a later finish reloads the ticket. */
+  const seen = useRef<{ id: number | null; finished: string | null } | null>(null);
   const reviewed = useRef(onReviewed);
 
   useEffect(() => {
@@ -70,19 +74,27 @@ export function useSopAiReview(credentialId: string, workItem: { id: number; rev
 
   // A review that finishes while the page is open: reload the ticket once (not for the result already there on arrival).
   useEffect(() => {
-    if (results.isFetched && seen.current === undefined) {
-      seen.current = finished;
+    if (!results.isFetched) {
       return;
     }
 
-    if (finished && seen.current !== undefined && finished !== seen.current) {
-      seen.current = finished;
+    if (seen.current === null || seen.current.id !== id) {
+      seen.current = { id, finished };
+      return;
+    }
+
+    if (finished && finished !== seen.current.finished) {
+      seen.current = { id, finished };
       reviewed.current?.();
     }
-  }, [finished, results.isFetched]);
+  }, [id, finished, results.isFetched]);
 
   return {
     configured,
+    /** Saved reviews could not be read (the review itself may still run). */
+    resultsError: results.error ?? preference.error,
+    /** AI settings are still loading: whether AI is set up is not known yet. */
+    settingsLoading: preference.isLoading,
     /** The provider reviews would use now (a paused review may belong to an earlier one). */
     currentProvider: preference.data?.provider ?? null,
     check,

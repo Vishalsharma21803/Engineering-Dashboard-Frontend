@@ -23,6 +23,10 @@ export interface AiReviewProps {
   currentProvider?: string | null;
   /** Asking the server to (re)check failed, e.g. offline or AI settings missing. */
   enqueueError?: unknown;
+  /** The saved review (or the AI settings) could not be loaded. */
+  loadError?: unknown;
+  /** AI settings are still loading. */
+  settingsLoading?: boolean;
   /** Proposes the (edited) draft through the approval flow; without it drafts are read-only. */
   onUseFix?: (result: AiRuleResult, fix: NonNullable<AiRuleResult["fix"]>) => void;
   isProposing?: boolean;
@@ -131,8 +135,22 @@ export function AiRuleReview({ result, onUseFix, isProposing = false, showRule =
  * The AI review's status for one ticket: who reviewed it and when, whether it
  * is running, paused or failed, and a button to review again.
  */
-export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking, currentProvider = null, enqueueError = null, reviewable }: AiReviewProps & { reviewable: boolean }) {
+export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking, currentProvider = null, enqueueError = null, loadError = null, settingsLoading = false, reviewable }: AiReviewProps & { reviewable: boolean }) {
+  const loadAlert = loadError ? (
+    <p role="alert" className="text-sm text-rose-600">
+      Could not load the AI review: {loadError instanceof ApiError ? loadError.message : "the server could not be reached"}.
+    </p>
+  ) : null;
+
+  if (settingsLoading) {
+    return null;
+  }
+
   if (!configured) {
+    if (loadAlert) {
+      return loadAlert;
+    }
+
     return reviewable ? (
       <p className="text-sm text-slate-600">
         An AI review can clear findings written another way and draft fixes.{" "}
@@ -174,6 +192,7 @@ export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking
         </Button>
       </div>
 
+      {loadAlert}
       {enqueueError ? (
         <p role="alert" className="text-sm text-rose-600">
           Could not start the AI review: {enqueueError instanceof ApiError ? enqueueError.message : "the server could not be reached"}.

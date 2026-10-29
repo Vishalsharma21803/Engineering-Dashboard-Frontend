@@ -133,7 +133,7 @@ export function AzureLayout() {
               <p className="hidden text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600 sm:block">Azure DevOps</p>
               <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Developer cockpit</h1>
               <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
-                {credential?.organizationUrl ?? "Loading organization..."}
+                {credential?.organizationUrl ?? (credentials.error ? "Organization could not be loaded" : "Loading organization...")}
                 {project ? ` · ${project.name}` : " · all projects"}
               </p>
             </div>
@@ -150,6 +150,7 @@ export function AzureLayout() {
                 value={credentialId}
                 onChange={(event) => selectCredential(event.target.value)}
               >
+                {credentials.error && !credentials.data ? <option value={credentialId}>Organizations could not be loaded</option> : null}
                 {(credentials.data ?? []).map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
                     {getCredentialDisplayName(candidate)}
@@ -173,7 +174,9 @@ export function AzureLayout() {
                 <option value="" disabled={onProjectPage && !projects.isLoading}>
                   {projects.isLoading
                     ? "Loading projects..."
-                    : onProjectPage
+                    : projects.error && !projects.data
+                      ? "Projects could not be loaded"
+                      : onProjectPage
                       ? "All projects (My work & Approvals only)"
                       : "All projects"}
                 </option>
@@ -186,6 +189,19 @@ export function AzureLayout() {
             </div>
           </div>
         </div>
+
+        {(projects.error && !projects.data) || (credentials.error && !credentials.data) ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:px-5">
+            Could not load your {credentials.error && !credentials.data ? "organizations" : "projects"} from {credentials.error && !credentials.data ? "Cockpit" : "Azure DevOps"}.
+            <button
+              type="button"
+              className="font-medium underline"
+              onClick={() => void (credentials.error ? credentials.refetch() : projects.refetch())}
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
 
         <nav aria-label="Azure DevOps" className="flex gap-1 overflow-x-auto whitespace-nowrap border-t border-slate-200 px-2 sm:px-3">
           <NavLink to={withProject(base)} end className={tabClassName}>
@@ -205,6 +221,10 @@ export function AzureLayout() {
             {pendingCount > 0 ? (
               <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
                 {pendingCount}
+              </span>
+            ) : pending.error && !pending.data ? (
+              <span title="Pending approvals could not be loaded" className="inline-flex min-w-5 items-center justify-center rounded-full bg-slate-300 px-1.5 text-xs font-semibold text-slate-700">
+                ?<span className="sr-only"> pending approvals could not be loaded</span>
               </span>
             ) : null}
           </NavLink>

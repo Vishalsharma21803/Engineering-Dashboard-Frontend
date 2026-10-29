@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/page-loader";
+import { StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { ApiError } from "@/lib/api-client";
 import { applyApiError } from "@/lib/form-errors";
 import { CredentialForm } from "../components/credential-form";
@@ -51,7 +52,9 @@ export function EditCredentialPage() {
     );
   }
 
-  if (isError) {
+  // Only a failed first load replaces the page; a failed background
+  // refresh keeps the form and what was typed into it.
+  if (isError && !credentials) {
     return (
       <section className="mx-auto w-full max-w-2xl">
         <Card className="p-6">
@@ -243,6 +246,10 @@ export function EditCredentialPage() {
           or recovered.
         </p>
       </div>
+
+      {isError ? (
+        <StaleDataBanner error={error} onRetry={() => void refetch()} isRetrying={isFetching} />
+      ) : null}
 
       <Card className="p-6 sm:p-8">
         <CredentialForm

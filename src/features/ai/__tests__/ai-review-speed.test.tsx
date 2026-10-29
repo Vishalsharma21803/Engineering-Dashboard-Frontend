@@ -15,6 +15,14 @@ describe("AiReviewSpeed", () => {
     expect(screen.getByText(/This model is slow for ticket reviews/)).toBeInTheDocument();
   });
 
+  it("says the review speed could not be loaded instead of showing nothing", async () => {
+    mockBackend([{ path: "/api/ai/sop-check-timing", status: 500, body: { message: "Database unavailable" } }]);
+    renderWithProviders(<AiReviewSpeed provider="OPENROUTER" model="free/model" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Review speed could not be loaded.");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
   it("shows nothing for a model with no reviews yet", async () => {
     mockBackend(timing([{ provider: "CLAUDE", model: "other", checks: 3, averageSeconds: 8, maxSeconds: 12, rateLimited: 0, failed: 0 }]));
     const { container } = renderWithProviders(<AiReviewSpeed provider="CLAUDE" model="claude-sonnet-5-5" />);

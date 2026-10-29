@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Updating } from "@/components/ui/updating";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
-import { EmptyState, ErrorCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
@@ -45,7 +45,8 @@ export function UnlinkedTab({ connection, onPropose, isProposing, today }: { con
   const to = today;
   const from = shiftDay(to, -13);
   const pageParam = usePageParam("unlinkedPage");
-  const timeZone = useSolidtimeTimeZone(connection.credentialId) ?? "UTC";
+  // Without my Solidtime time zone, the browser's is used, as for "today" on the Time page.
+  const timeZone = useSolidtimeTimeZone(connection.credentialId) ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const list = useQuery({
     queryKey: [...solidtimeKeys.unlinked(connection.credentialId), { from, to, page: pageParam.page }],
     queryFn: () => getUnlinked(connection.credentialId, { from, to, page: pageParam.page }),
@@ -55,10 +56,11 @@ export function UnlinkedTab({ connection, onPropose, isProposing, today }: { con
   useSyncServedPage(pageParam, list.data && !list.isPlaceholderData ? list.data.page : undefined);
 
   if (list.isLoading) return <SkeletonRows rows={3} />;
-  if (list.error || !list.data) return <ErrorCard error={list.error} onRetry={() => void list.refetch()} />;
+  if (!list.data) return <ErrorCard error={list.error} onRetry={() => void list.refetch()} isRetrying={list.isFetching} />;
 
   return (
     <div className="flex flex-col gap-3">
+      {list.error ? <StaleDataBanner error={list.error} onRetry={() => void list.refetch()} isRetrying={list.isFetching} /> : null}
       <p className="text-sm text-slate-600">
         Your entries from {formatDayLabel(from, { day: "numeric", month: "short" })} to {formatDayLabel(to, { day: "numeric", month: "short" })} that name no ticket. Add the ticket number (e.g. #21786) so the time counts for it.
       </p>

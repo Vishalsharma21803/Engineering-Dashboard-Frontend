@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ErrorCard, SectionCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, SectionCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { getTicketTime } from "../api/solidtime.api";
@@ -26,7 +26,8 @@ interface TicketTimePanelProps {
  * with the offer to update Azure from it through approval.
  */
 export function TicketTimePanel({ azureCredentialId, ticket, onPropose, isProposing }: TicketTimePanelProps) {
-  const { connection, isLoading } = useLinkedSolidtime(azureCredentialId);
+  const linked = useLinkedSolidtime(azureCredentialId);
+  const { connection, isLoading } = linked;
   const [checked, setChecked] = useState(false);
   const time = useQuery({
     queryKey: solidtimeKeys.ticketTime(connection?.credentialId ?? "", ticket.id),
@@ -41,6 +42,15 @@ export function TicketTimePanel({ azureCredentialId, ticket, onPropose, isPropos
     return (
       <SectionCard title="Time" description={description}>
         <SkeletonRows rows={2} />
+      </SectionCard>
+    );
+  }
+
+  // Connections that could not be read are unknown, not "not connected".
+  if (!connection && linked.error) {
+    return (
+      <SectionCard title="Time" description={description}>
+        <ErrorCard error={linked.error} onRetry={() => void linked.refetch()} isRetrying={linked.isFetching} />
       </SectionCard>
     );
   }
@@ -76,10 +86,13 @@ export function TicketTimePanel({ azureCredentialId, ticket, onPropose, isPropos
         <p className="text-sm text-slate-600">See how much time is logged on #{ticket.id} in Solidtime and update Azure's Completed Work from it.</p>
       ) : time.isLoading ? (
         <SkeletonRows rows={2} />
-      ) : time.error || !time.data ? (
-        <ErrorCard error={time.error} onRetry={() => void time.refetch()} />
+      ) : !time.data ? (
+        <ErrorCard error={time.error} onRetry={() => void time.refetch()} isRetrying={time.isFetching} />
       ) : (
-        <TicketTimeResult data={time.data} azureCredentialId={azureCredentialId} onPropose={onPropose} isProposing={isProposing} />
+        <div className="flex flex-col gap-3">
+          {time.error ? <StaleDataBanner error={time.error} onRetry={() => void time.refetch()} isRetrying={time.isFetching} /> : null}
+          <TicketTimeResult data={time.data} azureCredentialId={azureCredentialId} onPropose={onPropose} isProposing={isProposing} />
+        </div>
       )}
     </SectionCard>
   );

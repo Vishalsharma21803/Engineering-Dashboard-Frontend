@@ -10,7 +10,7 @@ import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { DeploymentsPanel } from "../components/deployments-panel";
-import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StaleDataBanner, StatTile } from "../components/feedback";
 import { PipelinesPanel } from "../components/pipelines-panel";
 import { PullRequestList } from "../components/pull-request-list";
 import { TeamWorkTable } from "../components/work-item-table";
@@ -56,8 +56,16 @@ function PagedList<T>({
   useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
 
   if (query.isLoading) return <SkeletonRows rows={2} />;
-  if (query.error || !query.data) return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
-  if (query.data.total === 0) return <EmptyState>{empty}</EmptyState>;
+  if (!query.data) return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+  const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
+  if (query.data.total === 0) {
+    return (
+      <>
+        {stale}
+        <EmptyState>{empty}</EmptyState>
+      </>
+    );
+  }
 
   return (
     <>
@@ -169,16 +177,18 @@ export function ProjectOverviewPage() {
   const [searchParams] = useSearchParams();
   const buildParam = Number(searchParams.get("build"));
   const focusBuildId = Number.isInteger(buildParam) && buildParam > 0 ? buildParam : null;
-  const { data: project, isLoading, error, refetch } = useProjectOverview(credentialId, projectId);
+  const { data: project, isLoading, isFetching, error, refetch } = useProjectOverview(credentialId, projectId);
   const review = useActionReview();
 
   if (isLoading) return <SkeletonRows rows={5} />;
-  if (error || !project) {
+  if (!project) {
     return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    // Keyed on the project: lists, filters and open panels of another project must not carry over.
+    <div key={project.id} className="flex flex-col gap-6">
+      {error ? <StaleDataBanner credentialId={credentialId} error={error} onRetry={() => void refetch()} isRetrying={isFetching} /> : null}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{project.name}</h2>

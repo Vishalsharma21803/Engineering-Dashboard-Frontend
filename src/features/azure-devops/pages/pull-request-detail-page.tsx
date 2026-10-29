@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 
-import { EmptyState, ErrorCard, SectionCard, SectionView, SkeletonRows } from "../components/feedback";
+import { EmptyState, ErrorCard, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
 import { StatusBadge } from "../components/status-badge";
 import { usePullRequest } from "../hooks/use-pull-requests";
 import { formatRelative } from "../utils/format";
@@ -8,10 +8,15 @@ import { VOTE_LABELS } from "../utils/labels";
 
 export function PullRequestDetailPage() {
   const { credentialId = "", projectId = "", repositoryId = "", pullRequestId = "" } = useParams();
-  const { data: pr, isLoading, error, refetch } = usePullRequest(credentialId, projectId, repositoryId, Number(pullRequestId));
+  const id = Number(pullRequestId);
+  const { data: pr, isLoading, isFetching, error, refetch } = usePullRequest(credentialId, projectId, repositoryId, id);
+
+  if (!Number.isInteger(id) || id <= 0) {
+    return <EmptyState>“{pullRequestId}” is not a pull request number.</EmptyState>;
+  }
 
   if (isLoading) return <SkeletonRows rows={5} />;
-  if (error || !pr) {
+  if (!pr) {
     return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
   }
 
@@ -19,6 +24,7 @@ export function PullRequestDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {error ? <StaleDataBanner credentialId={credentialId} error={error} onRetry={() => void refetch()} isRetrying={isFetching} /> : null}
       <div>
         <p className="break-words text-sm text-slate-500">
           {pr.projectName} · {pr.repositoryName} · {pr.sourceBranch} → {pr.targetBranch} · by {pr.createdBy.displayName}{" "}

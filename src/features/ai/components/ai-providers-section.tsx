@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useAiCredentials } from "../hooks/use-ai";
 import type { AiProvider } from "../types/ai.types";
@@ -37,7 +37,7 @@ export function AiProvidersSection() {
           </p>
         </div>
         {!adding ? (
-          <Button size="sm" variant="secondary" disabled={allAdded || credentials.isLoading} title={allAdded ? "Every provider already has a key" : undefined} onClick={() => setAdding(true)}>
+          <Button size="sm" variant="secondary" disabled={allAdded || !credentials.data} title={allAdded ? "Every provider already has a key" : undefined} onClick={() => setAdding(true)}>
             + Add AI provider
           </Button>
         ) : null}
@@ -54,8 +54,15 @@ export function AiProvidersSection() {
         />
       ) : null}
 
+      {credentials.error && credentials.data ? (
+        <StaleDataBanner error={credentials.error} onRetry={() => void credentials.refetch()} isRetrying={credentials.isFetching} />
+      ) : null}
+
       {credentials.isLoading ? (
         <SkeletonRows rows={2} />
+      ) : !credentials.data ? (
+        // Unknown is not "none": a failed load never claims there is no provider yet.
+        <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} isRetrying={credentials.isFetching} />
       ) : saved.length === 0 ? (
         !adding ? (
           <p className="rounded-xl border border-dashed border-slate-300 bg-surface px-4 py-6 text-center text-sm text-slate-600">

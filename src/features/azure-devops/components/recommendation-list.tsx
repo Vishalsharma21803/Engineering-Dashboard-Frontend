@@ -19,7 +19,7 @@ import { CATEGORY_LABELS, actionKindLabel } from "../utils/labels";
 import { pluralizeText } from "../utils/format";
 import { movedByPendingMark } from "../utils/triage";
 import { retryUnlessClientError } from "../utils/query-retry";
-import { EmptyState, ErrorCard, SkeletonRows } from "./feedback";
+import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "./feedback";
 import { StatusBadge } from "./status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
 import { PriorityBadge, WorkItemTypeBadge } from "./work-item-badges";
@@ -94,14 +94,20 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
     return <SkeletonRows rows={4} />;
   }
 
-  if (query.error || !query.data) {
+  if (!query.data) {
     return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
   }
 
+  const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   const data = query.data;
 
   if (data.poolTotal === 0 && data.hiddenCount === 0) {
-    return <EmptyState>Nothing needs your attention right now.</EmptyState>;
+    return (
+      <>
+        {stale}
+        <EmptyState>Nothing needs your attention right now.</EmptyState>
+      </>
+    );
   }
 
   const showHidden = data.showingHidden;
@@ -236,81 +242,84 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
   }
 
   return (
-    <div className="space-y-3">
-      {categories.length > 1 || category || hiddenCount > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {categories.length > 1 || category ? (
-            <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-1.5">
-              {[{ value: "" as const, count: data.poolTotal }, ...categories].map((entry) => (
-                <button
-                  key={entry.value || "all"}
-                  type="button"
-                  aria-pressed={category === entry.value}
-                  onClick={() => choose(entry.value)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
-                    category === entry.value
-                      ? "border-inverse bg-inverse text-on-inverse"
-                      : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                  )}
-                >
-                  {entry.value ? (
-                    <span aria-hidden="true" className={cn("size-2 rounded-full", CATEGORY_BARS[entry.value])} />
-                  ) : null}
-                  {entry.value ? CATEGORY_LABELS[entry.value].label : "All"}
-                  <span className={category === entry.value ? "text-on-inverse/70" : "text-slate-400"}>{entry.count}</span>
-                </button>
-              ))}
-            </div>
+    <>
+      {stale}
+      <div className="space-y-3">
+        {categories.length > 1 || category || hiddenCount > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {categories.length > 1 || category ? (
+              <div role="group" aria-label="Filter by category" className="flex flex-wrap gap-1.5">
+                {[{ value: "" as const, count: data.poolTotal }, ...categories].map((entry) => (
+                  <button
+                    key={entry.value || "all"}
+                    type="button"
+                    aria-pressed={category === entry.value}
+                    onClick={() => choose(entry.value)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition",
+                      category === entry.value
+                        ? "border-inverse bg-inverse text-on-inverse"
+                        : "border-slate-200 bg-surface text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                    )}
+                  >
+                    {entry.value ? (
+                      <span aria-hidden="true" className={cn("size-2 rounded-full", CATEGORY_BARS[entry.value])} />
+                    ) : null}
+                    {entry.value ? CATEGORY_LABELS[entry.value].label : "All"}
+                    <span className={category === entry.value ? "text-on-inverse/70" : "text-slate-400"}>{entry.count}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span />
+            )}
+            <HiddenToggle
+              count={hiddenCount}
+              shown={showHidden}
+              onToggle={() => {
+                setShowHidden(!showHidden);
+                setPage(1, { replace: true });
+              }}
+            />
+          </div>
+        ) : null}
+
+        <Updating active={query.isPlaceholderData}>
+          {showHidden ? (
+            <ol aria-label="Snoozed and abandoned" className="space-y-2">
+              {entries.map((entry) => renderItem(entry, null))}
+            </ol>
           ) : (
-            <span />
+            <>
+              {active.length > 0 ? (
+                <ol className="space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
+              ) : data.activeTotal === 0 ? (
+                <EmptyState>
+                  Nothing needs your attention right now
+                  {data.acknowledgedTotal > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
+                </EmptyState>
+              ) : null}
+
+              {acknowledged.length > 0 ? (
+                <section aria-label="Acknowledged" className="space-y-2 pt-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Acknowledged · {data.acknowledgedTotal}</h3>
+                  <ol className="space-y-2">{acknowledged.map((entry) => renderItem(entry, null))}</ol>
+                </section>
+              ) : null}
+            </>
           )}
-          <HiddenToggle
-            count={hiddenCount}
-            shown={showHidden}
-            onToggle={() => {
-              setShowHidden(!showHidden);
-              setPage(1, { replace: true });
-            }}
-          />
-        </div>
-      ) : null}
 
-      <Updating active={query.isPlaceholderData}>
-        {showHidden ? (
-          <ol aria-label="Snoozed and abandoned" className="space-y-2">
-            {entries.map((entry) => renderItem(entry, null))}
-          </ol>
-        ) : (
-          <>
-            {active.length > 0 ? (
-              <ol className="space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
-            ) : data.activeTotal === 0 ? (
-              <EmptyState>
-                Nothing needs your attention right now
-                {data.acknowledgedTotal > 0 || hiddenCount > 0 ? " — everything left is acknowledged, snoozed or abandoned." : "."}
-              </EmptyState>
-            ) : null}
-
-            {acknowledged.length > 0 ? (
-              <section aria-label="Acknowledged" className="space-y-2 pt-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Acknowledged · {data.acknowledgedTotal}</h3>
-                <ol className="space-y-2">{acknowledged.map((entry) => renderItem(entry, null))}</ol>
-              </section>
-            ) : null}
-          </>
-        )}
-
-      </Updating>
-      <Pagination
-        label="Prioritized action pages"
-        page={data.page}
-        totalPages={data.totalPages}
-        total={data.total}
-        pageSize={data.pageSize}
-        disabled={query.isFetching}
-        onChange={(next) => setPage(next)}
-      />
-    </div>
+        </Updating>
+        <Pagination
+          label="Prioritized action pages"
+          page={data.page}
+          totalPages={data.totalPages}
+          total={data.total}
+          pageSize={data.pageSize}
+          disabled={query.isFetching}
+          onChange={(next) => setPage(next)}
+        />
+      </div>
+    </>
   );
 }

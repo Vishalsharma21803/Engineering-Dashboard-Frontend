@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { cn } from "@/utils/cn";
 import { useAiCredentials, useAiModels, useAiPreference, useAiUsage, useUpdateAiPreference } from "../hooks/use-ai";
 import type { AiEffort, AiPreference, AiProvider } from "../types/ai.types";
@@ -27,7 +28,7 @@ export function AiSettingsCard() {
   const credentials = useAiCredentials();
   const preference = useAiPreference();
 
-  if (preference.isLoading || credentials.isLoading || !preference.data) {
+  if (preference.isLoading || credentials.isLoading) {
     return (
       <Card className="flex items-center gap-2 p-5 text-sm text-slate-500">
         <Spinner className="size-4" /> Loading AI settings…
@@ -35,8 +36,18 @@ export function AiSettingsCard() {
     );
   }
 
-  // Re-mount the form whenever the saved settings change so it starts from them.
-  return <AiSettingsForm key={preference.data.updatedAt ?? "unsaved"} initial={preference.data} />;
+  if (!preference.data) {
+    return <ErrorCard error={preference.error} onRetry={() => void preference.refetch()} isRetrying={preference.isFetching} />;
+  }
+
+  return (
+    <>
+      {/* A failed background refresh keeps the form (and unsaved changes) on screen. */}
+      {preference.error ? <StaleDataBanner error={preference.error} onRetry={() => void preference.refetch()} isRetrying={preference.isFetching} /> : null}
+      {/* Re-mount the form whenever the saved settings change so it starts from them. */}
+      <AiSettingsForm key={preference.data.updatedAt ?? "unsaved"} initial={preference.data} />
+    </>
+  );
 }
 
 function AiSettingsForm({ initial }: { initial: AiPreference }) {
@@ -53,6 +64,10 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
   const models = useAiModels(provider);
 
   const providersWithKeys = (credentials.data ?? []).map((credential) => credential.provider);
+  /** The saved keys could not be read, so which providers have one is unknown (not "none"). */
+  const keysUnknown = credentials.isError && !credentials.data;
+  /** Usage could not be read: show that, not figures that look like nothing was spent. */
+  const usageUnknown = usage.isError && !usage.data;
   const selectedModel = useMemo(
     () => (models.data ?? []).find((option) => option.id === model) ?? null,
     [models.data, model]
@@ -123,29 +138,38 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
         )}
       </div>
 
-      <dl aria-label="AI usage" className="grid border-y border-slate-200 bg-slate-50 sm:grid-cols-3">
-        <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Spent today</dt>
-          <dd className="mt-1">
-            <span className="text-lg font-semibold text-slate-950">{usage.data ? formatUsd(usage.data.todayUsd) : "—"}</span>
-            <span className="text-sm text-slate-500"> of {formatUsd(initial.dailyLimitUsd)}</span>
-            <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
-              <span className={cn("block h-full rounded-full", spentShare >= 1 ? "bg-rose-500" : spentShare >= 0.8 ? "bg-amber-500" : "bg-indigo-500")} style={{ width: `${spentShare * 100}%` }} />
-            </span>
-          </dd>
-        </div>
-        <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Calls today</dt>
-          <dd className="mt-1 text-lg font-semibold text-slate-950">{usage.data ? usage.data.callsToday : "—"}</dd>
-        </div>
-        <div className="px-5 py-3">
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">This month</dt>
-          <dd className="mt-1 text-lg font-semibold text-slate-950">
-            {usage.data ? formatUsd(usage.data.monthUsd) : "—"}
-            <span className="block text-xs font-normal text-slate-500">Daily total resets at 00:00 UTC</span>
-          </dd>
-        </div>
-      </dl>
+      {usageUnknown ? (
+        <p role="alert" className="flex flex-wrap items-center gap-2 border-y border-slate-200 bg-slate-50 px-5 py-3 text-sm text-rose-600">
+          AI usage could not be loaded.
+          <Button size="sm" variant="ghost" disabled={usage.isFetching} onClick={() => void usage.refetch()}>
+            {usage.isFetching ? "Retrying..." : "Retry"}
+          </Button>
+        </p>
+      ) : (
+        <dl aria-label="AI usage" className="grid border-y border-slate-200 bg-slate-50 sm:grid-cols-3">
+          <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Spent today</dt>
+            <dd className="mt-1">
+              <span className="text-lg font-semibold text-slate-950">{usage.data ? formatUsd(usage.data.todayUsd) : "—"}</span>
+              <span className="text-sm text-slate-500"> of {formatUsd(initial.dailyLimitUsd)}</span>
+              <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                <span className={cn("block h-full rounded-full", spentShare >= 1 ? "bg-rose-500" : spentShare >= 0.8 ? "bg-amber-500" : "bg-indigo-500")} style={{ width: `${spentShare * 100}%` }} />
+              </span>
+            </dd>
+          </div>
+          <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Calls today</dt>
+            <dd className="mt-1 text-lg font-semibold text-slate-950">{usage.data ? usage.data.callsToday : "—"}</dd>
+          </div>
+          <div className="px-5 py-3">
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">This month</dt>
+            <dd className="mt-1 text-lg font-semibold text-slate-950">
+              {usage.data ? formatUsd(usage.data.monthUsd) : "—"}
+              <span className="block text-xs font-normal text-slate-500">Daily total resets at 00:00 UTC</span>
+            </dd>
+          </div>
+        </dl>
+      )}
       <AiReviewSpeed provider={initial.provider} model={initial.model} />
 
       <form onSubmit={submit}>
@@ -171,11 +195,20 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
                   {(["CLAUDE", "OPENROUTER", "OPENCODE"] as const).map((option) => (
                     <option key={option} value={option} disabled={!providersWithKeys.includes(option)}>
                       {PROVIDER_INFO[option].name}
-                      {providersWithKeys.includes(option) ? "" : " (add a key first)"}
+                      {providersWithKeys.includes(option) ? "" : keysUnknown ? " (keys not loaded)" : " (add a key first)"}
                     </option>
                   ))}
                 </select>
-                {providersWithKeys.length === 0 ? <p className="text-xs text-slate-500">Add an AI provider key above to turn AI checks on.</p> : null}
+                {keysUnknown ? (
+                  <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
+                    Your AI keys could not be loaded.
+                    <Button size="sm" variant="ghost" disabled={credentials.isFetching} onClick={() => void credentials.refetch()}>
+                      {credentials.isFetching ? "Retrying..." : "Retry"}
+                    </Button>
+                  </p>
+                ) : providersWithKeys.length === 0 ? (
+                  <p className="text-xs text-slate-500">Add an AI provider key above to turn AI checks on.</p>
+                ) : null}
               </div>
 
               <div className="space-y-1.5">

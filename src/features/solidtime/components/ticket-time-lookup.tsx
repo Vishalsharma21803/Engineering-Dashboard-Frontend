@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/utils/cn";
-import { ErrorCard, SkeletonRows } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { getTicketTime } from "../api/solidtime.api";
@@ -52,10 +52,11 @@ export function TicketTimeLookup({ connection, onPropose, isProposing }: { conne
 
       {ticketId === null ? null : time.isLoading ? (
         <SkeletonRows rows={2} />
-      ) : time.error || !time.data ? (
-        <ErrorCard error={time.error} onRetry={() => void time.refetch()} />
+      ) : !time.data ? (
+        <ErrorCard error={time.error} onRetry={() => void time.refetch()} isRetrying={time.isFetching} />
       ) : (
         <div className="flex flex-col gap-3">
+          {time.error ? <StaleDataBanner error={time.error} onRetry={() => void time.refetch()} isRetrying={time.isFetching} /> : null}
           <p className="font-medium text-slate-950">
             {ticket && connection.azureCredentialId ? (
               <Link

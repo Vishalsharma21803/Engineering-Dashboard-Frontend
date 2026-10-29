@@ -82,8 +82,9 @@ export async function getTicketTimes(credentialId: string, ids: number[]) {
   return (await apiRequest<{ times: TicketTime[] }>(read(credentialId, `/ticket-times?ids=${ids.join(",")}`))).times;
 }
 
-export async function getDraft(credentialId: string, day: string) {
-  return (await apiRequest<{ draft: DayDraft }>(read(credentialId, `/draft?day=${day}`))).draft;
+/** `refresh` asks the backend to read Azure DevOps and Solidtime fresh instead of from its cache. */
+export async function getDraft(credentialId: string, day: string, options: { refresh?: boolean } = {}) {
+  return (await apiRequest<{ draft: DayDraft }>(read(credentialId, `/draft?day=${day}${options.refresh ? "&refresh=true" : ""}`))).draft;
 }
 
 /** Asks the user's AI model for hours on drafted rows. Writes nothing; spends AI credit. */

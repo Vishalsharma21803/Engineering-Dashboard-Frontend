@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Spinner } from "@/components/ui/spinner";
-import { ErrorCard } from "@/features/azure-devops/components/feedback";
+import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { usePlatforms, type ConnectResult } from "../api/platform.api";
 import { PlatformForm } from "../components/platform-form";
 
@@ -61,10 +61,12 @@ export function CreateCredentialPage() {
           <p className="flex items-center gap-2 text-sm text-slate-500">
             <Spinner className="size-4" /> Loading platforms…
           </p>
-        ) : platforms.error || !platform ? (
+        ) : !platforms.data || !platform ? (
           <ErrorCard error={platforms.error} onRetry={() => void platforms.refetch()} />
         ) : (
           <>
+            {/* A failed background refresh keeps the form (and what was typed) on screen. */}
+            {platforms.error ? <StaleDataBanner error={platforms.error} onRetry={() => void platforms.refetch()} isRetrying={platforms.isFetching} /> : null}
             <FormField id="platform" label="Platform" hint={platform.description}>
               <select id="platform" className={SELECT} value={platform.id} disabled={saving} onChange={(event) => setSearchParams({ platform: event.target.value }, { replace: true })}>
                 {integrations.map((option) => (

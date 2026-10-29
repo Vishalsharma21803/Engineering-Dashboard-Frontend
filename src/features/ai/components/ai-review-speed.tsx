@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useSopCheckTiming } from "../hooks/use-ai";
 import type { AiProvider } from "../types/ai.types";
 
@@ -12,6 +13,20 @@ const SLOW_SECONDS = 30;
 export function AiReviewSpeed({ provider, model }: { provider: AiProvider | null; model: string | null }) {
   const timing = useSopCheckTiming();
   const stats = timing.data?.models.find((entry) => entry.provider === provider && entry.model === model);
+
+  // A failed read is not "no reviews yet": say so instead of showing nothing.
+  if (model && timing.isError && !timing.data) {
+    return (
+      <div className="border-b border-slate-200 px-5 py-3 text-sm" aria-label="AI review speed">
+        <p role="alert" className="flex flex-wrap items-center gap-2 text-rose-600">
+          Review speed could not be loaded.
+          <Button size="sm" variant="ghost" disabled={timing.isFetching} onClick={() => void timing.refetch()}>
+            {timing.isFetching ? "Retrying..." : "Retry"}
+          </Button>
+        </p>
+      </div>
+    );
+  }
 
   if (!model || !stats || (stats.checks === 0 && stats.rateLimited === 0)) {
     return null;

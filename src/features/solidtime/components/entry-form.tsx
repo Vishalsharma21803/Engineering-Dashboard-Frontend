@@ -6,6 +6,7 @@ import type { ProposeActionInput } from "@/features/azure-devops/types/action.ty
 import { useCatalog } from "../hooks/use-solidtime";
 import type { SolidtimeConnection, TimesheetEntry } from "../types/solidtime.types";
 import { fromLocalInput, fromZonedInput, toLocalInput, toZonedInput } from "../utils/time";
+import { LoadErrorNotice } from "./load-error-notice";
 
 const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm";
 
@@ -103,6 +104,11 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
           ))}
         </select>
       </label>
+      {catalog.isError && !catalog.data ? (
+        <div className="sm:col-span-2">
+          <LoadErrorNotice what="Projects and tasks" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} />
+        </div>
+      ) : null}
       <label className="flex flex-col gap-1 text-sm text-slate-700">
         Start
         <Input type="datetime-local" value={start} onChange={(event) => setStart(event.target.value)} />

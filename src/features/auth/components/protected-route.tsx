@@ -6,9 +6,11 @@ import {
 
 import { PageLoader } from "@/components/ui/page-loader";
 import { useAuth } from "../hooks/use-auth";
+import { ServerUnavailable } from "./server-unavailable";
 
 export function ProtectedRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, error, retry, isRetrying } =
+    useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -16,6 +18,16 @@ export function ProtectedRoute() {
       <PageLoader
         label="Checking your session..."
         fullScreen={false}
+      />
+    );
+  }
+
+  // Only a 401 signs out; a failed check keeps the user here with a retry.
+  if (!isAuthenticated && error && retry) {
+    return (
+      <ServerUnavailable
+        onRetry={retry}
+        isRetrying={isRetrying ?? false}
       />
     );
   }

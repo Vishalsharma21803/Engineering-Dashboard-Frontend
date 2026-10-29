@@ -15,6 +15,8 @@ export function useProjects(credentialId: string) {
     queryFn: () => listProjects(credentialId),
     retry: retryUnlessClientError,
     staleTime: 5 * 60_000,
+    // No organization chosen yet (e.g. while credentials load): nothing to ask for.
+    enabled: credentialId !== "",
   });
 }
 

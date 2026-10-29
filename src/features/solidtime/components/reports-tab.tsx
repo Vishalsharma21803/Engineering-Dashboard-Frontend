@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { Updating } from "@/components/ui/updating";
-import { EmptyState, ErrorCard, SkeletonRows, StatTile } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner, StatTile } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { Page } from "@/features/azure-devops/types/azure.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
@@ -145,10 +145,12 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
   const typePage = usePageParam("typePage");
   const ticketPage = usePageParam("accuracyTicketPage");
   const updateParams = useSearchParamsUpdate();
+  /** A typed range can end before it starts; it is not read, and nothing from another range is shown under it. */
+  const rangeValid = from <= to;
   const accuracy = useQuery({
     queryKey: [...solidtimeKeys.accuracy(connection.credentialId), { from, to, personPage: personPage.page, typePage: typePage.page, ticketPage: ticketPage.page }],
     queryFn: () => getAccuracy(connection.credentialId, { from, to, personPage: personPage.page, typePage: typePage.page, ticketPage: ticketPage.page }),
-    enabled: from <= to,
+    enabled: rangeValid,
     placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
   });
@@ -220,10 +222,16 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
           </div>
         </Card>
 
-        {accuracy.isLoading ? (
+        {rangeValid && accuracy.error && data ? <StaleDataBanner error={accuracy.error} onRetry={() => void accuracy.refetch()} isRetrying={accuracy.isFetching} /> : null}
+
+        {!rangeValid ? (
+          <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            The start date ({formatDayLabel(from, { day: "numeric", month: "short", year: "numeric" })}) is after the end date ({formatDayLabel(to, { day: "numeric", month: "short", year: "numeric" })}). Choose a start on or before the end.
+          </p>
+        ) : accuracy.isLoading ? (
           <SkeletonRows rows={3} />
-        ) : accuracy.error || !data ? (
-          <ErrorCard error={accuracy.error} onRetry={() => void accuracy.refetch()} />
+        ) : !data ? (
+          <ErrorCard error={accuracy.error} onRetry={() => void accuracy.refetch()} isRetrying={accuracy.isFetching} />
         ) : data.totals.tickets === 0 ? (
           <EmptyState>
             No tracked tickets with an Azure estimate between {formatDayLabel(from, { day: "numeric", month: "short" })} and {formatDayLabel(to, { day: "numeric", month: "short" })}.

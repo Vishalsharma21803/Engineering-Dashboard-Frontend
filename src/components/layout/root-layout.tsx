@@ -21,7 +21,7 @@ const navLinkClassName = ({
   );
 
 export function RootLayout() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, error } = useAuth();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -68,7 +68,8 @@ export function RootLayout() {
               <Spinner className="size-4 text-slate-400" />
             ) : user ? (
               <UserMenu />
-            ) : (
+            ) : error ? null : (
+              // The server is unreachable: whether the user is signed in is unknown, so no sign-in links.
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"

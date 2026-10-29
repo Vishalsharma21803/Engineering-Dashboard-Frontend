@@ -2,8 +2,9 @@ import { Link, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { Spinner } from "@/components/ui/spinner";
 import { ActionReviewDialog } from "../components/action-review-dialog";
-import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows } from "../components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
 import { StatusBadge } from "../components/status-badge";
 import {
   PriorityBadge,
@@ -58,14 +59,18 @@ function Field({ label, value, hours = false, optional = false }: { label: strin
 export function WorkItemDetailPage() {
   const { credentialId = "", projectId = "", workItemId = "" } = useParams();
   const id = Number(workItemId);
-  const { data: workItem, isLoading, error, refetch } = useWorkItem(credentialId, projectId, id);
+  const { data: workItem, isLoading, isFetching, error, refetch } = useWorkItem(credentialId, projectId, id);
   const review = useActionReview();
   // Opening a ticket asks the AI to review it (skipped when the saved review is up to date).
   // A finished review reloads the ticket, whose SOP result then includes the AI's clears.
   const ai = useSopAiReview(credentialId, workItem ? { id: workItem.id, rev: workItem.rev } : undefined, () => void refetch());
 
+  if (!Number.isInteger(id) || id <= 0) {
+    return <EmptyState>“{workItemId}” is not a ticket number.</EmptyState>;
+  }
+
   if (isLoading) return <SkeletonRows rows={5} />;
-  if (error || !workItem) {
+  if (!workItem) {
     return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
   }
 
@@ -73,6 +78,7 @@ export function WorkItemDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {error ? <StaleDataBanner credentialId={credentialId} error={error} onRetry={() => void refetch()} isRetrying={isFetching} /> : null}
       <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-surface p-5 pl-6 shadow-sm">
         <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", workItemTypeStyle(workItem.type).bar)} />
         <nav aria-label="Breadcrumb" className="text-sm text-slate-500">
@@ -93,6 +99,10 @@ export function WorkItemDetailPage() {
           <WorkItemStateBadge state={workItem.state} category={workItem.stateCategory} />
           <PriorityBadge priority={workItem.priority} />
           <span className="text-xs text-slate-500">changed {formatRelative(workItem.changedDate)}</span>
+          <Button size="sm" variant="ghost" onClick={() => void refetch()} disabled={isFetching} title="Read this ticket again from Azure DevOps">
+            {isFetching ? <Spinner className="size-3.5" /> : null}
+            {isFetching ? "Updating…" : "Refresh"}
+          </Button>
           {workItem.blocked ? <StatusBadge tone="danger">Blocked</StatusBadge> : null}
           {workItem.tags.map((tag) => (
             <StatusBadge key={tag} tone="neutral" dot={false}>
@@ -126,6 +136,8 @@ export function WorkItemDetailPage() {
             isRechecking: ai.isRechecking,
             currentProvider: ai.currentProvider,
             enqueueError: ai.enqueueError,
+            loadError: ai.resultsError,
+            settingsLoading: ai.settingsLoading,
             isProposing: review.isProposing,
             onUseFix: (_result, fix) =>
               review.propose({
@@ -171,6 +183,8 @@ export function WorkItemDetailPage() {
       <div id="propose-change" className="scroll-mt-24">
         <SectionCard title="Propose a change" description="Nothing is written to Azure DevOps until you approve it in the review dialog.">
           <WorkItemActions
+            // Another ticket starts a fresh form; a new revision of this one updates it without losing typed text.
+            key={workItem.id}
             credentialId={credentialId}
             workItem={workItem}
             isProposing={review.isProposing}

@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useLinkedSolidtime } from "@/features/solidtime/hooks/use-solidtime";
 import { ActionReviewDialog } from "../components/action-review-dialog";
-import { ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
+import { ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StaleDataBanner, StatTile } from "../components/feedback";
 import { PipelineRunList } from "../components/pipeline-run-list";
 import { PullRequestList } from "../components/pull-request-list";
 import { RecommendationList } from "../components/recommendation-list";
@@ -38,7 +38,8 @@ export function DashboardPage() {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("project") ?? undefined;
   const { data: dashboard, isLoading, error, refetch, refresh, isRefreshing } = useDashboard(credentialId, projectId);
-  const pendingActions = useActions({ status: "PENDING" });
+  // The same count as the organization's "Approvals" badge.
+  const pendingActions = useActions({ status: "PENDING", credentialId });
   const review = useActionReview();
   const triage = useDashboardTriage(credentialId, dashboard);
   const linkedTime = useLinkedSolidtime(credentialId);
@@ -68,9 +69,20 @@ export function DashboardPage() {
     return <SkeletonRows rows={6} />;
   }
 
-  if (error || !dashboard) {
+  if (!dashboard) {
     return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
   }
+
+  // Sections that could not be read: the lists and counts below would otherwise look complete.
+  const failedSections = (
+    [
+      ["your work items", dashboard.sections.workItems],
+      ["SOP checks", dashboard.sections.compliance],
+      ["pull requests", dashboard.sections.pullRequests],
+      ["pipelines", dashboard.sections.pipelines],
+    ] as const
+    // "forbidden" (the PAT lacks a scope) is explained in its own section; this is for reads that failed.
+  ).filter(([, section]) => section.status === "error");
 
   // Counts leave out snoozed and abandoned items; acknowledged ones are still on the list.
   const hidden = (itemKey: string | null, projectName: string | null) =>
@@ -90,7 +102,7 @@ export function DashboardPage() {
     (build) => build.status === "completed" && build.result === "failed"
   );
   const failedBuilds = failed.filter((build) => !hidden(pipelineKey(build), build.projectName)).length;
-  const pending = pendingActions.data?.total ?? 0;
+  const pending = pendingActions.data ? pendingActions.data.total : "—";
   const names = projectNames(dashboard);
 
   return (
@@ -161,6 +173,15 @@ export function DashboardPage() {
         </div>
       ) : null}
 
+      {error ? <StaleDataBanner credentialId={credentialId} error={error} onRetry={() => void refresh()} isRetrying={isRefreshing} /> : null}
+
+      {failedSections.length > 0 ? (
+        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          Could not read {failedSections.map(([label]) => label).join(", ")} from Azure DevOps, so the counts and prioritized actions below are incomplete.
+          Use “Refresh from Azure” to try again.
+        </p>
+      ) : null}
+
       {dashboard.projectsTruncated ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           Only the first 30 projects are scanned. Choose a project above to narrow the view.
@@ -185,7 +206,7 @@ export function DashboardPage() {
           hint={hiddenHint(failed.length - failedBuilds, "latest run per branch")}
         />
         <Link to={`/azure/${encodeURIComponent(credentialId)}/actions`} className="block rounded-xl transition hover:-translate-y-0.5 hover:shadow-md">
-          <StatTile label="Awaiting approval" value={pending} hint="proposed changes" />
+          <StatTile label="Awaiting approval" value={pending} hint={pendingActions.error && !pendingActions.data ? "could not be loaded" : "proposed changes"} />
         </Link>
       </div>
 

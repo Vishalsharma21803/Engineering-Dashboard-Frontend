@@ -16,7 +16,15 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const queryClient = useQueryClient();
-  const { data: user = null, isLoading } = useQuery({
+  // getCurrentUser resolves to null on a 401; anything else it throws stays
+  // an error here, so a server outage is not mistaken for a sign-out.
+  const {
+    data: user = null,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: authKeys.me,
     queryFn: getCurrentUser,
     retry: false,
@@ -44,8 +52,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user,
       isAuthenticated: user !== null,
       isLoading,
+      error,
+      retry: () => void refetch(),
+      isRetrying: isFetching,
     }),
-    [user, isLoading]
+    [user, isLoading, error, refetch, isFetching]
   );
 
   return (

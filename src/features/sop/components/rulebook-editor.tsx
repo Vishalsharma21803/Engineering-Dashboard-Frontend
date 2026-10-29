@@ -34,6 +34,8 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
   const [note, setNote] = useState("");
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [validating, setValidating] = useState(false);
+  /** The live check could not reach the server (saving still checks the rules). */
+  const [validationFailed, setValidationFailed] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [saveErrors, setSaveErrors] = useState<RuleProblem[]>([]);
   /** Read-only rulebooks open on the readable rule list; editable ones on the editor. */
@@ -50,8 +52,18 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
     const timer = window.setTimeout(() => {
       setValidating(true);
       validateRulebook(scope, content)
-        .then((result) => current && setValidation(result))
-        .catch(() => current && setValidation(null))
+        .then((result) => {
+          if (current) {
+            setValidation(result);
+            setValidationFailed(false);
+          }
+        })
+        .catch(() => {
+          if (current) {
+            setValidation(null);
+            setValidationFailed(true);
+          }
+        })
         .finally(() => current && setValidating(false));
     }, VALIDATE_DELAY_MS);
 
@@ -155,7 +167,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
               value=""
               onChange={(event) => event.target.value && void loadVersion(Number(event.target.value))}
             >
-              <option value="">History…</option>
+              <option value="">{versions.isLoading ? "Loading history…" : versions.error ? "History could not be loaded" : "History…"}</option>
               {(versions.data ?? []).map((version) => (
                 <option key={version.version} value={version.version}>
                   v{version.version}
@@ -289,6 +301,10 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
             ) : problems.length > 0 ? (
               <span className="font-medium text-rose-600">
                 {problems.length} problem{problems.length === 1 ? "" : "s"} to fix before saving
+              </span>
+            ) : validationFailed ? (
+              <span role="alert" className="text-amber-700">
+                Could not check the rules right now; they are checked again when you save.
               </span>
             ) : null}
             {message ? (

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { CredentialAlertTone } from "@/features/credentials/components/credential-alert";
 import { CredentialCardFrame, type CardNotice } from "@/features/credentials/components/credential-card-frame";
@@ -18,6 +19,7 @@ import { listMemberships, updateConnection, validateConnection, type ConnectionC
 import { solidtimeKeys } from "../api/solidtime.keys";
 import { useSolidtimeConnections } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
+import { LoadErrorNotice } from "./load-error-notice";
 
 const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
@@ -152,19 +154,22 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
       </dl>
 
       {connection.organizationId === null ? (
-        <label className="flex max-w-sm flex-col gap-1 text-sm font-medium text-slate-700">
-          Choose the Solidtime organization
-          <select className={SELECT} defaultValue="" onChange={(event) => event.target.value && update.mutate({ organizationId: event.target.value })}>
-            <option value="" disabled>
-              {memberships.isLoading ? "Loading…" : "Choose an organization"}
-            </option>
-            {(memberships.data ?? []).map((membership) => (
-              <option key={membership.organization.id} value={membership.organization.id}>
-                {membership.organization.name} ({membership.role})
+        <div className="flex max-w-sm flex-col gap-1">
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Choose the Solidtime organization
+            <select className={SELECT} defaultValue="" disabled={!memberships.data} onChange={(event) => event.target.value && update.mutate({ organizationId: event.target.value })}>
+              <option value="" disabled>
+                {memberships.isLoading ? "Loading…" : !memberships.data ? "Organizations not loaded" : "Choose an organization"}
               </option>
-            ))}
-          </select>
-        </label>
+              {(memberships.data ?? []).map((membership) => (
+                <option key={membership.organization.id} value={membership.organization.id}>
+                  {membership.organization.name} ({membership.role})
+                </option>
+              ))}
+            </select>
+          </label>
+          {memberships.isError && !memberships.data ? <LoadErrorNotice what="Your Solidtime organizations" onRetry={() => void memberships.refetch()} isRetrying={memberships.isFetching} /> : null}
+        </div>
       ) : null}
 
       <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
@@ -174,6 +179,8 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
             className={SELECT}
             aria-label={`Azure organization for ${name}`}
             value={connection.azureCredentialId ?? ""}
+            // Without the list, the current link cannot be shown; it would read "Not linked".
+            disabled={!azure.data}
             onChange={(event) => update.mutate({ azureCredentialId: event.target.value || null })}
           >
             <option value="">Not linked</option>
@@ -183,6 +190,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
               </option>
             ))}
           </select>
+          {azure.isError && !azure.data ? <LoadErrorNotice what="Azure DevOps organizations" onRetry={() => void azure.refetch()} isRetrying={azure.isFetching} /> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Daily target (hours)
@@ -230,11 +238,16 @@ export function SolidtimeConnectionsSection({ onNotice }: { onNotice: (notice: C
         </p>
       </div>
 
+      {connections.error && connections.data ? <StaleDataBanner error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} /> : null}
+
       {connections.isLoading ? (
         <p className="flex items-center gap-2 text-sm text-slate-500">
           <Spinner className="size-4" /> Loading…
         </p>
-      ) : (connections.data ?? []).length === 0 ? (
+      ) : !connections.data ? (
+        // Unknown is not "none": a failed load never says no account is connected.
+        <ErrorCard error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} />
+      ) : connections.data.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-300 bg-surface px-4 py-6 text-center text-sm text-slate-600">
           No Solidtime account connected.{" "}
           <Link to="/credentials/new?platform=solidtime" className="font-medium text-indigo-700 hover:underline">
@@ -243,7 +256,7 @@ export function SolidtimeConnectionsSection({ onNotice }: { onNotice: (notice: C
         </p>
       ) : (
         <div className="space-y-3">
-          {(connections.data ?? []).map((connection) => (
+          {connections.data.map((connection) => (
             <ConnectionCard key={connection.credentialId} connection={connection} onNotice={onNotice} />
           ))}
         </div>

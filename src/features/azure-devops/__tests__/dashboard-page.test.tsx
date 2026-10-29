@@ -8,9 +8,9 @@ import { CREDENTIAL_ID, dashboard, dashboardListBody, pageOf, pendingAction } fr
 
 const base = `/api/azure/${CREDENTIAL_ID}`;
 
-function setup() {
+function setup(served = dashboard) {
   const calls = mockBackend([
-    { path: `${base}/dashboard`, body: { dashboard } },
+    { path: `${base}/dashboard`, body: { dashboard: served } },
     {
       path: `${base}/my-work`,
       body: {
@@ -66,6 +66,14 @@ describe("DashboardPage", () => {
     for (const call of calls) {
       expect(call.url.startsWith("/api/")).toBe(true);
     }
+  });
+
+  it("says which sections could not be read, so the counts are not taken as complete", async () => {
+    setup({ ...dashboard, sections: { ...dashboard.sections, compliance: { status: "error", data: null, reason: "AZURE_UPSTREAM_ERROR" } } });
+
+    expect(await screen.findByText(/Could not read SOP checks from Azure DevOps/)).toBeInTheDocument();
+    // A missing PAT scope is explained in its own section, not as a failure to retry.
+    expect(screen.getByText(/Could not read SOP checks from Azure DevOps/)).not.toHaveTextContent("pipelines");
   });
 
   it("proposes a recommended action and opens review without executing it", async () => {

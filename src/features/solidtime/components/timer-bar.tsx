@@ -7,6 +7,7 @@ import type { ProposeActionInput } from "@/features/azure-devops/types/action.ty
 import { useCatalog, useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
 import { formatDuration } from "../utils/time";
+import { LoadErrorNotice } from "./load-error-notice";
 
 const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm";
 
@@ -52,8 +53,9 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
   // The timer could not be read: say why, and hold Start (a timer may be running that this page cannot see).
   const readError = timer.error && !timer.data ? (timer.error instanceof ApiError ? timer.error.message : "Solidtime could not be reached.") : null;
 
+  // One block, so the notices stay with the form in the Time page's grid.
   return (
-    <>
+    <div className="flex flex-col gap-2">
       {readError ? (
         <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
           Your Solidtime timer could not be read: {readError}
@@ -88,6 +90,7 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
           Start timer…
         </Button>
       </form>
-    </>
+      {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { Card } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/page-loader";
+import { StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { ApiError } from "@/lib/api-client";
 import { CredentialAlert } from "../components/credential-alert";
 import { CredentialCard } from "../components/credential-card";
@@ -283,9 +284,13 @@ export function CredentialsPage() {
           </h2>
           <p className="mt-1 text-sm text-slate-600">Organizations Cockpit reads your work items, pull requests and pipelines from.</p>
         </div>
+        {isError && credentials ? (
+          // A failed background refresh keeps the last list on screen.
+          <StaleDataBanner error={error} onRetry={() => void refetch()} isRetrying={isFetching} />
+        ) : null}
         {isLoading ? (
           <CredentialsSkeleton />
-        ) : isError ? (
+        ) : isError && !credentials ? (
           <Card className="p-6">
             <h2 className="text-base font-semibold text-slate-950">
               Unable to load credentials

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { Updating } from "@/components/ui/updating";
-import { EmptyState, ErrorCard, SkeletonRows, StatTile } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner, StatTile } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
@@ -212,10 +212,12 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
 
       {editing === "new" ? <EntryForm connection={connection} onPropose={onPropose} isProposing={isProposing} onCancel={() => setEditing(null)} timeZone={sheet.data?.timeZone ?? null} /> : null}
 
+      {sheet.error && sheet.data ? <StaleDataBanner error={sheet.error} onRetry={() => void sheet.refetch()} isRetrying={sheet.isFetching} /> : null}
+
       {sheet.isLoading ? (
         <SkeletonRows rows={4} />
-      ) : sheet.error || !sheet.data ? (
-        <ErrorCard error={sheet.error} onRetry={() => void sheet.refetch()} />
+      ) : !sheet.data ? (
+        <ErrorCard error={sheet.error} onRetry={() => void sheet.refetch()} isRetrying={sheet.isFetching} />
       ) : (
         <Updating active={stale} label={`Loading ${rangeLabel}…`} className="flex flex-col gap-4">
           <div className="flex flex-col gap-4">

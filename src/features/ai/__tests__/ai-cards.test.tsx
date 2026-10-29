@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -183,6 +183,37 @@ describe("AiSettingsCard", () => {
     await userEvent.selectOptions(screen.getByLabelText("Provider"), "");
     expect(save).toBeDisabled();
     expect(calls.some((call) => call.method === "PUT")).toBe(false);
+  });
+
+  it("shows an error with a retry instead of loading forever when the saved settings cannot be read", async () => {
+    mockBackend([
+      { path: "/api/ai/credentials", body: { credentials: [openRouterCredential] } },
+      { path: "/api/ai/preferences", status: 500, body: { message: "Database unavailable" } },
+    ]);
+    renderWithProviders(<AiSettingsCard />);
+
+    const alert = await screen.findByRole("alert");
+    expect(screen.queryByText(/Loading AI settings/)).not.toBeInTheDocument();
+
+    setup();
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Save AI settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("says usage could not be loaded instead of showing empty figures", async () => {
+    mockBackend([
+      { path: "/api/ai/credentials", body: { credentials: [openRouterCredential] } },
+      {
+        path: "/api/ai/preferences",
+        body: { preference: { provider: null, model: null, effort: "MEDIUM", dailyLimitUsd: 2, dataCollectionAcceptedAt: null, updatedAt: null } },
+      },
+      { path: "/api/ai/usage", status: 500, body: { message: "Database unavailable" } },
+    ]);
+    renderWithProviders(<AiSettingsCard />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("AI usage could not be loaded.");
+    expect(screen.queryByLabelText("AI usage")).not.toBeInTheDocument();
   });
 
   it("only offers providers the user has a key for, and shows usage", async () => {
