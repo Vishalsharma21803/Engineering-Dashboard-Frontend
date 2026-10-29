@@ -21,6 +21,8 @@ test("a developer tunes their own rules; the default rules stay read-only", asyn
   await page.getByRole("link", { name: "SOP rules" }).first().click();
   await expect(page.getByRole("heading", { name: "SOP rules" })).toBeVisible();
 
+  // The Markdown editor sits under Advanced, below the rules list.
+  await page.getByText("Advanced: edit as Markdown").click();
   const editor = page.getByLabel("My rules");
   await editor.fill("---\nid: NOPE-01\nseverity: off\n---\n");
   await expect(page.getByText(/no default rule/)).toBeVisible();
@@ -40,15 +42,42 @@ test("a developer tunes their own rules; the default rules stay read-only", asyn
 
   await page.getByRole("tab", { name: "Default rules" }).click();
   await expect(page.getByText("Only SOP owners can change the default rules.", { exact: false })).toBeVisible();
-  // Read-only: it opens on the rule list; the Markdown can be read, not edited.
+  // Read-only: it opens on the rule list; the Markdown (under Advanced) can be read, not edited.
+  await page.getByText("Advanced: view as Markdown").click();
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   await expect(page.getByLabel("Default rulebook")).toHaveAttribute("readonly", "");
+});
+
+test("a developer changes a rule's level and settings from the rules list, and resets it", async ({ page }) => {
+  await register(page, `list-${Date.now()}@example.com`);
+  await page.goto("/sop-rules?tab=personal");
+
+  const row = page.getByRole("listitem").filter({ has: page.getByLabel("Level for STR-08") });
+  await page.getByLabel("Level for STR-08").selectOption("notice");
+  await expect(row).toContainText("yours");
+
+  await row.getByRole("button", { name: "Settings" }).click();
+  await row.getByLabel(/Min steps/).fill("4");
+  await row.getByRole("button", { name: "Save settings" }).click();
+  await expect(row.getByLabel(/Min steps/)).toHaveValue("4");
+
+  // The same change is what the Markdown holds (the list writes the rule file).
+  await page.getByText("Advanced: edit as Markdown").click();
+  const markdown = page.getByLabel("My rules");
+  await expect(markdown).toHaveValue(/id: STR-08\n/);
+  await expect(markdown).toHaveValue(/severity: notice/);
+  await expect(markdown).toHaveValue(/params: \{"min_steps":4\}/);
+
+  await row.getByRole("button", { name: "Reset to default" }).click();
+  await expect(row).not.toContainText("yours");
+  await expect(page.getByLabel("Level for STR-08")).toHaveValue("warn");
 });
 
 test("an SOP owner saves a new default version with a note", async ({ page }) => {
   await register(page, "owner@example.com");
   await page.goto("/sop-rules");
   await page.getByRole("tab", { name: "Default rules" }).click();
+  await page.getByText("Advanced: edit as Markdown").click();
 
   const editor = page.getByLabel("Default rulebook");
   await expect(editor).toHaveValue(/id: STR-03/);
@@ -79,13 +108,15 @@ test("rules are tried on a real ticket and shown on the work item page", async (
 
   // An unsaved personal draft that switches T-01 off is tried on the same ticket.
   await page.goto("/sop-rules");
+  await page.getByText("Advanced: edit as Markdown").click();
   await page.getByLabel("My rules").fill("---\nid: T-01\nseverity: off\n---\n");
   await expect(page.getByText(/✓ Valid/)).toBeVisible();
   await expect(page.getByLabel("Project")).toHaveValue(/aaaaaaaa/);
   await page.getByLabel("Ticket number").fill("102");
   await page.getByRole("button", { name: "Run rules" }).click();
   await expect(page.getByText("#102 Fix flaky test · Task · Active")).toBeVisible();
-  await expect(page.getByText("No SOP gaps found by the code rules.")).toBeVisible();
+  await expect(page.getByText("Nothing needed in this stage.")).toBeVisible();
+  await expect(page.getByText("No original estimate (hours).")).toHaveCount(0);
 
   // The saved rules still flag it.
   await page.getByLabel("Use the rules in the editor (unsaved)").uncheck();
@@ -108,6 +139,7 @@ test("the team SOP report uses the default rules for everyone in the project", a
 
   // A personal override does not change the team report.
   await page.goto("/sop-rules");
+  await page.getByText("Advanced: edit as Markdown").click();
   await page.getByLabel("My rules").fill("---\nid: T-01\nseverity: off\n---\n");
   await expect(page.getByText(/✓ Valid/)).toBeVisible();
   await page.getByRole("button", { name: "Save as new version" }).click();

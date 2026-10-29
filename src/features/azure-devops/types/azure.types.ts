@@ -365,6 +365,8 @@ export interface ComplianceViolation {
   message: string;
   evidence: string[];
   suggestedAction: SuggestedAction | null;
+  /** "earlier": the rule belongs to a stage the ticket has already moved past. */
+  phase: "now" | "earlier";
 }
 
 export interface ComplianceRuleRef {
@@ -385,14 +387,27 @@ export interface ComplianceResult {
   sopProject: "checked" | "not-set-up" | "switched-off";
   /** -1 marks an unsaved draft (rule testing). */
   rulebook: { defaultVersion: number; personalVersion: number };
-  /** SOP gaps: counted in badges, filters and reports. */
+  /** SOP gaps (missed in a stage the ticket moved past, or due now): counted in badges, filters and reports. */
   violations: ComplianceViolation[];
   /** Shown on the ticket only; never counted as gaps. */
   notices: ComplianceViolation[];
+  /** Needed in the ticket's current stage; not gaps yet. */
+  todos: ComplianceViolation[];
   passedRules: ComplianceRuleRef[];
-  pendingRules: Array<ComplianceRuleRef & { message: string }>;
   skippedRules: Array<ComplianceRuleRef & { reason: string }>;
-  aiRules: ComplianceRuleRef[];
+  /** Rules only AI can judge; judged on the ticket page. */
+  aiRules: Array<ComplianceRuleRef & { due: boolean; phase: "now" | "earlier" }>;
+  /** Code findings the user's AI review showed to be met. */
+  cleared: Array<ComplianceRuleRef & { reason: string; quotes: string[] }>;
+  /** The user's last AI review of this ticket (saved; the dashboard never calls the AI). */
+  aiReview: ComplianceAiReview | null;
+}
+
+export interface ComplianceAiReview {
+  status: "QUEUED" | "RUNNING" | "DONE" | "FAILED" | "SKIPPED";
+  checkedAt: string | null;
+  /** The ticket changed since: its clears no longer apply until it is reviewed again. */
+  outdated: boolean;
 }
 
 export type RecommendationCategory =

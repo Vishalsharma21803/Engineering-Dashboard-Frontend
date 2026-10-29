@@ -20,7 +20,7 @@ import type { ActionKind } from "../types/action.types";
 import type { WorkFieldChange } from "../types/azure.types";
 import { formatDateTime, formatRelative, formatValue } from "../utils/format";
 import { SopResultPanel } from "@/features/sop/components/sop-result-panel";
-import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
+import { useSopAiReview } from "@/features/sop/hooks/use-sop-ai";
 import { fixToAction } from "@/features/sop/utils/ai-check";
 import { actionKindLabel } from "../utils/labels";
 
@@ -60,8 +60,9 @@ export function WorkItemDetailPage() {
   const id = Number(workItemId);
   const { data: workItem, isLoading, error, refetch } = useWorkItem(credentialId, projectId, id);
   const review = useActionReview();
-  // Viewing a ticket checks it with AI if it changed since its last check.
-  const ai = useSopAiChecks(credentialId, workItem ? [workItem.id] : [], workItem ? `${workItem.id}:${workItem.rev}` : null);
+  // Opening a ticket asks the AI to review it (skipped when the saved review is up to date).
+  // A finished review reloads the ticket, whose SOP result then includes the AI's clears.
+  const ai = useSopAiReview(credentialId, workItem ? { id: workItem.id, rev: workItem.rev } : undefined, () => void refetch());
 
   if (isLoading) return <SkeletonRows rows={5} />;
   if (error || !workItem) {
@@ -119,8 +120,9 @@ export function WorkItemDetailPage() {
           result={workItem.compliance}
           ai={{
             configured: ai.configured,
-            check: ai.checks.get(workItem.id),
-            onRecheck: () => ai.recheck([workItem.id]),
+            check: ai.check,
+            rev: workItem.rev,
+            onRecheck: ai.recheck,
             isRechecking: ai.isRechecking,
             currentProvider: ai.currentProvider,
             enqueueError: ai.enqueueError,

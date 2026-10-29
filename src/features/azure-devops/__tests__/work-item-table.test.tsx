@@ -61,7 +61,7 @@ function renderMyWork(route: string, page: MyWorkPage) {
   const calls = mockBackend([{ path: "/api/azure/c/my-work", body: { myWork: page } }]);
   renderWithProviders(
     <>
-      <MyWorkTable credentialId="c" projectId={undefined} dashboardToken="t" aiChecks={new Map()} triage={triage} />
+      <MyWorkTable credentialId="c" projectId={undefined} dashboardToken="t" triage={triage} />
       <Location />
     </>,
     { route }

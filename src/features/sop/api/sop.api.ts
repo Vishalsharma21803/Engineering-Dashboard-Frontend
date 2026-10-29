@@ -19,6 +19,7 @@ import type {
   SopTestResult,
   ValidationResult,
 } from "../types/sop.types";
+import type { RuleEditsInput, RulesList } from "../types/rules-list.types";
 
 const BASE: Record<RulebookScope, string> = {
   default: "/api/sop/rulebook",
@@ -141,4 +142,20 @@ export async function listProjectChanges(projectName: string) {
 
 export async function setProjectChecked(projectName: string, checked: boolean) {
   await apiRequest(`/api/sop/projects/${encodeURIComponent(projectName)}/checked`, { method: "PUT", body: { checked } });
+}
+
+/* Rules list: the rules as structured data, and edits to them (saved as a new rulebook version). */
+
+export async function getRulesList() {
+  return apiRequest<RulesList>("/api/sop/rules");
+}
+
+export async function editRules(scope: RulebookScope, input: RuleEditsInput) {
+  const { baseVersion, edits, note } = input;
+  return (
+    await apiRequest<{ rulebook: RulebookContent }>(`${BASE[scope]}/edits`, {
+      method: "POST",
+      body: scope === "default" && note ? { baseVersion, edits, note } : { baseVersion, edits },
+    })
+  ).rulebook;
 }

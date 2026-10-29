@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { Spinner } from "@/components/ui/spinner";
@@ -7,7 +8,8 @@ import { cn } from "@/utils/cn";
 import { ProjectsTab } from "../components/projects-tab";
 import { RuleSummaryTable } from "../components/rule-summary-table";
 import { RulebookEditor } from "../components/rulebook-editor";
-import { useEffectiveRules, useRulebook } from "../hooks/use-sop";
+import { RulesList } from "../components/rules-list";
+import { useEffectiveRules, useRulebook, useRulesList } from "../hooks/use-sop";
 import type { RulebookScope } from "../types/sop.types";
 import { rulebookVersionsLabel } from "../utils/rule-labels";
 
@@ -72,6 +74,81 @@ function EditorTab({ scope, canSave, readOnlyReason }: { scope: RulebookScope; c
   );
 }
 
+const DEFAULT_READ_ONLY = "Only SOP owners can change the default rules.";
+
+/**
+ * "My rules" and "Default rules": the rules list first; the Markdown editor
+ * stays under Advanced (import/export, history, bulk edits) and is only
+ * mounted while open, so the page does not load and validate it unasked.
+ */
+function RulesTab({ scope, isOwner }: { scope: RulebookScope; isOwner: boolean }) {
+  const list = useRulesList();
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // The editor keeps its own copy of the text; a change saved from the list restarts it from the new version.
+  const [editorKey, setEditorKey] = useState(0);
+
+  if (list.isLoading) {
+    return (
+      <p className="flex items-center gap-2 text-sm text-slate-500">
+        <Spinner className="size-4" /> Loading rules…
+      </p>
+    );
+  }
+
+  if (list.error || !list.data) {
+    return <ErrorCard error={list.error} onRetry={() => void list.refetch()} />;
+  }
+
+  const editable = scope === "personal" || list.data.canEditDefaults;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {!editable ? (
+        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{DEFAULT_READ_ONLY}</p>
+      ) : null}
+
+      {scope === "personal" && list.data.issues.length > 0 ? (
+        <ul className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {list.data.issues.map((issue, index) => (
+            <li key={index}>
+              Your rules, {issue.field}: {issue.message} (ignored)
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <RulesList
+        scope={scope}
+        rules={scope === "personal" ? list.data.rules : list.data.defaultRules}
+        checks={list.data.checks}
+        editable={editable}
+        baseVersion={scope === "personal" ? list.data.personalVersion : list.data.defaultVersion}
+        onSaved={() => setEditorKey((key) => key + 1)}
+      />
+
+      <details open={advancedOpen} onToggle={(event) => setAdvancedOpen(event.currentTarget.open)} className="rounded-xl border border-slate-200 bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-medium text-slate-800">
+          Advanced: {scope === "default" && !isOwner ? "view as Markdown" : "edit as Markdown"}
+        </summary>
+        {advancedOpen ? (
+          <div className="mt-4">
+            {scope === "personal" ? (
+              <EditorTab key={editorKey} scope="personal" canSave />
+            ) : (
+              <EditorTab
+                key={editorKey}
+                scope="default"
+                canSave={isOwner}
+                {...(isOwner ? {} : { readOnlyReason: `${DEFAULT_READ_ONLY} Copy a rule id into My rules to adjust it for yourself.` })}
+              />
+            )}
+          </div>
+        ) : null}
+      </details>
+    </div>
+  );
+}
+
 function EffectiveTab() {
   const effective = useEffectiveRules();
 
@@ -133,8 +210,9 @@ export function SopRulesPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">SOP</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">SOP rules</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Rules are Markdown "rule cards". Code rules are fixed built-in checks you can tune; AI rules are plain English judged by
-          your AI model. The default rules are set by SOP owners; your own rules only change your checks.
+          Code checks every rule: an item is a to-do while the ticket is in its stage and a gap once the ticket moves on without it.
+          When you open a ticket, your AI model reviews what code found, can clear a finding written another way, and drafts fixes.
+          The default rules are set by SOP owners; your own changes only affect your checks.
         </p>
       </div>
 
@@ -159,14 +237,8 @@ export function SopRulesPage() {
       <p className="-mt-2 text-sm text-slate-600">{TABS.find((item) => item.id === tab)?.description}</p>
 
       {tab === "projects" ? <ProjectsTab /> : null}
-      {tab === "personal" ? <EditorTab scope="personal" canSave /> : null}
-      {tab === "default" ? (
-        <EditorTab
-          scope="default"
-          canSave={isOwner}
-          {...(isOwner ? {} : { readOnlyReason: "Only SOP owners can change the default rules. Copy a rule id into My rules to adjust it for yourself." })}
-        />
-      ) : null}
+      {tab === "personal" ? <RulesTab scope="personal" isOwner={isOwner} /> : null}
+      {tab === "default" ? <RulesTab scope="default" isOwner={isOwner} /> : null}
       {tab === "effective" ? <EffectiveTab /> : null}
     </section>
   );

@@ -1,6 +1,5 @@
 import { providerShortName } from "@/features/ai/utils/ai-display";
 import type { ActionKind } from "@/features/azure-devops/types/action.types";
-import type { ComplianceResult, ComplianceViolation } from "@/features/azure-devops/types/azure.types";
 import type { AiCheck, AiFixTarget, AiRuleResult } from "../types/sop.types";
 
 const REASONS: Record<string, string> = {
@@ -45,44 +44,9 @@ export const FIX_TARGET_LABELS: Record<AiFixTarget, string> = {
   tags: "Add tags",
 };
 
-/** AI "fail" verdicts as violations (notice rules: notices), so badges, filters and counts treat them like code rules. */
-export function aiViolations(check: AiCheck | undefined): ComplianceViolation[] {
-  return (check?.results ?? [])
-    .filter((result) => result.verdict === "fail")
-    .map((result) => ({
-      ruleId: result.ruleId,
-      ruleTitle: result.ruleTitle,
-      checker: "ai" as const,
-      severity: result.severity,
-      message: result.reason,
-      evidence: result.quotes,
-      suggestedAction: null,
-    }));
-}
-
-export function withAiViolations(
-  compliance: Map<number, ComplianceResult>,
-  checks: Map<number, AiCheck>
-): Map<number, ComplianceResult> {
-  if (checks.size === 0) {
-    return compliance;
-  }
-
-  return new Map(
-    [...compliance].map(([id, result]) => {
-      const extra = aiViolations(checks.get(id));
-      return [
-        id,
-        extra.length
-          ? {
-              ...result,
-              violations: [...result.violations, ...extra.filter((finding) => finding.severity !== "low")],
-              notices: [...result.notices, ...extra.filter((finding) => finding.severity === "low")],
-            }
-          : result,
-      ];
-    })
-  );
+/** The current review's verdicts by rule, or nothing when it judged another revision of the ticket. */
+export function currentVerdicts(check: AiCheck | undefined, rev: number): Map<string, AiRuleResult> {
+  return check && check.ticketRev === rev ? new Map((check.results ?? []).map((result) => [result.ruleId, result])) : new Map();
 }
 
 const TEXT_FIELDS: Partial<Record<AiFixTarget, string>> = {

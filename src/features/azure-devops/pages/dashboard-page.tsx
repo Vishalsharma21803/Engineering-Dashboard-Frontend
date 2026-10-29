@@ -2,9 +2,7 @@ import { useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { useSopAiChecks } from "@/features/sop/hooks/use-sop-ai";
 import { useLinkedSolidtime } from "@/features/solidtime/hooks/use-solidtime";
-import { withAiViolations } from "@/features/sop/utils/ai-check";
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StatTile } from "../components/feedback";
 import { PipelineRunList } from "../components/pipeline-run-list";
@@ -45,17 +43,15 @@ export function DashboardPage() {
   const triage = useDashboardTriage(credentialId, dashboard);
   const linkedTime = useLinkedSolidtime(credentialId);
 
-  const codeCompliance = useMemo(
+  // Code results with the user's saved AI reviews applied by the server. The dashboard never calls the AI:
+  // a ticket is reviewed when it is opened.
+  const compliance = useMemo(
     () =>
       new Map<number, ComplianceResult>(
         (dashboard?.sections.compliance.data ?? []).map((result) => [result.workItemId, result])
       ),
     [dashboard]
   );
-  // AI checks run for the open tickets on My work; each load or refresh re-checks only changed tickets.
-  const openIds = useMemo(() => (dashboard?.sections.workItems.data ?? []).map((item) => item.id), [dashboard]);
-  const ai = useSopAiChecks(credentialId, openIds, dashboard?.generatedAt ?? null);
-  const compliance = useMemo(() => withAiViolations(codeCompliance, ai.checks), [codeCompliance, ai.checks]);
 
   const workItemKinds = useMemo(() => {
     const kinds = new Map<number, { type: string; priority: number | null }>();
@@ -215,7 +211,6 @@ export function DashboardPage() {
               credentialId={credentialId}
               projectId={projectId}
               dashboardToken={dashboard.generatedAt}
-              aiChecks={ai.checks}
               triage={triage}
               time={linkedTime.connection ? { connection: linkedTime.connection, onPropose: (input) => review.propose(input), isProposing: review.isProposing } : undefined}
             />

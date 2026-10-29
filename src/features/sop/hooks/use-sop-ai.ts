@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useRef } from "react";
 
 import { useAiPreference } from "@/features/ai/hooks/use-ai";
 import { enqueueAiChecks, listAiChecks } from "../api/sop.api";
 import { sopKeys } from "../api/sop.keys";
 import type { AiCheck } from "../types/sop.types";
 
-const MAX_IDS = 200;
 const POLL_MS = 3_000;
 const PAUSED_POLL_MS = 60_000;
 
@@ -21,24 +20,26 @@ export function isAiCheckBusy(check: AiCheck | undefined): boolean {
 }
 
 /**
- * AI checks for these tickets. When the user has set up an AI model, every
- * new `loadToken` (a page load or refresh) asks the server to check tickets
- * that changed; unchanged ones cost nothing. Results are polled until done.
+ * The AI review of one ticket, for its page. Opening the ticket asks the
+ * server to review it; the server skips that when the saved review already
+ * matches this revision, rules and AI settings, so it costs nothing then.
+ * When a new review lands, `onReviewed` runs (the page reloads the ticket,
+ * whose SOP result then shows the AI's clears). The dashboard never calls this.
  */
-export function useSopAiChecks(credentialId: string, workItemIds: number[], loadToken: string | null) {
+export function useSopAiReview(credentialId: string, workItem: { id: number; rev: number } | undefined, onReviewed?: () => void) {
   const queryClient = useQueryClient();
   const preference = useAiPreference();
   const configured = Boolean(preference.data?.provider && preference.data.model);
-  // New AI settings (provider, model, effort) change what a check would use, so they re-ask too.
+  // New AI settings (provider, model, effort) change what a review would use, so they ask again too.
   const settingsToken = preference.data
     ? `${preference.data.provider ?? ""}|${preference.data.model ?? ""}|${preference.data.effort}|${preference.data.updatedAt ?? ""}`
     : "";
-  const idsKey = useMemo(() => [...new Set(workItemIds)].sort((a, b) => a - b).slice(0, MAX_IDS).join(","), [workItemIds]);
+  const id = workItem?.id ?? null;
 
   const results = useQuery({
-    queryKey: sopKeys.aiResults(credentialId, idsKey),
-    queryFn: () => listAiChecks(credentialId, idsKey.split(",").map(Number)),
-    enabled: configured && idsKey !== "",
+    queryKey: sopKeys.aiResults(credentialId, String(id ?? "")),
+    queryFn: () => listAiChecks(credentialId, [id as number]),
+    enabled: configured && id !== null,
     refetchInterval: (query) => {
       const checks = query.state.data ?? [];
       return checks.some(isAiCheckBusy) ? POLL_MS : checks.some(isAiCheckPaused) ? PAUSED_POLL_MS : false;
@@ -46,26 +47,47 @@ export function useSopAiChecks(credentialId: string, workItemIds: number[], load
   });
 
   const enqueue = useMutation({
-    mutationFn: ({ ids, force }: { ids: number[]; force: boolean }) => enqueueAiChecks(credentialId, ids, force),
+    mutationFn: ({ force }: { force: boolean }) => enqueueAiChecks(credentialId, [id as number], force),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: sopKeys.ai(credentialId) }),
   });
   const { mutate } = enqueue;
+  const revision = workItem ? `${workItem.id}:${workItem.rev}` : null;
 
   useEffect(() => {
-    if (configured && idsKey !== "" && loadToken) {
-      mutate({ ids: idsKey.split(",").map(Number), force: false });
+    if (configured && revision) {
+      mutate({ force: false });
     }
-  }, [configured, idsKey, loadToken, settingsToken, mutate]);
+  }, [configured, revision, settingsToken, mutate]);
 
-  const checks = useMemo(() => new Map((results.data ?? []).map((check) => [check.workItemId, check])), [results.data]);
+  const check = results.data?.find((row) => row.workItemId === id);
+  const finished = check?.status === "DONE" ? check.finishedAt : null;
+  const seen = useRef<string | null | undefined>(undefined);
+  const reviewed = useRef(onReviewed);
+
+  useEffect(() => {
+    reviewed.current = onReviewed;
+  }, [onReviewed]);
+
+  // A review that finishes while the page is open: reload the ticket once (not for the result already there on arrival).
+  useEffect(() => {
+    if (results.isFetched && seen.current === undefined) {
+      seen.current = finished;
+      return;
+    }
+
+    if (finished && seen.current !== undefined && finished !== seen.current) {
+      seen.current = finished;
+      reviewed.current?.();
+    }
+  }, [finished, results.isFetched]);
 
   return {
     configured,
-    /** The provider checks would use now (a paused check may belong to an earlier one). */
+    /** The provider reviews would use now (a paused review may belong to an earlier one). */
     currentProvider: preference.data?.provider ?? null,
-    checks,
-    /** Re-check now, even if nothing changed. */
-    recheck: (ids: number[]) => enqueue.mutate({ ids, force: true }),
+    check,
+    /** Review again now, even if nothing changed. */
+    recheck: () => enqueue.mutate({ force: true }),
     isRechecking: enqueue.isPending,
     enqueueError: enqueue.error,
   };

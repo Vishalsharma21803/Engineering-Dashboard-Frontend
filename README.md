@@ -15,7 +15,7 @@ React + Vite frontend for Engineer Cockpit.
 ## Scripts
 
 ```bash
-npm run dev        # start Vite dev server on http://localhost:5173
+npm run dev        # start Vite dev server on http://localhost:5180
 npm run build      # typecheck and build production bundle
 npm run preview    # preview production build
 npm run lint       # run oxlint
@@ -27,13 +27,13 @@ npm run test:e2e   # full stack in Chromium against a fake Azure DevOps org
 ## API proxy
 
 Development requests to `/api/*` are proxied to the backend at
-`http://localhost:3000` by `vite.config.ts`. This keeps cookies same-origin
+`http://localhost:4000` by `vite.config.ts`. This keeps cookies same-origin
 during local development.
 
 To point the frontend directly at another backend, create `.env`:
 
 ```bash
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:4000
 ```
 
 Leave it empty to use the proxy.

@@ -90,9 +90,11 @@ export const dashboard: Dashboard = {
           sopProject: "checked",
           rulebook: { defaultVersion: 0, personalVersion: 0 },
           passedRules: [],
-          pendingRules: [],
+          todos: [],
           skippedRules: [],
           aiRules: [],
+          cleared: [],
+          aiReview: null,
           notices: [],
           violations: [
             {
@@ -103,6 +105,7 @@ export const dashboard: Dashboard = {
               message: "No original estimate (hours).",
               evidence: [],
               suggestedAction: null,
+              phase: "earlier",
             },
           ],
         },

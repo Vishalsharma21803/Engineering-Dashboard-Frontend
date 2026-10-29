@@ -4,6 +4,7 @@ import {
   deleteAiCredential,
   getAiPreference,
   getAiUsage,
+  getSopCheckTiming,
   getOpenRouterAllowlist,
   listAiCredentials,
   listAiModels,
@@ -34,6 +35,10 @@ export function useAiPreference() {
 
 export function useAiUsage() {
   return useQuery({ queryKey: aiKeys.usage, queryFn: getAiUsage });
+}
+
+export function useSopCheckTiming() {
+  return useQuery({ queryKey: aiKeys.timing, queryFn: getSopCheckTiming });
 }
 
 export function useOpenRouterAllowlist() {

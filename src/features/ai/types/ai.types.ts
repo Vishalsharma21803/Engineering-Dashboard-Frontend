@@ -52,6 +52,12 @@ export interface AiUsageSummary {
   resetsAt: string;
 }
 
+/** How long the user's AI ticket reviews took per model (time running, not queued), over `days`. */
+export interface SopCheckTiming {
+  days: number;
+  models: Array<{ provider: AiProvider | null; model: string; checks: number; averageSeconds: number | null; maxSeconds: number | null; rateLimited: number; failed: number }>;
+}
+
 export type ValidateAiCredentialResponse =
   | { valid: true; details: Record<string, string | number | boolean | null>; lastValidatedAt: string }
   | { valid: false; reason: string; lastValidatedAt: string };

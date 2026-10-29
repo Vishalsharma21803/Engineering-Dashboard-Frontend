@@ -81,6 +81,11 @@ export interface AiRuleResult {
   ruleTitle: string;
   /** "low" for notice rules: shown, never counted as a gap. */
   severity: "high" | "medium" | "low";
+  /**
+   * gap: code found it missing ("pass" clears it); quality: code found it ("fail" is advice only);
+   * draft: a plain-fact gap the AI only drafts a fix for; ai-rule: a rule only AI judges. Missing on old results.
+   */
+  review?: "gap" | "quality" | "draft" | "ai-rule";
   verdict: "pass" | "fail" | "unsure";
   reason: string;
   /** What to do, for the developer; never posted. Missing on checks made before this field existed. */
@@ -98,6 +103,8 @@ export interface AiCheck {
   status: AiCheckStatus;
   /** Kept while a re-check runs, so earlier verdicts stay visible. */
   results: AiRuleResult[] | null;
+  /** The ticket revision the results judged; another revision makes them outdated. */
+  ticketRev: number | null;
   errorReason: string | null;
   /** What the AI provider itself said about the failure or limit. */
   errorDetail: string | null;

@@ -3,10 +3,22 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ComplianceResult } from "@/features/azure-devops/types/azure.types";
-import { AiResults } from "../components/ai-results";
-import type { AiCheck } from "../types/sop.types";
-import { fixToAction, withAiViolations } from "../utils/ai-check";
+import { AiReviewHeader, AiRuleReview } from "../components/ai-results";
+import type { AiCheck, AiRuleResult } from "../types/sop.types";
+import { currentVerdicts, fixToAction } from "../utils/ai-check";
+
+const draft: AiRuleResult = {
+  ruleId: "STR-08",
+  ruleTitle: "Approach before starting",
+  severity: "medium",
+  review: "gap",
+  verdict: "fail",
+  reason: "No steps are written down.",
+  advice: "State the steps.",
+  quotes: [],
+  fix: { target: "comment", text: "Approach:\n1. Add the export button" },
+  note: null,
+};
 
 const check: AiCheck = {
   workItemId: 7,
@@ -19,69 +31,40 @@ const check: AiCheck = {
   finishedAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   errorReason: null,
-  results: [
-    {
-      ruleId: "STR-08",
-      ruleTitle: "Approach before starting",
-      severity: "medium",
-      verdict: "pass",
-      reason: "Steps are listed.",
-      quotes: [],
-      fix: null,
-      note: null,
-    },
-    {
-      ruleId: "STR-06",
-      ruleTitle: "User-story form",
-      severity: "high",
-      verdict: "fail",
-      reason: "No benefit is stated.",
-      quotes: ["As a manager I want a summary"],
-      fix: { target: "description", text: "As a manager I want a summary so that I can track progress." },
-      note: "1 quote(s) could not be found in the ticket and were removed.",
-    },
-  ],
+  ticketRev: 5,
+  results: [draft],
 };
 
-function renderResults(props: Partial<Parameters<typeof AiResults>[0]> = {}) {
+function renderHeader(props: Partial<Parameters<typeof AiReviewHeader>[0]> = {}) {
   const onRecheck = vi.fn();
   render(
     <MemoryRouter>
-      <AiResults configured check={check} ruleCount={2} onRecheck={onRecheck} isRechecking={false} {...props} />
+      <AiReviewHeader configured check={check} rev={5} onRecheck={onRecheck} isRechecking={false} reviewable {...props} />
     </MemoryRouter>
   );
   return onRecheck;
 }
 
-describe("AiResults", () => {
-  it("lists failures first with verified quotes, the fix and the verifier's note", async () => {
-    const onRecheck = renderResults();
-
-    const items = screen.getAllByRole("listitem").filter((item) => item.querySelector("span"));
-    expect(items[0]).toHaveTextContent("STR-06");
-    expect(screen.getByText("“As a manager I want a summary”")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ready to post · Replace description (edit before using it)")).toHaveValue(
-      "As a manager I want a summary so that I can track progress."
-    );
-    expect(screen.getByText(/Checked: 1 quote\(s\) could not be found/)).toBeInTheDocument();
-    expect(screen.getByText("AI checks").closest("div")).toHaveTextContent(/claude-sonnet-5-5 · \$0\.0042/);
-
-    await userEvent.click(screen.getByRole("button", { name: "Re-check with AI" }));
+describe("AiReviewHeader", () => {
+  it("shows who reviewed the ticket and when, and reviews again on request", async () => {
+    const onRecheck = renderHeader();
+    expect(screen.getByText("AI review").closest("div")).toHaveTextContent(/claude-sonnet-5-5 · \$0\.0042 · checked/);
+    await userEvent.click(screen.getByRole("button", { name: "Review again" }));
     expect(onRecheck).toHaveBeenCalled();
   });
 
-  it("explains skipped checks and points to setup when AI is not configured", () => {
-    renderResults({ check: { ...check, status: "SKIPPED", errorReason: "DAILY_LIMIT_REACHED", results: null } });
+  it("explains skipped reviews and points to setup when AI is not configured", () => {
+    renderHeader({ check: { ...check, status: "SKIPPED", errorReason: "DAILY_LIMIT_REACHED", results: null } });
     expect(screen.getByRole("alert")).toHaveTextContent("daily AI spend limit");
 
     document.body.innerHTML = "";
-    renderResults({ configured: false });
+    renderHeader({ configured: false });
     expect(screen.getByRole("link", { name: "Set up your AI model" })).toHaveAttribute("href", "/credentials");
   });
 
-  it("shows a rate-limited check as paused with its retry time and the provider's words, and can try now", async () => {
+  it("shows a rate-limited review as paused with its retry time and the provider's words, and can try now", async () => {
     const retryAt = new Date(Date.now() + 10 * 60 * 60 * 1000).toISOString();
-    const onRecheck = renderResults({
+    const onRecheck = renderHeader({
       check: { ...check, status: "QUEUED", provider: "OPENROUTER", errorReason: "AI_RATE_LIMITED", errorDetail: "free-models-per-day limit exceeded", notBefore: retryAt },
     });
 
@@ -91,96 +74,68 @@ describe("AiResults", () => {
     expect(onRecheck).toHaveBeenCalled();
   });
 
-  it("lets a check paused by an old provider run now with the current one", async () => {
+  it("lets a review paused by an old provider run now with the current one", async () => {
     const retryAt = new Date(Date.now() + 10 * 60 * 60 * 1000).toISOString();
-    const onRecheck = renderResults({
+    const onRecheck = renderHeader({
       currentProvider: "OPENCODE",
       check: { ...check, status: "QUEUED", provider: "OPENROUTER", errorReason: "AI_RATE_LIMITED", notBefore: retryAt },
     });
 
     expect(screen.getByRole("status")).toHaveTextContent("paused by OpenRouter. You now use OpenCode");
-    await userEvent.click(screen.getByRole("button", { name: "Check with OpenCode" }));
+    await userEvent.click(screen.getByRole("button", { name: "Review with OpenCode" }));
     expect(onRecheck).toHaveBeenCalled();
   });
 
-  it("shows a running check", () => {
-    renderResults({ check: { ...check, status: "RUNNING" } });
-    expect(screen.getByRole("button", { name: "Checking…" })).toBeDisabled();
-    expect(screen.getByText("Showing the previous result until the new check finishes.")).toBeInTheDocument();
+  it("says when a review is running, and hides a review of an older revision of the ticket", () => {
+    renderHeader({ check: { ...check, status: "RUNNING" }, rev: 6 });
+    expect(screen.getByRole("button", { name: "Reviewing…" })).toBeDisabled();
+    expect(screen.getByText(/code results below are already final/)).toBeInTheDocument();
+    expect(screen.getByText(/results are hidden until this review finishes/)).toBeInTheDocument();
+    expect(currentVerdicts(check, 6).size).toBe(0);
+    expect(currentVerdicts(check, 5).get("STR-08")).toBe(draft);
   });
 });
 
-describe("AiResults drafts", () => {
-  const failing = (text: string, advice: string | null = "State the benefit.") => ({
-    ...check,
-    results: [
-      {
-        ruleId: "STR-06",
-        ruleTitle: "User-story form",
-        severity: "high" as const,
-        verdict: "fail" as const,
-        reason: "No benefit is stated.",
-        advice,
-        quotes: [],
-        fix: { target: "comment" as const, text },
-        note: null,
-      },
-    ],
-  });
+describe("AiRuleReview drafts", () => {
+  const failing = (text: string, advice: string | null = "State the benefit.") => ({ ...draft, advice, fix: { target: "comment" as const, text } });
 
   it("shows the suggestion apart from the draft, and proposes the edited text", async () => {
     const onUseFix = vi.fn();
-    renderResults({ check: failing("Approach:\n1. Add the export button"), onUseFix });
+    render(<AiRuleReview result={failing("Approach:\n1. Add the export button")} onUseFix={onUseFix} />);
 
+    expect(screen.getByText("AI confirms")).toBeInTheDocument();
     expect(screen.getByText("Suggestion:").closest("p")).toHaveTextContent("Suggestion: State the benefit.");
-    const draft = screen.getByLabelText(/Ready to post · Add comment/);
-    await userEvent.type(draft, "\n2. Stream the CSV");
+    const text = screen.getByLabelText(/Ready to post · Add comment/);
+    await userEvent.type(text, "\n2. Stream the CSV");
     await userEvent.click(screen.getByRole("button", { name: "Use this text…" }));
 
-    expect(onUseFix).toHaveBeenCalledWith(expect.objectContaining({ ruleId: "STR-06" }), {
+    expect(onUseFix).toHaveBeenCalledWith(expect.objectContaining({ ruleId: "STR-08" }), {
       target: "comment",
       text: "Approach:\n1. Add the export button\n2. Stream the CSV",
     });
   });
 
   it("blocks the draft until every [[fill in]] gap is completed", async () => {
-    const onUseFix = vi.fn();
-    renderResults({ check: failing("Root cause: [[fill in: root cause]]. Fixed in [[fill in: PR number]]."), onUseFix });
+    render(<AiRuleReview result={failing("Root cause: [[fill in: root cause]]. Fixed in [[fill in: PR number]].")} onUseFix={vi.fn()} />);
 
     const use = screen.getByRole("button", { name: "Use this text…" });
     expect(use).toBeDisabled();
     expect(screen.getByText(/Fill in these 2 gaps first/)).toBeInTheDocument();
 
-    const draft = screen.getByLabelText(/Ready to post/);
-    await userEvent.clear(draft);
-    await userEvent.type(draft, "Root cause: null document on save. Fixed in PR 42.");
+    const text = screen.getByLabelText(/Ready to post/);
+    await userEvent.clear(text);
+    await userEvent.type(text, "Root cause: null document on save. Fixed in PR 42.");
     expect(use).toBeEnabled();
   });
 
-  it("shows checks made before advice existed without a suggestion line", () => {
-    renderResults({ check: failing("Hello", null) });
+  it("labels quality advice and plain-fact drafts, and shows old results without a suggestion line", () => {
+    render(<AiRuleReview result={{ ...failing("Hello", null), review: "quality" }} />);
+    expect(screen.getByText("AI suggestion")).toBeInTheDocument();
     expect(screen.queryByText("Suggestion:")).not.toBeInTheDocument();
-  });
-});
 
-describe("withAiViolations", () => {
-  it("adds AI failures to the code results as violations", () => {
-    const result = { workItemId: 7, violations: [{ ruleId: "STR-05" }], notices: [] } as unknown as ComplianceResult;
-    const merged = withAiViolations(new Map([[7, result]]), new Map([[7, check]]));
-
-    expect(merged.get(7)?.violations).toEqual([
-      { ruleId: "STR-05" },
-      expect.objectContaining({ ruleId: "STR-06", checker: "ai", severity: "high", message: "No benefit is stated.", evidence: ["As a manager I want a summary"] }),
-    ]);
-  });
-
-  it("adds AI failures of notice rules as notices, not gaps", () => {
-    const result = { workItemId: 7, violations: [], notices: [] } as unknown as ComplianceResult;
-    const notice = { ...check, results: (check.results ?? []).map((item) => ({ ...item, severity: "low" as const })) };
-    const merged = withAiViolations(new Map([[7, result]]), new Map([[7, notice]]));
-
-    expect(merged.get(7)?.violations).toEqual([]);
-    expect(merged.get(7)?.notices).toEqual([expect.objectContaining({ ruleId: "STR-06", checker: "ai", severity: "low" })]);
+    document.body.innerHTML = "";
+    render(<AiRuleReview result={{ ...failing("As a manager…"), review: "draft" }} />);
+    expect(screen.getByText("AI draft")).toBeInTheDocument();
   });
 });
 

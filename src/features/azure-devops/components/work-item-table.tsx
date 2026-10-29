@@ -4,9 +4,6 @@ import { Link } from "react-router-dom";
 
 import { Pagination } from "@/components/ui/pagination";
 import { Updating } from "@/components/ui/updating";
-import { isAiCheckBusy, isAiCheckPaused } from "@/features/sop/hooks/use-sop-ai";
-import type { AiCheck } from "@/features/sop/types/sop.types";
-import { describeAiCheckReason, describeAiPause } from "@/features/sop/utils/ai-check";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
 import { getTicketTimes } from "@/features/solidtime/api/solidtime.api";
@@ -18,7 +15,8 @@ import type { ProposeActionInput } from "../types/action.types";
 import { getMyWorkPage, getTeamWorkPage } from "../api/azure.api";
 import { azureKeys } from "../api/azure.keys";
 import type { DashboardTriage } from "../hooks/use-triage";
-import type { ComplianceResult, WorkItemListFilters, WorkItemSummary } from "../types/azure.types";
+import type { ComplianceAiReview, ComplianceResult, WorkItemListFilters, WorkItemSummary } from "../types/azure.types";
+import { formatRelative } from "../utils/format";
 import { SEVERITY_TONES } from "../utils/labels";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { UNTRIAGED, workItemKey } from "../utils/triage";
@@ -49,35 +47,51 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function AiStatusBadge({ check }: { check: AiCheck | undefined }) {
-  if (check && isAiCheckPaused(check)) {
+/** The saved AI review of the ticket (made when it was opened; the list never calls the AI). */
+function AiReviewBadge({ review, cleared }: { review: ComplianceAiReview | null; cleared: number }) {
+  if (!review) {
+    return null;
+  }
+
+  if (review.status === "QUEUED" || review.status === "RUNNING") {
     return (
-      <StatusBadge tone="warning" title={`${describeAiPause(check)}${check.errorDetail ? ` Provider said: ${check.errorDetail}` : ""}`}>
-        AI paused
+      <StatusBadge tone="info" title="The AI is reviewing this ticket">
+        AI reviewing
       </StatusBadge>
     );
   }
 
-  if (isAiCheckBusy(check)) {
+  if (review.status === "FAILED" || review.status === "SKIPPED") {
     return (
-      <StatusBadge tone="info" title="AI check running">
-        AI checking
-      </StatusBadge>
-    );
-  }
-
-  if (check?.status === "FAILED" || check?.status === "SKIPPED") {
-    return (
-      <StatusBadge tone="neutral" title={`AI check: ${describeAiCheckReason(check.errorReason)}`}>
+      <StatusBadge tone="neutral" title="The last AI review did not finish. Open the ticket to see why.">
         AI ✕
       </StatusBadge>
     );
   }
 
-  return null;
+  const when = review.checkedAt ? `checked ${formatRelative(review.checkedAt)}` : "checked";
+
+  return review.outdated ? (
+    <StatusBadge tone="neutral" dot={false} title={`AI review ${when}; the ticket changed since, so it may be outdated. Open the ticket to review it again.`}>
+      AI may be outdated
+    </StatusBadge>
+  ) : (
+    <StatusBadge tone="neutral" dot={false} title={`AI review ${when}${cleared ? `; it cleared ${cleared} code finding${cleared === 1 ? "" : "s"}` : ""}.`}>
+      AI ✓{cleared ? ` ${cleared} cleared` : ""}
+    </StatusBadge>
+  );
 }
 
-export function ComplianceBadges({ result, ai }: { result: ComplianceResult | undefined; ai?: AiCheck | undefined }) {
+/** Items still needed in the ticket's current stage: not gaps yet. */
+function TodoBadge({ result }: { result: ComplianceResult }) {
+  return result.todos.length > 0 ? (
+    <StatusBadge tone="neutral" dot={false} title={`To do in this stage: ${result.todos.map((todo) => `${todo.ruleId} ${todo.ruleTitle}`).join("; ")}`}>
+      {result.todos.length} to do
+    </StatusBadge>
+  ) : null;
+}
+
+export function ComplianceBadges({ result }: { result: ComplianceResult | undefined }) {
   if (!result) {
     return <span className="text-xs text-slate-400">—</span>;
   }
@@ -97,11 +111,17 @@ export function ComplianceBadges({ result, ai }: { result: ComplianceResult | un
     );
   }
 
+  const extras = (
+    <>
+      <TodoBadge result={result} />
+      <AiReviewBadge review={result.aiReview} cleared={result.cleared.length} />
+    </>
+  );
+
   if (result.violations.length === 0) {
     const notes = [
       `${result.passedRules.length} ${result.passedRules.length === 1 ? "rule" : "rules"} passed`,
       result.notices.length ? `notices: ${result.notices.map((notice) => notice.ruleId).join(", ")}` : null,
-      result.pendingRules.length ? `${result.pendingRules.length} still open` : null,
       result.skippedRules.length ? `skipped: ${result.skippedRules.map((rule) => rule.ruleId).join(", ")}` : null,
     ].filter(Boolean);
 
@@ -110,7 +130,7 @@ export function ComplianceBadges({ result, ai }: { result: ComplianceResult | un
         <StatusBadge tone="success" title={notes.join("; ")}>
           SOP OK
         </StatusBadge>
-        <AiStatusBadge check={ai} />
+        {extras}
       </div>
     );
   }
@@ -121,13 +141,13 @@ export function ComplianceBadges({ result, ai }: { result: ComplianceResult | un
         <StatusBadge
           key={`${violation.checker}:${violation.ruleId}`}
           tone={SEVERITY_TONES[violation.severity]}
-          title={`${violation.checker === "ai" ? "AI: " : ""}${violation.ruleTitle}: ${violation.message}`}
+          title={`${violation.checker === "ai" ? "AI: " : ""}${violation.ruleTitle}: ${violation.message}${violation.phase === "earlier" ? " (missed in an earlier stage)" : ""}`}
         >
           {violation.ruleId}
           {violation.checker === "ai" ? " · AI" : ""}
         </StatusBadge>
       ))}
-      <AiStatusBadge check={ai} />
+      {extras}
     </div>
   );
 }
@@ -138,7 +158,6 @@ interface WorkItemRowsProps {
   /** team: everyone's items in a project, with assignee instead of compliance. */
   team: boolean;
   myId: string | null;
-  aiChecks?: Map<number, AiCheck> | undefined;
   /** Dashboard snooze / acknowledge / abandon state; omitted for team lists. */
   triage?: DashboardTriage | undefined;
   /** Tracked time and the timer for a row (My work, when Solidtime is linked). */
@@ -167,7 +186,7 @@ function WorkAmounts({ item }: { item: WorkItemSummary }) {
  * A table from sm up; below that the same rows stack as cards (one DOM, so links and buttons exist once).
  * Explicit roles keep the table semantics when CSS turns the rows into blocks.
  */
-export function WorkItemRows({ credentialId, rows, team, myId, aiChecks, triage, timeCell }: WorkItemRowsProps) {
+export function WorkItemRows({ credentialId, rows, team, myId, triage, timeCell }: WorkItemRowsProps) {
   return (
     <div className="sm:overflow-x-auto">
       <table role="table" className="block w-full text-left text-sm sm:table sm:min-w-[760px]">
@@ -249,7 +268,7 @@ export function WorkItemRows({ credentialId, rows, team, myId, aiChecks, triage,
                       <span className="text-xs italic text-slate-400">Unassigned</span>
                     )
                   ) : (
-                    <ComplianceBadges result={compliance ?? undefined} ai={aiChecks?.get(item.id)} />
+                    <ComplianceBadges result={compliance ?? undefined} />
                   )}
                 </td>
                 {triage ? (
@@ -308,24 +327,22 @@ interface MyWorkTableProps {
   projectId: string | undefined;
   /** Changes whenever the dashboard reloads, so the page reloads with it. */
   dashboardToken: string;
-  aiChecks: Map<number, AiCheck>;
   triage: DashboardTriage;
   /** Time tracking on the rows (Solidtime linked to this organization). */
   time?: { connection: SolidtimeConnection; onPropose: (input: ProposeActionInput) => void; isProposing: boolean } | undefined;
 }
 
 /** My open tickets, 10 per page, filtered by the server. The page lives in the URL (?page=). */
-export function MyWorkTable({ credentialId, projectId, dashboardToken, aiChecks, triage, time }: MyWorkTableProps) {
+export function MyWorkTable({ credentialId, projectId, dashboardToken, triage, time }: MyWorkTableProps) {
   const pageParam = usePageParam("page");
   const { page, setPage } = pageParam;
   const [showHidden, setShowHidden] = useState(false);
   const toFirstPage = () => setPage(1, { replace: true });
   const list = useListFilters(toFirstPage);
-  // New AI verdicts and triage marks change which tickets match, so they refresh the page too.
-  const aiToken = [...aiChecks.values()].map((check) => `${check.workItemId}:${check.updatedAt}`).join(",");
+  // Triage marks change which tickets match, so they refresh the page too.
 
   const query = useQuery({
-    queryKey: [...azureKeys.myWork(credentialId, projectId ?? "all"), { page, showHidden, filters: list.filters, dashboardToken, aiToken, triage: triage.version }],
+    queryKey: [...azureKeys.myWork(credentialId, projectId ?? "all"), { page, showHidden, filters: list.filters, dashboardToken, triage: triage.version }],
     queryFn: () => getMyWorkPage(credentialId, { projectId, page, hidden: showHidden, filters: list.filters }),
     placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
@@ -388,7 +405,6 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, aiChecks,
           rows={data.items}
           team={false}
           myId={null}
-          aiChecks={aiChecks}
           triage={triage}
           timeCell={
             time

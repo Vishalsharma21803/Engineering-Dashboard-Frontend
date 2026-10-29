@@ -5,6 +5,7 @@ import type {
   AiPreference,
   AiProvider,
   AiUsageSummary,
+  SopCheckTiming,
   UpdateAiPreferenceInput,
   ValidateAiCredentialResponse,
 } from "../types/ai.types";
@@ -48,6 +49,10 @@ export async function updateAiPreference(input: UpdateAiPreferenceInput) {
 
 export async function getAiUsage() {
   return (await apiRequest<{ usage: AiUsageSummary }>("/api/ai/usage")).usage;
+}
+
+export async function getSopCheckTiming() {
+  return (await apiRequest<{ timing: SopCheckTiming }>("/api/ai/sop-check-timing")).timing;
 }
 
 export async function getOpenRouterAllowlist() {

@@ -12,14 +12,14 @@ import { isAiCheckBusy, isAiCheckPaused } from "../hooks/use-sop-ai";
 import type { AiCheck, AiRuleResult } from "../types/sop.types";
 import { FIX_TARGET_LABELS, describeAiCheckReason, describeAiPause } from "../utils/ai-check";
 
-export interface AiResultsProps {
+export interface AiReviewProps {
   configured: boolean;
   check: AiCheck | undefined;
-  /** AI rules that apply to this ticket (from the code check). */
-  ruleCount: number;
+  /** The ticket's current revision: a review of another revision may be outdated. */
+  rev: number;
   onRecheck: () => void;
   isRechecking: boolean;
-  /** Provider checks use now; a check paused by another provider can run right away. */
+  /** Provider reviews use now; a review paused by another provider can run right away. */
   currentProvider?: string | null;
   /** Asking the server to (re)check failed, e.g. offline or AI settings missing. */
   enqueueError?: unknown;
@@ -28,9 +28,6 @@ export interface AiResultsProps {
   isProposing?: boolean;
 }
 
-const VERDICT_ORDER = { fail: 0, unsure: 1, pass: 2 } as const;
-const VERDICT_LABELS = { fail: "Failed", unsure: "Unsure", pass: "Passed" } as const;
-
 /** A gap the AI left for facts only the developer knows. */
 const PLACEHOLDER = /\[\[\s*fill in[^\]]*\]\]/gi;
 
@@ -38,7 +35,7 @@ function placeholders(text: string): string[] {
   return text.match(PLACEHOLDER) ?? [];
 }
 
-function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult; fix: NonNullable<AiRuleResult["fix"]>; onUseFix: AiResultsProps["onUseFix"]; isProposing: boolean }) {
+function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult; fix: NonNullable<AiRuleResult["fix"]>; onUseFix: AiReviewProps["onUseFix"]; isProposing: boolean }) {
   const [text, setText] = useState(fix.text);
   const gaps = placeholders(text);
   const singleLine = fix.target === "title" || fix.target === "category" || fix.target === "tags";
@@ -76,16 +73,38 @@ function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult
   );
 }
 
-function Verdict({ result, onUseFix, isProposing }: { result: AiRuleResult; onUseFix: AiResultsProps["onUseFix"]; isProposing: boolean }) {
-  const tone = result.verdict === "fail" ? SEVERITY_TONES[result.severity] : result.verdict === "unsure" ? "warning" : "success";
-  const label = result.verdict === "fail" ? (result.severity === "low" ? "Notice" : "Failed") : VERDICT_LABELS[result.verdict];
+/** How the AI's verdict reads for a rule (see AiRuleResult.review). */
+function verdictLabel(result: AiRuleResult): { label: string; tone: "danger" | "warning" | "info" | "success" | "neutral" } {
+  if (result.verdict === "unsure") {
+    return { label: "AI unsure", tone: "neutral" };
+  }
+
+  switch (result.review) {
+    case "gap":
+      return result.verdict === "pass" ? { label: "AI: met", tone: "success" } : { label: "AI confirms", tone: "warning" };
+    case "quality":
+      return result.verdict === "pass" ? { label: "AI: good", tone: "success" } : { label: "AI suggestion", tone: "info" };
+    case "draft":
+      return { label: "AI draft", tone: "info" };
+    default:
+      return result.verdict === "pass" ? { label: "Passed", tone: "success" } : { label: result.severity === "low" ? "Notice" : "Failed", tone: SEVERITY_TONES[result.severity] };
+  }
+}
+
+/** One rule's AI review: its verdict, reason, verified quotes, advice and a draft to propose. */
+export function AiRuleReview({ result, onUseFix, isProposing = false, showRule = false }: { result: AiRuleResult; onUseFix?: AiReviewProps["onUseFix"]; isProposing?: boolean; showRule?: boolean }) {
+  const { label, tone } = verdictLabel(result);
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+    <div className="flex flex-col gap-1.5 rounded-md border border-dashed border-slate-200 p-2">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge tone={tone}>{label}</StatusBadge>
-        <span className="font-mono text-xs text-slate-500">{result.ruleId}</span>
-        <span className="text-sm font-medium text-slate-900">{result.ruleTitle}</span>
+        {showRule ? (
+          <>
+            <span className="font-mono text-xs text-slate-500">{result.ruleId}</span>
+            <span className="text-sm font-medium text-slate-900">{result.ruleTitle}</span>
+          </>
+        ) : null}
       </div>
       <p className="text-sm text-slate-700">{result.reason}</p>
       {result.quotes.length > 0 ? (
@@ -104,36 +123,25 @@ function Verdict({ result, onUseFix, isProposing }: { result: AiRuleResult; onUs
       ) : null}
       {result.fix ? <FixDraft result={result} fix={result.fix} onUseFix={onUseFix} isProposing={isProposing} /> : null}
       {result.note ? <p className="text-xs text-slate-500">Checked: {result.note}</p> : null}
-    </li>
+    </div>
   );
 }
 
-/** AI verdicts for one ticket, with their verified quotes and suggested fixes. */
-export function AiResults({
-  configured,
-  check,
-  ruleCount,
-  onRecheck,
-  isRechecking,
-  onUseFix,
-  isProposing = false,
-  currentProvider = null,
-  enqueueError = null,
-}: AiResultsProps) {
-  if (ruleCount === 0) {
-    return null;
-  }
-
+/**
+ * The AI review's status for one ticket: who reviewed it and when, whether it
+ * is running, paused or failed, and a button to review again.
+ */
+export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking, currentProvider = null, enqueueError = null, reviewable }: AiReviewProps & { reviewable: boolean }) {
   if (!configured) {
-    return (
+    return reviewable ? (
       <p className="text-sm text-slate-600">
-        {ruleCount} rule(s) here are judged by AI.{" "}
+        An AI review can clear findings written another way and draft fixes.{" "}
         <Link to="/credentials" className="font-medium text-indigo-700 hover:underline">
           Set up your AI model
         </Link>{" "}
-        to check them.
+        to use it.
       </p>
-    );
+    ) : null;
   }
 
   const busy = isAiCheckBusy(check);
@@ -141,30 +149,34 @@ export function AiResults({
   const pausedByOther = isAiCheckPaused(check) && Boolean(currentProvider) && check?.provider !== currentProvider;
   const paused = isAiCheckPaused(check) && !pausedByOther;
   const providerName = providerShortName(currentProvider, "AI");
-  const results = [...(check?.results ?? [])].sort((a, b) => VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict]);
+  const outdated = Boolean(check?.results?.length) && check?.ticketRev !== rev;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 rounded-lg bg-slate-50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-900">AI checks</p>
-          {check?.model || check?.costUsd || check?.finishedAt ? (
-            <p className="break-all text-xs text-slate-500">
-              {[check.model, check.costUsd ? `$${check.costUsd.toFixed(4)}` : null, check.finishedAt ? formatRelative(check.finishedAt) : null]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          ) : null}
+          <p className="text-sm font-medium text-slate-900">AI review</p>
+          <p className="break-all text-xs text-slate-500">
+            {busy
+              ? "Reviewing this ticket… the code results below are already final."
+              : check?.status === "DONE"
+                ? [check.model, check.costUsd ? `$${check.costUsd.toFixed(4)}` : null, check.finishedAt ? `checked ${formatRelative(check.finishedAt)}` : null]
+                    .filter(Boolean)
+                    .join(" · ")
+                : !check
+                  ? "Not reviewed yet."
+                  : null}
+          </p>
         </div>
         <Button size="sm" variant="secondary" onClick={onRecheck} disabled={busy || isRechecking}>
           {busy || isRechecking ? <Spinner className="size-4" /> : null}
-          {busy ? "Checking…" : paused ? "Try now" : pausedByOther ? `Check with ${providerName}` : "Re-check with AI"}
+          {busy ? "Reviewing…" : paused ? "Try now" : pausedByOther ? `Review with ${providerName}` : "Review again"}
         </Button>
       </div>
 
       {enqueueError ? (
         <p role="alert" className="text-sm text-rose-600">
-          Could not start the AI check: {enqueueError instanceof ApiError ? enqueueError.message : "the server could not be reached"}.
+          Could not start the AI review: {enqueueError instanceof ApiError ? enqueueError.message : "the server could not be reached"}.
         </p>
       ) : null}
       {check && (check.status === "FAILED" || check.status === "SKIPPED") ? (
@@ -174,8 +186,8 @@ export function AiResults({
       ) : null}
       {pausedByOther && check ? (
         <p role="status" className="text-sm text-slate-600">
-          The last check was paused by {providerShortName(check.provider, "another provider")}. You now use {providerName}; it is
-          checked again automatically, or click “Check with {providerName}”.
+          The last review was paused by {providerShortName(check.provider, "another provider")}. You now use {providerName}; it is
+          reviewed again automatically, or click “Review with {providerName}”.
         </p>
       ) : null}
       {paused && check ? (
@@ -188,17 +200,8 @@ export function AiResults({
           {providerShortName(check.provider, "The provider")} said: “{check.errorDetail}”
         </p>
       ) : null}
-      {(busy || paused) && results.length > 0 ? (
-        <p className="text-xs text-slate-500">Showing the previous result until the new check finishes.</p>
-      ) : null}
-      {!check && !busy ? <p className="text-sm text-slate-500">Not checked by AI yet.</p> : null}
-
-      {results.length > 0 ? (
-        <ul className="space-y-2">
-          {results.map((result) => (
-            <Verdict key={`${check?.updatedAt ?? ""}:${result.ruleId}`} result={result} onUseFix={onUseFix} isProposing={isProposing} />
-          ))}
-        </ul>
+      {outdated ? (
+        <p className="text-xs text-slate-500">The ticket changed since the last review, so its results are hidden{busy ? " until this review finishes" : "; it may be outdated"}.</p>
       ) : null}
     </div>
   );

@@ -10,7 +10,7 @@ test.beforeEach(async ({ request }) => {
   await request.post(`${BACKEND}/__e2e/rulebook`);
 });
 
-test("My work checks wording rules with the developer's own AI model", async ({ page, request }) => {
+test("opening a ticket reviews it with the developer's own AI model; My work never calls the AI", async ({ page, request }) => {
   await page.goto("/register");
   await page.getByLabel("Name").fill("AI Tester");
   await page.getByLabel("Email").fill(`ai-${Date.now()}@example.com`);
@@ -38,19 +38,25 @@ test("My work checks wording rules with the developer's own AI model", async ({ 
   await page.getByRole("button", { name: "Save AI settings" }).click();
   await expect(page.getByText(/^Saved /)).toBeVisible();
 
-  // My work queues AI checks for the open Alpha tasks and shows the gaps when they finish.
+  // My work never calls the AI: no ticket has an AI result until it is opened.
   await page.goto("/azure");
   const table = page.getByRole("table");
-  await expect(table.getByText("T-05 · AI")).toHaveCount(3, { timeout: 15_000 });
-  await expect(page.getByLabel("SOP")).toContainText("T-05 · Approach is described (3)");
+  await expect(table.getByRole("link", { name: "#101 Implement login" })).toBeVisible();
+  await expect(table.getByText("T-05 · AI")).toHaveCount(0);
 
+  // Opening a ticket reviews it with the AI; its verdict on the AI-only rule shows once it lands.
   await table.getByRole("link", { name: "#101 Implement login" }).click();
-  await expect(page.getByText("Fake verdict for T-05.")).toBeVisible();
-  await expect(page.getByText("AI checks").locator("..")).toContainText("claude-haiku-5-5");
+  await expect(page.getByText("Fake verdict for T-05.")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("AI review", { exact: true }).locator("..")).toContainText("claude-haiku-5-5");
 
-  await page.getByRole("button", { name: "Re-check with AI" }).click();
-  await expect(page.getByRole("button", { name: "Re-check with AI" })).toBeEnabled({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Review again" }).click();
+  await expect(page.getByRole("button", { name: "Review again" })).toBeEnabled({ timeout: 15_000 });
   await expect(page.getByText("Fake verdict for T-05.")).toBeVisible();
+
+  // Back on My work, the saved review counts for that ticket only.
+  await page.goto("/azure");
+  await expect(page.getByRole("table").getByText("T-05 · AI")).toHaveCount(1);
+  await expect(page.getByLabel("SOP")).toContainText("T-05 · Approach is described (1)");
 
   const response = await request.get(`${BACKEND}/__e2e/requests`);
   const { requests } = (await response.json()) as { requests: Array<{ isWrite: boolean }> };

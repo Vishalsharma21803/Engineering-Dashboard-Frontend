@@ -3,6 +3,7 @@ export const sopKeys = {
   rulebook: (scope: string) => ["sop", "rulebook", scope] as const,
   versions: (scope: string) => ["sop", "versions", scope] as const,
   effective: ["sop", "effective"] as const,
+  rulesList: ["sop", "rules-list"] as const,
   projects: ["sop", "projects"] as const,
   azureProjects: (credentialId: string) => ["sop", "projects", "azure", credentialId] as const,
   projectSuggestion: (credentialId: string, projectId: string) => ["sop", "projects", "suggestion", credentialId, projectId] as const,

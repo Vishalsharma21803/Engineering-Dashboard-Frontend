@@ -11,11 +11,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 3000 and 5173 are used by other local stacks (SolidTime); fail loudly instead of drifting.
+    port: 5180,
+    strictPort: true,
     allowedHosts: [".trycloudflare.com", ".ngrok-free.app", ".ngrok-free.dev", ".ngrok.app"],
     proxy: {
       "/api": {
-        target: "http://localhost:3000",
+        target: "http://localhost:4000",
         changeOrigin: true,
       },
     },

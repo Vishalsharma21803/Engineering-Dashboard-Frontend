@@ -10,6 +10,7 @@ import { useAiCredentials, useAiModels, useAiPreference, useAiUsage, useUpdateAi
 import type { AiEffort, AiPreference, AiProvider } from "../types/ai.types";
 import { PROVIDER_INFO, formatPrice, formatUsd } from "../utils/ai-display";
 import { describeAiError } from "../utils/ai-errors";
+import { AiReviewSpeed } from "./ai-review-speed";
 import { formatDateTime } from "@/features/credentials/utils/credential-display";
 
 const EFFORT_LABELS: Record<AiEffort, { label: string; hint: string }> = {
@@ -145,6 +146,7 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
           </dd>
         </div>
       </dl>
+      <AiReviewSpeed provider={initial.provider} model={initial.model} />
 
       <form onSubmit={submit}>
         <div className="space-y-6 p-5">
