@@ -1,4 +1,33 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* shadcn/ui's dark: classes follow the in-app theme switch, not the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * shadcn/ui semantic colours, mapped onto the app palette. Inline, so each
+ * resolves where it is used and follows the dark-mode values below.
+ */
+@theme inline {
+  --color-background: var(--color-surface);
+  --color-foreground: var(--color-slate-950);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-slate-950);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-slate-950);
+  --color-primary: var(--color-indigo-600);
+  --color-primary-foreground: #fff;
+  --color-secondary: var(--color-slate-100);
+  --color-secondary-foreground: var(--color-slate-900);
+  --color-muted: var(--color-slate-100);
+  --color-muted-foreground: var(--color-slate-500);
+  --color-accent: var(--color-indigo-50);
+  --color-accent-foreground: var(--color-indigo-800);
+  --color-destructive: var(--color-rose-600);
+  --color-border: var(--color-slate-200);
+  --color-input: var(--color-slate-300);
+  --color-ring: var(--color-indigo-500);
+}
 
 @theme {
   /* Theme tokens: cards and inputs, dark "selected" chips, dialog backdrops. Dark values below. */
@@ -6,14 +35,39 @@
   --color-inverse: oklch(20.8% 0.042 265.755);
   --color-on-inverse: #fff;
   --color-backdrop: oklch(12.9% 0.042 264.695);
-  /* The logo square (slate-950 in light mode) and the low-priority badge (slate-500). */
-  --color-brand: oklch(12.9% 0.042 264.695);
-  --color-on-brand: #fff;
+  /* The low-priority badge (slate-500) and the P2 badge (burnt orange, white text at 5:1 in both themes). */
   --color-badge-muted: oklch(55.4% 0.046 257.417);
+  --color-badge-high: oklch(56% 0.17 42);
 
+  /* Accent: a deep indigo leaning violet, in place of Tailwind's stock indigo. Components keep their indigo-* classes. */
+  --color-indigo-50: oklch(97% 0.018 285);
+  --color-indigo-100: oklch(94% 0.036 284);
+  --color-indigo-200: oklch(88% 0.07 283);
+  --color-indigo-300: oklch(80% 0.115 282);
+  --color-indigo-400: oklch(70% 0.17 281);
+  --color-indigo-500: oklch(58.5% 0.225 280);
+  --color-indigo-600: oklch(50.5% 0.245 279);
+  --color-indigo-700: oklch(45% 0.225 280);
+  --color-indigo-800: oklch(39% 0.19 281);
+  --color-indigo-900: oklch(32% 0.145 282);
+  --color-indigo-950: oklch(23% 0.1 283);
+
+  /* Soft, layered elevation (dark-mode values at the end of the file). */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-md: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 6px 16px -4px rgb(15 23 42 / 0.1);
+  --shadow-lg: 0 2px 4px 0 rgb(15 23 42 / 0.04), 0 14px 32px -8px rgb(15 23 42 / 0.16);
+  --shadow-xl: 0 4px 8px 0 rgb(15 23 42 / 0.05), 0 22px 48px -12px rgb(15 23 42 / 0.22);
+  --shadow-2xl: 0 8px 16px 0 rgb(15 23 42 / 0.06), 0 32px 72px -18px rgb(15 23 42 / 0.32);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Self-hosted in main.tsx (@fontsource). */
   --font-sans:
-    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    sans-serif;
+    "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -21,12 +75,31 @@
     @apply scroll-smooth;
   }
 
+  html {
+    scrollbar-color: var(--color-slate-300) transparent;
+  }
+
   body {
     @apply min-h-screen bg-slate-50 font-sans text-slate-950 antialiased;
+    caret-color: var(--color-indigo-600);
+    /* A soft accent light from above the header; stays put while the page scrolls. */
+    background-image: radial-gradient(
+      ellipse 80rem 30rem at 50% 0,
+      color-mix(in oklab, var(--color-indigo-500) 9%, transparent),
+      transparent 70%
+    );
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
 
   ::selection {
     @apply bg-indigo-200 text-slate-950;
+  }
+
+  /* Figures in tables and time readouts line up. */
+  table,
+  time {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -40,8 +113,6 @@
   --color-surface: oklch(21% 0.038 264);
   --color-inverse: oklch(89% 0.013 255);
   --color-on-inverse: oklch(16.5% 0.035 265);
-  --color-brand: oklch(89% 0.013 255);
-  --color-on-brand: oklch(16.5% 0.035 265);
   --color-badge-muted: oklch(44.6% 0.043 257.281);
   --color-slate-50: oklch(16.5% 0.035 265);
   --color-slate-100: oklch(24% 0.038 263);
@@ -116,11 +187,31 @@
   --color-blue-900: color-mix(in oklab, var(--color-blue-400) 40%, white);
 }
 
+/* shadcn/ui components draw bare "border"s in the theme's border colour (explicit colour classes still win). */
+@layer base {
+  [data-slot] {
+    border-color: var(--color-border);
+  }
+}
+
 /* Focus rings offset against the dark page, not white. In the base layer, so an explicit ring-offset colour utility still wins. */
 @layer base {
   :root[data-theme="dark"] * {
     --tw-ring-offset-color: var(--color-slate-50);
   }
+}
+
+/* Accent text: indigo-500/600 are button fills and too dark as text on the dark page. */
+:root[data-theme="dark"] :is(.text-indigo-500, .text-indigo-600) {
+  color: var(--color-indigo-400);
+}
+
+:root[data-theme="dark"] :is(.hover\:text-indigo-500, .hover\:text-indigo-600):hover {
+  color: var(--color-indigo-300);
+}
+
+:root[data-theme="dark"] .group:hover .group-hover\:text-indigo-600 {
+  color: var(--color-indigo-300);
 }
 
 /* Parts designed dark in both modes (the sign-in side panel) keep the light-mode values. */
@@ -137,4 +228,231 @@
   --color-slate-800: oklch(27.9% 0.041 260.031);
   --color-slate-900: oklch(20.8% 0.042 265.755);
   --color-slate-950: oklch(12.9% 0.042 264.695);
+}
+
+/* Dark elevation: deeper drop, plus a faint top highlight that separates surfaces from the page. */
+:root[data-theme="dark"] .shadow-xs,
+:root[data-theme="dark"] .shadow-sm {
+  --tw-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.035), 0 1px 2px 0 rgb(0 0 0 / 0.35);
+}
+
+:root[data-theme="dark"] .shadow-md,
+:root[data-theme="dark"] .shadow-lg {
+  --tw-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.04), 0 12px 32px -8px rgb(0 0 0 / 0.55);
+}
+
+:root[data-theme="dark"] .shadow-xl,
+:root[data-theme="dark"] .shadow-2xl {
+  --tw-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 28px 64px -16px rgb(0 0 0 / 0.7);
+}
+
+/* Primary actions glow faintly in the dark, like a lit control. */
+:root[data-theme="dark"] .btn-primary:not(:disabled) {
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.16), 0 0 0 1px color-mix(in oklab, var(--color-indigo-400) 35%, transparent), 0 6px 20px -6px color-mix(in oklab, var(--color-indigo-500) 75%, transparent);
+}
+
+/* ---------------------------------------------------------------- Motion */
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@keyframes icon-swap {
+  from {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+}
+
+@keyframes header-lift {
+  to {
+    box-shadow: 0 1px 0 0 var(--color-slate-200), 0 10px 30px -18px rgb(15 23 42 / 0.35);
+  }
+}
+
+/* Loading placeholders sweep instead of blinking. */
+.skeleton .bg-slate-100 {
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--color-slate-200) 80%, transparent) 50%, transparent 100%);
+  background-size: 200% 100%;
+}
+
+.active-indicator {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Each page settles in when it is opened (only on mount; refetches never replay it). */
+  main > * {
+    animation: page-in 0.5s var(--ease-out-expo) backwards;
+  }
+
+  /* Stat tiles and listed items arrive in reading order. */
+  .stat-tile,
+  .stagger > * {
+    animation: rise-in 0.45s var(--ease-out-expo) backwards;
+  }
+
+  .stat-tile:nth-child(2),
+  .stagger > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+
+  .stat-tile:nth-child(3),
+  .stagger > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+
+  .stat-tile:nth-child(4),
+  .stagger > :nth-child(4) {
+    animation-delay: 120ms;
+  }
+
+  .stat-tile:nth-child(5),
+  .stagger > :nth-child(5) {
+    animation-delay: 160ms;
+  }
+
+  .stagger > :nth-child(n + 6) {
+    animation-delay: 200ms;
+  }
+
+  .toast-in {
+    animation: toast-in 0.36s var(--ease-out-expo);
+  }
+
+  .icon-swap {
+    animation: icon-swap 0.5s var(--ease-out-expo);
+  }
+
+  .skeleton .bg-slate-100 {
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  .active-indicator[data-ready] {
+    transition:
+      transform 0.42s var(--ease-out-expo),
+      width 0.42s var(--ease-out-expo),
+      height 0.42s var(--ease-out-expo),
+      opacity 0.2s ease-out;
+  }
+
+  /* The header picks up depth once content scrolls beneath it. */
+  @supports (animation-timeline: scroll()) {
+    .app-header {
+      animation: header-lift linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 96px;
+    }
+  }
+}
+
+/* ------------------------------------------------ Sign-in cockpit preview */
+
+@keyframes cp-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+
+/* The focus steps down the queue, one action at a time, then starts over. */
+@keyframes cp-focus {
+  0%,
+  20% {
+    transform: translateY(0);
+  }
+  25%,
+  45% {
+    transform: translateY(3.5rem);
+  }
+  50%,
+  70% {
+    transform: translateY(7rem);
+  }
+  75%,
+  95% {
+    transform: translateY(10.5rem);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes cp-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes cp-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes cp-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cockpit-preview {
+    animation: rise-in 0.9s var(--ease-out-expo) 0.1s backwards;
+  }
+
+  .cp-row {
+    animation: cp-row-in 0.7s var(--ease-out-expo) backwards;
+  }
+
+  .cp-focus {
+    animation: cp-focus 10s var(--ease-out-expo) 1.4s infinite;
+  }
+
+  .cp-run {
+    transform-origin: bottom;
+    animation: cp-grow-y 0.6s var(--ease-out-expo) backwards;
+  }
+
+  .cp-running,
+  .cp-live {
+    animation: cp-breathe 1.6s ease-in-out infinite;
+  }
+
+  .cp-gauge {
+    animation: cp-grow-x 1.4s var(--ease-out-expo) 0.9s backwards;
+  }
+}
+
+/* Theme switch: the new theme is revealed by a circle drawn from the toggle (see ThemeToggle). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }

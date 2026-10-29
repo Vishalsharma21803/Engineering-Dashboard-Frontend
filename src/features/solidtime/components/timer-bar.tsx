@@ -3,13 +3,12 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { useCatalog, useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
 import { formatDuration } from "../utils/time";
 import { LoadErrorNotice } from "./load-error-notice";
-
-const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm";
 
 /** The running timer with a live clock, or a quick way to start one. Both only propose; approval runs them. */
 export function TimerBar({ connection, onPropose, isProposing }: { connection: SolidtimeConnection; onPropose: (input: ProposeActionInput) => void; isProposing: boolean }) {
@@ -78,14 +77,14 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
         }}
       >
         <Input aria-label="What are you working on?" placeholder="What are you working on? e.g. #21786" value={description} onChange={(event) => setDescription(event.target.value)} className="h-9 sm:flex-1" />
-        <select aria-label="Project" className={SELECT} value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+        <SelectField aria-label="Project" size="sm" className="sm:w-48" value={projectId} onValueChange={(selected) => setProjectId(selected)}>
           <option value="">No project</option>
           {(catalog.data?.projects ?? []).map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
             </option>
           ))}
-        </select>
+        </SelectField>
         <Button type="submit" size="sm" disabled={isProposing || timer.isLoading || readError !== null}>
           Start timer…
         </Button>

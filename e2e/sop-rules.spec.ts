@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { choose, openOptions } from "./helpers/select.js";
 
 const BACKEND = "http://localhost:3100";
 
@@ -23,7 +24,7 @@ test("a developer tunes their own rules; the default rules stay read-only", asyn
 
   // The Markdown editor sits under Advanced, below the rules list.
   await page.getByText("Advanced: edit as Markdown").click();
-  const editor = page.getByLabel("My rules");
+  const editor = page.getByRole("textbox", { name: "My rules" });
   await editor.fill("---\nid: NOPE-01\nseverity: off\n---\n");
   await expect(page.getByText(/no default rule/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Save as new version" })).toBeDisabled();
@@ -53,7 +54,7 @@ test("a developer changes a rule's level and settings from the rules list, and r
   await page.goto("/sop-rules?tab=personal");
 
   const row = page.getByRole("listitem").filter({ has: page.getByLabel("Level for STR-08") });
-  await page.getByLabel("Level for STR-08").selectOption("notice");
+  await choose(page.getByLabel("Level for STR-08"), "notice");
   await expect(row).toContainText("yours");
 
   await row.getByRole("button", { name: "Settings" }).click();
@@ -63,14 +64,14 @@ test("a developer changes a rule's level and settings from the rules list, and r
 
   // The same change is what the Markdown holds (the list writes the rule file).
   await page.getByText("Advanced: edit as Markdown").click();
-  const markdown = page.getByLabel("My rules");
+  const markdown = page.getByRole("textbox", { name: "My rules" });
   await expect(markdown).toHaveValue(/id: STR-08\n/);
   await expect(markdown).toHaveValue(/severity: notice/);
   await expect(markdown).toHaveValue(/params: \{"min_steps":4\}/);
 
   await row.getByRole("button", { name: "Reset to default" }).click();
   await expect(row).not.toContainText("yours");
-  await expect(page.getByLabel("Level for STR-08")).toHaveValue("warn");
+  await expect(page.getByLabel("Level for STR-08")).toHaveAttribute("data-value", "warn");
 });
 
 test("an SOP owner saves a new default version with a note", async ({ page }) => {
@@ -88,7 +89,8 @@ test("an SOP owner saves a new default version with a note", async ({ page }) =>
   await page.getByLabel("Change note").fill("Shorter STR-03 title");
   await page.getByRole("button", { name: "Save as new version" }).click();
   await expect(page.getByText(/^Version 1/)).toBeVisible();
-  await expect(page.locator("#versions-default option", { hasText: "Shorter STR-03 title" })).toHaveCount(1);
+  await expect((await openOptions(page.locator("#versions-default"))).filter({ hasText: "Shorter STR-03 title" })).toHaveCount(1);
+  await page.keyboard.press("Escape");
 });
 
 test("rules are tried on a real ticket and shown on the work item page", async ({ page, request }) => {
@@ -109,9 +111,9 @@ test("rules are tried on a real ticket and shown on the work item page", async (
   // An unsaved personal draft that switches T-01 off is tried on the same ticket.
   await page.goto("/sop-rules");
   await page.getByText("Advanced: edit as Markdown").click();
-  await page.getByLabel("My rules").fill("---\nid: T-01\nseverity: off\n---\n");
+  await page.getByRole("textbox", { name: "My rules" }).fill("---\nid: T-01\nseverity: off\n---\n");
   await expect(page.getByText(/✓ Valid/)).toBeVisible();
-  await expect(page.getByLabel("Project")).toHaveValue(/aaaaaaaa/);
+  await expect(page.getByLabel("Project")).toHaveAttribute("data-value", /aaaaaaaa/);
   await page.getByLabel("Ticket number").fill("102");
   await page.getByRole("button", { name: "Run rules" }).click();
   await expect(page.getByText("#102 Fix flaky test · Task · Active")).toBeVisible();
@@ -140,7 +142,7 @@ test("the team SOP report uses the default rules for everyone in the project", a
   // A personal override does not change the team report.
   await page.goto("/sop-rules");
   await page.getByText("Advanced: edit as Markdown").click();
-  await page.getByLabel("My rules").fill("---\nid: T-01\nseverity: off\n---\n");
+  await page.getByRole("textbox", { name: "My rules" }).fill("---\nid: T-01\nseverity: off\n---\n");
   await expect(page.getByText(/✓ Valid/)).toBeVisible();
   await page.getByRole("button", { name: "Save as new version" }).click();
   await expect(page.getByText("Saved as version 1.")).toBeVisible();
@@ -149,7 +151,7 @@ test("the team SOP report uses the default rules for everyone in the project", a
   await page.getByRole("link", { name: "Project overview" }).click();
   // Wait for the tab to open before choosing the project, or a slow run can still be on My work.
   await expect(page).toHaveURL(/\/projects\//);
-  await page.getByLabel("Project").selectOption({ label: "Alpha" });
+  await choose(page.getByLabel("Project"), { label: "Alpha" });
   await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
   await expect(page.getByText(/No saved reports yet/)).toBeVisible();
   await page.getByRole("button", { name: "Run report" }).click();
@@ -162,7 +164,7 @@ test("the team SOP report uses the default rules for everyone in the project", a
   await expect(page.getByText("Tickets checked").locator("..")).toContainText("5");
 
   // Filters run on the server: one person's tickets only.
-  await page.getByRole("combobox").filter({ hasText: "Person: All" }).selectOption({ label: "Person: Reviewer Two (1)" });
+  await choose(page.getByRole("combobox").filter({ hasText: "Person: All" }), { label: "Person: Reviewer Two (1)" });
   await expect(page.getByText("Tickets checked").locator("..")).toContainText("1");
   await expect(byPerson.getByRole("row")).toHaveCount(2);
 
@@ -196,7 +198,7 @@ test("projects are set up from Azure and each developer chooses theirs; new tick
   // Set Beta up from its Azure states.
   await projects.getByRole("row", { name: /Beta/ }).getByRole("button", { name: "Set up" }).click();
   const form = page.getByRole("form", { name: "Set up Beta" });
-  await expect(form.getByLabel("Stage for Active")).toHaveValue("active");
+  await expect(form.getByLabel("Stage for Active")).toHaveAttribute("data-value", "active");
   await form.getByLabel("Team time zone").fill("Asia/Kolkata");
   await form.getByRole("button", { name: "Set up project" }).click();
   await expect(projects.getByRole("row", { name: /Beta/ })).toContainText("Set up");

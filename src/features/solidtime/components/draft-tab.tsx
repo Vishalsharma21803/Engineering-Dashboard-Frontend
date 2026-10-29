@@ -2,10 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Hint } from "@/components/ui/hint";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
@@ -19,7 +24,6 @@ import type { DayDraft, DraftEstimate, DraftRow, ProjectSource, SolidtimeConnect
 import { formatDayLabel, formatHours, shiftDay, zonedClock, zonedInstant } from "../utils/time";
 import { LoadErrorNotice } from "./load-error-notice";
 
-const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 const HOUR = 3_600_000;
 /** AI errors that are fixed on the Credentials page. */
 const AI_SETUP_REASONS = new Set(["AI_NOT_CONFIGURED", "AI_KEY_REQUIRED", "AI_MODEL_UNAVAILABLE", "DATA_COLLECTION_NOT_ACCEPTED", "AI_KEY_INVALID", "DAILY_LIMIT_REACHED"]);
@@ -244,16 +248,20 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
       <Card className="flex flex-col gap-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" aria-label="Previous day" disabled={day <= shiftDay(today, -14)} onClick={() => changeDay(shiftDay(day, -1))}>
-              ←
-            </Button>
+            <Hint label="Previous day">
+              <Button size="sm" variant="secondary" aria-label="Previous day" disabled={day <= shiftDay(today, -14)} onClick={() => changeDay(shiftDay(day, -1))}>
+                <ChevronLeftIcon />
+              </Button>
+            </Hint>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <span className="sr-only">Day</span>
-              <Input type="date" aria-label="Day" className="h-9 w-40" value={day} min={shiftDay(today, -14)} max={today} onChange={(event) => event.target.value && changeDay(event.target.value)} />
+              <DatePicker aria-label="Day" size="sm" value={day} min={shiftDay(today, -14)} max={today} onChange={(picked) => picked && changeDay(picked)} />
             </label>
-            <Button size="sm" variant="secondary" aria-label="Next day" disabled={day >= today} onClick={() => changeDay(shiftDay(day, 1))}>
-              →
-            </Button>
+            <Hint label="Next day">
+              <Button size="sm" variant="secondary" aria-label="Next day" disabled={day >= today} onClick={() => changeDay(shiftDay(day, 1))}>
+                <ChevronRightIcon />
+              </Button>
+            </Hint>
             {day !== today ? (
               <Button size="sm" variant="ghost" onClick={() => changeDay(today)}>
                 Today
@@ -350,7 +358,7 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                 <li key={row.ticketId} className={cn("rounded-xl border bg-surface p-4 shadow-sm", edit.include ? "border-indigo-200" : "border-slate-200")}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <label className="flex min-w-0 items-start gap-3">
-                      <input type="checkbox" className="mt-1 size-4 accent-indigo-600" checked={edit.include} onChange={(event) => set(row.ticketId, { include: event.target.checked, unticked: !event.target.checked })} aria-label={`Include #${row.ticketId}`} />
+                      <Checkbox className="mt-1" checked={edit.include} onCheckedChange={(state) => set(row.ticketId, { include: state === true, unticked: !state === true })} aria-label={`Include #${row.ticketId}`} />
                       <span className="min-w-0">
                         <span className="block font-medium text-slate-950">
                           #{row.ticketId} {row.title}
@@ -380,14 +388,14 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                     </label>
                     <label className="col-span-3 flex flex-col gap-1 text-xs font-medium text-slate-600 lg:col-span-1">
                       Project
-                      <select aria-label={`Project for #${row.ticketId}`} className={SELECT} value={edit.projectId} onChange={(event) => set(row.ticketId, { projectId: event.target.value })}>
+                      <SelectField aria-label={`Project for #${row.ticketId}`} size="sm" value={edit.projectId} onValueChange={(selected) => set(row.ticketId, { projectId: selected })}>
                         <option value="">No project</option>
                         {(catalog.data?.projects ?? []).map((project) => (
                           <option key={project.id} value={project.id}>
                             {project.name}
                           </option>
                         ))}
-                      </select>
+                      </SelectField>
                       <span className={cn("font-normal", edit.projectId ? "text-slate-500" : "text-amber-700")}>{projectHint}</span>
                     </label>
                     <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">

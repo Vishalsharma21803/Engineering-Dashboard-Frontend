@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { providerShortName } from "@/features/ai/utils/ai-display";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { formatRelative } from "@/features/azure-devops/utils/format";
@@ -50,12 +51,12 @@ function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult
       <label htmlFor={id} className="text-xs font-medium text-slate-600">
         Ready to post · {FIX_TARGET_LABELS[fix.target]} (edit before using it)
       </label>
-      <textarea
+      <Textarea
         id={id}
         value={text}
         rows={singleLine ? 1 : Math.min(12, Math.max(3, text.split("\n").length + 1))}
         onChange={(event) => setText(singleLine ? event.target.value.replace(/\n/g, " ") : event.target.value)}
-        className="w-full resize-y rounded-md border border-slate-300 bg-surface px-2 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        className="min-h-0 resize-y px-2 py-1.5"
       />
       {gaps.length > 0 ? (
         <p className="text-xs text-amber-700">

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useProjects } from "@/features/azure-devops/hooks/use-projects";
+import { SelectField } from "@/components/ui/select-field";
 import { updateConnection } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import { useCatalog } from "../hooks/use-solidtime";
@@ -55,14 +56,14 @@ function MappingList({ connection, azureCredentialId }: { connection: SolidtimeC
             return (
               <li key={project.id} className="grid items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_18rem]">
                 <span className="font-medium text-slate-800">{project.name}</span>
-                <select
+                <SelectField
                   aria-label={`Solidtime project for ${project.name}`}
-                  className="h-9 w-full rounded-lg border border-slate-300 bg-surface px-2.5 text-sm"
+                  size="sm"
                   value={connection.projectMap[key] ?? ""}
                   disabled={save.isPending}
-                  onChange={(event) => {
+                  onValueChange={(selected) => {
                     const next = { ...connection.projectMap };
-                    if (event.target.value) next[key] = event.target.value;
+                    if (selected) next[key] = selected;
                     else delete next[key];
                     save.mutate(next);
                   }}
@@ -73,7 +74,7 @@ function MappingList({ connection, azureCredentialId }: { connection: SolidtimeC
                       {candidate.name}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </li>
             );
           })}

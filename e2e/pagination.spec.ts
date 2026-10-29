@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { choose } from "./helpers/select.js";
 
 const BACKEND = "http://localhost:3100";
 
@@ -58,7 +59,7 @@ test("My work shows 10 tickets per page and survives tampered page numbers", asy
   // Filtering goes back to page 1 and pages the filtered list.
   await pager.getByRole("button", { name: "Page 2" }).click();
   await expect(page).toHaveURL(/[?&]page=2/);
-  await page.getByLabel("Type").selectOption({ label: "Type: Bug (1)" });
+  await choose(page.getByLabel("Type"), { label: "Type: Bug (1)" });
   await expect(rows(page)).toHaveCount(2);
   await expect(page).not.toHaveURL(/[?&]page=/);
   await expect(pager).toHaveCount(0);
@@ -70,7 +71,7 @@ test("Project overview and the team SOP report page their tickets", async ({ pag
   await page.getByRole("link", { name: "Project overview" }).click();
   // Wait for the tab to open before choosing the project, or a slow run can still be on My work.
   await expect(page).toHaveURL(/\/projects\//);
-  await page.getByLabel("Project").selectOption({ label: "Alpha" });
+  await choose(page.getByLabel("Project"), { label: "Alpha" });
   await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
 
   // Alpha: 101, 102, 103, 105, 106 + 23 = 28 tickets for the whole team.

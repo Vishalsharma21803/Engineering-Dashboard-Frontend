@@ -2,13 +2,15 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
-// jsdom does not implement <dialog> modality.
-HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
-  this.open = false;
-  this.dispatchEvent(new Event("close"));
+// Radix UI (shadcn/ui) primitives call pointer-capture, scrolling and resize APIs jsdom lacks.
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.setPointerCapture ??= () => undefined;
+Element.prototype.releasePointerCapture ??= () => undefined;
+Element.prototype.scrollIntoView ??= () => undefined;
+globalThis.ResizeObserver ??= class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
 };
 
 afterEach(() => {

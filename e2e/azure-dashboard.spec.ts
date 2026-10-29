@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { choose, openOptions } from "./helpers/select.js";
 
 const BACKEND = "http://localhost:3100";
 const FAKE_ORG_URL = "https://dev.azure.com/fake-org";
@@ -54,7 +55,8 @@ test("discovers projects, prioritizes work and never writes without approval", a
 
   // Project discovery
   const projectSelect = page.getByLabel("Project");
-  await expect(projectSelect.locator("option")).toHaveText(["All projects", "Alpha", "Beta"]);
+  await expect(await openOptions(projectSelect)).toHaveText(["All projects", "Alpha", "Beta"]);
+  await page.keyboard.press("Escape");
 
   // Prioritized dashboard, compliance and degraded-free sections
   await expect(page.getByRole("link", { name: "alpha-ci #2026.501 failed" })).toBeVisible();
@@ -133,7 +135,7 @@ test("updates a work item through the approval flow", async ({ page, request }) 
 test("shows pipeline failures and only proposes pipeline actions", async ({ page, request }) => {
   await signUpWithCredential(page);
   await page.goto("/azure");
-  await page.getByLabel("Project").selectOption({ label: "Alpha" });
+  await choose(page.getByLabel("Project"), { label: "Alpha" });
   await page.getByRole("link", { name: "Project overview" }).click();
 
   await expect(page.getByRole("heading", { name: "Alpha" })).toBeVisible();
@@ -163,14 +165,14 @@ test("tabs work and project overview shows the whole team while My work stays mi
   // Project overview with "All projects" in the header → opens the first project directly
   await tabs.getByRole("link", { name: "Project overview" }).click();
   await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
-  await expect(page.getByLabel("Project")).toHaveValue(/aaaaaaaa/);
+  await expect(page.getByLabel("Project")).toHaveAttribute("data-value", /aaaaaaaa/);
 
   // Team-wide work items and PRs
   await expect(page.getByRole("heading", { name: "Team work items" })).toBeVisible();
   const teamTable = page.getByRole("table");
   await expect(teamTable.getByRole("link", { name: "#105 Someone else's task" })).toBeVisible();
   await expect(teamTable.getByText("Reviewer Two")).toBeVisible();
-  await page.getByLabel("Assignee").selectOption({ label: "Assignee: Me (4)" });
+  await choose(page.getByLabel("Assignee"), { label: "Assignee: Me (4)" });
   await expect(teamTable.getByText("Someone else's task")).toHaveCount(0);
   await expect(teamTable.getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
 
@@ -187,17 +189,18 @@ test("tabs work and project overview shows the whole team while My work stays mi
   await expect(page.getByRole("heading", { name: "Prioritized actions" })).toBeVisible();
 
   // The last viewed project is remembered: view Beta, go home, reopen the tab
-  await page.getByLabel("Project").selectOption({ label: "Beta" });
+  await choose(page.getByLabel("Project"), { label: "Beta" });
   await tabs.getByRole("link", { name: "Project overview" }).click();
   await expect(page.getByRole("heading", { name: "Beta", exact: true })).toBeVisible();
 
   // "All projects" is not selectable on Project overview, so the tab never changes
-  const allOption = page.getByLabel("Project").locator('option[value=""]');
-  await expect(allOption).toBeDisabled();
+  const allOption = (await openOptions(page.getByLabel("Project"))).and(page.locator('[data-value=""]'));
+  await expect(allOption).toHaveAttribute("aria-disabled", "true");
   await expect(allOption).toHaveText("All projects (My work & Approvals only)");
+  await page.keyboard.press("Escape");
 
   await tabs.getByRole("link", { name: "My work" }).click();
-  await page.getByLabel("Project").selectOption({ label: "All projects" });
+  await choose(page.getByLabel("Project"), { label: "All projects" });
   await expect(page.getByRole("heading", { name: "Prioritized actions" })).toBeVisible();
   await tabs.getByRole("link", { name: "Project overview" }).click();
   await expect(page.getByRole("heading", { name: "Beta", exact: true })).toBeVisible();
@@ -209,7 +212,7 @@ test("keeps the selected project across tabs and filters lists", async ({ page }
   const tabs = page.getByRole("navigation", { name: "Azure DevOps" });
   const projectSelect = page.getByLabel("Project");
 
-  await projectSelect.selectOption({ label: "Alpha" });
+  await choose(projectSelect, { label: "Alpha" });
   await expect(page).toHaveURL(/\?project=aaaaaaaa/);
 
   await tabs.getByRole("link", { name: "Project overview" }).click();
@@ -218,21 +221,21 @@ test("keeps the selected project across tabs and filters lists", async ({ page }
   await tabs.getByRole("link", { name: "Approvals & audit" }).click();
   await expect(page).toHaveURL(/\/actions\?project=aaaaaaaa/);
   await expect(page.getByText("Showing changes for Alpha")).toBeVisible();
-  await expect(projectSelect).toHaveValue(/aaaaaaaa/);
+  await expect(projectSelect).toHaveAttribute("data-value", /aaaaaaaa/);
 
   // Still Alpha after leaving the cockpit and coming back
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Credentials" }).click();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Azure DevOps", exact: true }).click();
   await expect(page).toHaveURL(/\?project=aaaaaaaa/);
-  await expect(projectSelect).toHaveValue(/aaaaaaaa/);
+  await expect(projectSelect).toHaveAttribute("data-value", /aaaaaaaa/);
 
   // Filters on My work
   const table = page.getByRole("table");
-  await page.getByLabel("Type").selectOption({ label: "Type: Bug (1)" });
+  await choose(page.getByLabel("Type"), { label: "Type: Bug (1)" });
   await expect(table.getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
   await expect(table.getByRole("link", { name: "#102 Fix flaky test" })).toHaveCount(0);
   await page.getByRole("button", { name: "Clear filters" }).first().click();
-  await page.getByLabel("SOP").selectOption({ label: "SOP: T-01 · Estimate exists (2)" });
+  await choose(page.getByLabel("SOP"), { label: "SOP: T-01 · Estimate exists (2)" });
   await expect(table.getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
   await expect(table.getByRole("link", { name: "#101 Implement login" })).toHaveCount(0);
   await expect(table.getByRole("row")).toHaveCount(3);
@@ -242,7 +245,7 @@ test("keeps the selected project across tabs and filters lists", async ({ page }
   await expect(page.locator("ol").getByRole("link", { name: "#103 Crash on save" })).toHaveCount(0);
 
   // Choosing "All projects" sticks too
-  await projectSelect.selectOption({ label: "All projects" });
+  await choose(projectSelect, { label: "All projects" });
   await tabs.getByRole("link", { name: "Approvals & audit" }).click();
   await expect(page).toHaveURL(/\/actions$/);
 });
@@ -266,23 +269,23 @@ test("switching project or organization keeps the current tab", async ({ page })
   // Project change on Project overview stays on Project overview
   await tabs.getByRole("link", { name: "Project overview" }).click();
   await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
-  await projectSelect.selectOption({ label: "Beta" });
+  await choose(projectSelect, { label: "Beta" });
   await expect(page.getByRole("heading", { name: "Beta", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/projects\/bbbbbbbb/);
 
   // Organization change on Project overview opens the other org's project overview
-  await orgSelect.selectOption({ label: "fake-org-2" });
+  await choose(orgSelect, { label: "fake-org-2" });
   await expect(page.getByRole("heading", { name: "Gamma", exact: true })).toBeVisible();
-  await expect(projectSelect).toHaveValue(/eeeeeeee/);
+  await expect(projectSelect).toHaveAttribute("data-value", /eeeeeeee/);
 
   // ...and back: the first org remembers Beta
-  await orgSelect.selectOption({ label: "fake-org" });
+  await choose(orgSelect, { label: "fake-org" });
   await expect(page.getByRole("heading", { name: "Beta", exact: true })).toBeVisible();
 
   // Organization change on Approvals stays on Approvals
   await tabs.getByRole("link", { name: "Approvals & audit" }).click();
   await expect(page).toHaveURL(/\/actions\?project=bbbbbbbb/);
-  await orgSelect.selectOption({ label: "fake-org-2" });
+  await choose(orgSelect, { label: "fake-org-2" });
   await expect(page).toHaveURL(/fake|\/actions/);
   await expect(page.getByRole("heading", { name: "Awaiting your approval" })).toBeVisible();
   await expect(page).toHaveURL(/\/actions\?project=eeeeeeee/);
@@ -290,9 +293,9 @@ test("switching project or organization keeps the current tab", async ({ page })
   // Project change on My work stays on My work
   await tabs.getByRole("link", { name: "My work" }).click();
   await expect(page.getByRole("heading", { name: "Prioritized actions" })).toBeVisible();
-  await orgSelect.selectOption({ label: "fake-org" });
+  await choose(orgSelect, { label: "fake-org" });
   await expect(page.getByRole("heading", { name: "Prioritized actions" })).toBeVisible();
-  await projectSelect.selectOption({ label: "Alpha" });
+  await choose(projectSelect, { label: "Alpha" });
   await expect(page.getByRole("heading", { name: "Prioritized actions" })).toBeVisible();
   await expect(page).toHaveURL(/\?project=aaaaaaaa/);
 });

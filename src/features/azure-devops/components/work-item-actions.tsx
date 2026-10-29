@@ -3,6 +3,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
+import { Textarea } from "@/components/ui/textarea";
 import { useRepositories } from "../hooks/use-projects";
 import type { ProposeActionInput } from "../types/action.types";
 import type { SupportedWorkFields, WorkItemDetail } from "../types/azure.types";
@@ -24,12 +26,6 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   effort: "Effort",
   priority: "Priority (1–4)",
 };
-
-const textareaClassName =
-  "block min-h-24 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm text-slate-950 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
-
-const selectClassName =
-  "block h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 function ActionBlock({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (
@@ -105,9 +101,9 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
           <Label htmlFor="action-comment" className="sr-only">
             Comment
           </Label>
-          <textarea
+          <Textarea
             id="action-comment"
-            className={textareaClassName}
+            className="min-h-24"
             value={comment}
             maxLength={10_000}
             onChange={(event) => setComment(event.target.value)}
@@ -162,14 +158,14 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
             <Label htmlFor="action-state" className="sr-only">
               New state
             </Label>
-            <select id="action-state" className={selectClassName} value={state} onChange={(event) => setState(event.target.value)}>
+            <SelectField id="action-state" value={state} onValueChange={(selected) => setState(selected)}>
               <option value="">Choose a state</option>
               {transitions.map((candidate) => (
                 <option key={candidate.name} value={candidate.name}>
                   {candidate.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
             <Button type="submit" size="sm" className="h-10" disabled={isProposing || state === ""}>
               Review…
             </Button>
@@ -193,11 +189,11 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
           <Label htmlFor="action-repo" className="sr-only">
             Repository
           </Label>
-          <select
+          <SelectField
             id="action-repo"
-            className={`${selectClassName} col-span-2 sm:col-span-1`}
+            className="col-span-2 sm:col-span-1"
             value={repositoryId}
-            onChange={(event) => setRepositoryId(event.target.value)}
+            onValueChange={(selected) => setRepositoryId(selected)}
           >
             <option value="">{repositories.isLoading ? "Loading..." : repositories.error && !repositories.data ? "Repositories could not be loaded" : "Repository"}</option>
             {(repositories.data ?? []).map((repository) => (
@@ -205,7 +201,7 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
                 {repository.name}
               </option>
             ))}
-          </select>
+          </SelectField>
           <Label htmlFor="action-pr" className="sr-only">
             Pull request number
           </Label>

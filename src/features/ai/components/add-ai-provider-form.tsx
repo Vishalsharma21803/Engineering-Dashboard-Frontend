@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
 import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { usePlatforms } from "@/features/credentials/api/platform.api";
 import { PlatformForm } from "@/features/credentials/components/platform-form";
@@ -10,8 +11,6 @@ import { useValidateAiCredential } from "../hooks/use-ai";
 import type { AiProvider } from "../types/ai.types";
 import { describeAiError } from "../utils/ai-errors";
 import { validationNotice, type AiNotice } from "../utils/ai-validation";
-
-const SELECT = "h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 /**
  * The one place to add an AI provider key. Providers and their fields come from
@@ -48,14 +47,14 @@ export function AddAiProviderForm({ existing, onDone, onCancel }: { existing: Se
           {/* A failed background refresh keeps the form (and the typed key) on screen. */}
           {platforms.error ? <StaleDataBanner error={platforms.error} onRetry={() => void platforms.refetch()} isRetrying={platforms.isFetching} /> : null}
           <FormField id="new-ai-provider" label="Provider" hint={platform.description}>
-            <select id="new-ai-provider" className={SELECT} value={platform.id} disabled={saving || validate.isPending} onChange={(event) => setChosen(event.target.value)}>
+            <SelectField id="new-ai-provider" value={platform.id} disabled={saving || validate.isPending} onValueChange={(selected) => setChosen(selected)}>
               {providers.map((option) => (
                 <option key={option.id} value={option.id} disabled={existing.has(option.aiProvider!)}>
                   {option.label}
                   {existing.has(option.aiProvider!) ? " (already added)" : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </FormField>
 
           {existing.has(platform.aiProvider!) && !saving ? (

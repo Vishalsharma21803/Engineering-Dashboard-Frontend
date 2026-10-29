@@ -7,6 +7,8 @@ import { Pagination } from "@/components/ui/pagination";
 import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
@@ -25,8 +27,6 @@ import {
 } from "../api/sop.api";
 import { sopKeys } from "../api/sop.keys";
 import { SOP_STAGE_OPTIONS, type AzureSopProject, type ProjectSettings, type SopStageName } from "../types/sop.types";
-
-const SELECT = "h-9 w-full rounded-lg border border-slate-300 bg-surface px-2 text-sm";
 
 const STAGE_LABELS: Record<SopStageName, string> = {
   ready: "Ready (new, not started)",
@@ -213,11 +213,12 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
                   <span className="font-medium text-slate-900">{state}</span>
                   {info ? <span className="block text-xs text-slate-500">{info.types.join(", ")}</span> : <span className="block text-xs text-amber-600">not in Azure any more</span>}
                 </span>
-                <select
+                <SelectField
                   aria-label={`Stage for ${state}`}
-                  className="h-9 w-48 rounded-lg border border-slate-300 bg-surface px-2 text-sm"
+                  size="sm"
+                  className="w-48"
                   value={choice[state] ?? ""}
-                  onChange={(event) => setChoice({ ...choice, [state]: event.target.value as SopStageName | "" })}
+                  onValueChange={(selected) => setChoice({ ...choice, [state]: selected as SopStageName | "" })}
                 >
                   <option value="">Not used</option>
                   {SOP_STAGE_OPTIONS.map((stage) => (
@@ -225,7 +226,7 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
                       {STAGE_LABELS[stage]}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             );
           })}
@@ -236,25 +237,25 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           Category field
-          <select className={SELECT} value={category} onChange={(event) => setCategory(event.target.value)}>
+          <SelectField size="sm" value={category} onValueChange={(selected) => setCategory(selected)}>
             <option value="">None</option>
             {categoryOptions.map((field) => (
               <option key={field} value={field}>
                 {field}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           Target completion field
-          <select className={SELECT} value={target} onChange={(event) => setTarget(event.target.value)}>
+          <SelectField size="sm" value={target} onValueChange={(selected) => setTarget(selected)}>
             <option value="">None</option>
             {targetOptions.map((field) => (
               <option key={field} value={field}>
                 {field}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <label className="flex flex-col gap-1 text-sm text-slate-700">
           Pull requests go into branch
@@ -303,10 +304,10 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm text-slate-700">
             Stages come from
-            <select className={SELECT} value={stageSource} onChange={(event) => setStageSource(event.target.value as ProjectSettings["stageSource"])}>
+            <SelectField size="sm" value={stageSource} onValueChange={(selected) => setStageSource(selected as ProjectSettings["stageSource"])}>
               <option value="state">Work item state</option>
               <option value="board_column">Board column</option>
-            </select>
+            </SelectField>
           </label>
           {(["tl", "qa", "po"] as const).map((role) => (
             <label key={role} className="flex flex-col gap-1 text-sm text-slate-700">
@@ -446,11 +447,11 @@ export function ProjectsTab() {
       {azure.length > 1 ? (
         <label className="flex max-w-xs flex-col gap-1 text-sm text-slate-700">
           Organization
-          <select
-            className={SELECT}
+          <SelectField
+            size="sm"
             value={credentialId}
-            onChange={(event) => {
-              setChosen(event.target.value);
+            onValueChange={(selected) => {
+              setChosen(selected);
               updateParams({ projectsPage: null, elsewherePage: null }, { replace: true });
             }}
           >
@@ -459,7 +460,7 @@ export function ProjectsTab() {
                 {getCredentialDisplayName(credential)}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
       ) : null}
 
@@ -526,14 +527,13 @@ export function ProjectsTab() {
                         className="px-4 py-3"
                         title={project.setUp ? undefined : "Set this project up first; only set-up projects can be checked."}
                       >
-                        <input
-                          type="checkbox"
-                          className="size-4 align-middle"
+                        <Checkbox
+                          className="align-middle"
                           aria-label={`Check ${project.name} for me`}
                           checked={project.setUp && (pendingChoice[project.name] ?? project.checkedForMe)}
                           disabled={!project.setUp || toggle.isPending}
-                          onChange={(event) => {
-                            const checked = event.target.checked;
+                          onCheckedChange={(state) => {
+                            const checked = state === true;
                             setPendingChoice((current) => ({ ...current, [project.name]: checked }));
                             toggle.mutate({ name: project.name, checked });
                           }}
@@ -597,13 +597,12 @@ export function ProjectsTab() {
                 <span className="font-medium text-slate-900">{setUp.projectName}</span>
                 <span className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       aria-label={`Check ${setUp.projectName} for me`}
                       checked={pendingChoice[setUp.projectName] ?? setUp.checkedForMe}
                       disabled={toggle.isPending}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
+                      onCheckedChange={(state) => {
+                        const checked = state === true;
                         setPendingChoice((current) => ({ ...current, [setUp.projectName]: checked }));
                         toggle.mutate({ name: setUp.projectName, checked });
                       }}

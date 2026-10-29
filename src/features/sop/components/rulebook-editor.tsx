@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/utils/cn";
 import { getRulebookVersion, validateRulebook } from "../api/sop.api";
@@ -161,11 +162,12 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
             <label className="sr-only" htmlFor={`versions-${scope}`}>
               Load a version
             </label>
-            <select
+            <SelectField
               id={`versions-${scope}`}
-              className="h-9 w-40 min-w-0 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm sm:w-48"
+              size="sm"
+              className="w-40 sm:w-48"
               value=""
-              onChange={(event) => event.target.value && void loadVersion(Number(event.target.value))}
+              onValueChange={(selected) => selected && void loadVersion(Number(selected))}
             >
               <option value="">{versions.isLoading ? "Loading history…" : versions.error ? "History could not be loaded" : "History…"}</option>
               {(versions.data ?? []).map((version) => (
@@ -175,7 +177,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
                   {version.createdAt ? ` (${new Date(version.createdAt).toLocaleString()})` : ""}
                 </option>
               ))}
-            </select>
+            </SelectField>
             <Button size="sm" variant="secondary" onClick={exportFile}>
               Export .md
             </Button>

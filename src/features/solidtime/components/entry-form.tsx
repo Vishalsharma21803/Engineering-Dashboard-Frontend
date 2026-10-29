@@ -2,13 +2,13 @@ import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { useCatalog } from "../hooks/use-solidtime";
 import type { SolidtimeConnection, TimesheetEntry } from "../types/solidtime.types";
 import { fromLocalInput, fromZonedInput, toLocalInput, toZonedInput } from "../utils/time";
 import { LoadErrorNotice } from "./load-error-notice";
-
-const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm";
 
 interface EntryFormProps {
   connection: SolidtimeConnection;
@@ -77,11 +77,11 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
       </label>
       <label className="flex flex-col gap-1 text-sm text-slate-700">
         Project
-        <select
-          className={SELECT}
+        <SelectField
+          size="sm"
           value={projectId}
-          onChange={(event) => {
-            setProjectId(event.target.value);
+          onValueChange={(selected) => {
+            setProjectId(selected);
             setTaskId("");
           }}
         >
@@ -91,18 +91,18 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
               {project.name}
             </option>
           ))}
-        </select>
+        </SelectField>
       </label>
       <label className="flex flex-col gap-1 text-sm text-slate-700">
         Task
-        <select className={SELECT} value={taskId} disabled={!projectId} onChange={(event) => setTaskId(event.target.value)}>
+        <SelectField size="sm" value={taskId} disabled={!projectId} onValueChange={(selected) => setTaskId(selected)}>
           <option value="">No task</option>
           {tasks.map((task) => (
             <option key={task.id} value={task.id}>
               {task.name}
             </option>
           ))}
-        </select>
+        </SelectField>
       </label>
       {catalog.isError && !catalog.data ? (
         <div className="sm:col-span-2">
@@ -119,7 +119,7 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
       </label>
       {timeZone ? <p className="text-xs text-slate-500 sm:col-span-2">Times are in {timeZone}, your Solidtime time zone.</p> : null}
       <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" checked={billable} onChange={(event) => setBillable(event.target.checked)} /> Billable
+        <Checkbox checked={billable} onCheckedChange={(state) => setBillable(state === true)} /> Billable
       </label>
       {error ? (
         <p role="alert" className="text-sm text-rose-600 sm:col-span-2">

@@ -109,8 +109,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
         </p>
       ) : (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Azure DevOps</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Approvals & audit</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Approvals & audit</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
             Every change to Azure DevOps is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
           </p>

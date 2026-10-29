@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api-client";
 import { useEditRules } from "../hooks/use-sop";
 import type { CheckInfo, ItemKind, NewRuleCard, RuleWhen } from "../types/rules-list.types";
@@ -11,10 +15,7 @@ import type { RulebookScope, RuleSeverity } from "../types/sop.types";
 import { problemText, ruleEditErrorText } from "../utils/rule-edit-errors";
 import { AI_REVIEW_NOTES, ITEM_KINDS, SEVERITY_LABELS, SEVERITY_ORDER, WHEN_GROUP_LABELS, WHEN_ORDER, checkerLabel, itemTypeLabel } from "../utils/rule-labels";
 import { draftFromParams, paramEntries, paramsFromDraft, type ParamDraft } from "../utils/rule-params";
-import { RuleParamsFields, SELECT_CLASS } from "./rule-params-form";
-
-const TEXTAREA_CLASS =
-  "block min-h-20 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm text-slate-950 shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
+import { RuleParamsFields } from "./rule-params-form";
 
 /** Same pattern the server checks: default rule ids look like ABC-01. */
 const RULE_ID = /^[A-Z][A-Z0-9]*-[A-Za-z0-9-]+$/;
@@ -129,7 +130,7 @@ export function AddRuleForm({ scope, checks, baseVersion, onDone, onSaved }: Add
 
       <fieldset>
         <legend className="text-sm font-medium text-slate-700">Checked by</legend>
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+        <RadioGroup name={field("checker")} value={checker} onValueChange={(value) => setChecker(value as typeof checker)} className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
           {(
             [
               ["code", "A built-in check"],
@@ -137,24 +138,24 @@ export function AddRuleForm({ scope, checks, baseVersion, onDone, onSaved }: Add
             ] as const
           ).map(([value, label]) => (
             <label key={value} className="flex items-center gap-1.5 text-sm text-slate-700">
-              <input type="radio" name={field("checker")} value={value} checked={checker === value} onChange={() => setChecker(value)} className="size-4" />
+              <RadioGroupItem value={value} />
               {label}
             </label>
           ))}
-        </div>
+        </RadioGroup>
       </fieldset>
 
       {checker === "code" ? (
         <div className="flex flex-col gap-3">
           <FormField id={field("uses")} label="Check" {...errorOf("uses")}>
-            <select id={field("uses")} className={SELECT_CLASS} value={uses} onChange={(event) => chooseCheck(event.target.value)}>
+            <SelectField id={field("uses")} size="sm" value={uses} onValueChange={(selected) => chooseCheck(selected)}>
               <option value="">Choose a check…</option>
               {checks.map((item) => (
                 <option key={item.name} value={item.name}>
                   {checkerLabel(item.name)}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </FormField>
           {check ? (
             <div className="text-sm">
@@ -172,23 +173,23 @@ export function AddRuleForm({ scope, checks, baseVersion, onDone, onSaved }: Add
 
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField id={field("when")} label="When" {...errorOf("when")}>
-          <select id={field("when")} className={SELECT_CLASS} value={when} onChange={(event) => setWhen(event.target.value as RuleWhen)}>
+          <SelectField id={field("when")} size="sm" value={when} onValueChange={(selected) => setWhen(selected as RuleWhen)}>
             <option value="">Choose a stage…</option>
             {WHEN_ORDER.map((value) => (
               <option key={value} value={value}>
                 {WHEN_GROUP_LABELS[value]}
               </option>
             ))}
-          </select>
+          </SelectField>
         </FormField>
         <FormField id={field("severity")} label="Level">
-          <select id={field("severity")} className={SELECT_CLASS} value={severity} onChange={(event) => setSeverity(event.target.value as RuleSeverity)}>
+          <SelectField id={field("severity")} size="sm" value={severity} onValueChange={(selected) => setSeverity(selected as RuleSeverity)}>
             {SEVERITY_ORDER.map((value) => (
               <option key={value} value={value}>
                 {SEVERITY_LABELS[value]}
               </option>
             ))}
-          </select>
+          </SelectField>
         </FormField>
       </div>
 
@@ -197,11 +198,10 @@ export function AddRuleForm({ scope, checks, baseVersion, onDone, onSaved }: Add
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
           {ITEM_KINDS.map((kind) => (
             <label key={kind} className="flex items-center gap-1.5 text-sm text-slate-700">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={types.includes(kind)}
-                onChange={(event) => setTypes(event.target.checked ? [...types, kind] : types.filter((item) => item !== kind))}
-                className="size-4 rounded border-slate-300"
+                onCheckedChange={(state) => setTypes(state === true ? [...types, kind] : types.filter((item) => item !== kind))}
+                
               />
               {itemTypeLabel(kind)}
             </label>
@@ -211,16 +211,16 @@ export function AddRuleForm({ scope, checks, baseVersion, onDone, onSaved }: Add
       </fieldset>
 
       <FormField id={field("rule")} label="Rule" {...errorOf("rule")}>
-        <textarea id={field("rule")} className={TEXTAREA_CLASS} value={rule} onChange={(event) => setRule(event.target.value)} maxLength={2000} />
+        <Textarea id={field("rule")} className="min-h-20" value={rule} onChange={(event) => setRule(event.target.value)} maxLength={2000} />
       </FormField>
 
       {checker === "ai" ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField id={field("passes")} label="Passes when" {...errorOf("passesWhen")}>
-            <textarea id={field("passes")} className={TEXTAREA_CLASS} value={passesWhen} onChange={(event) => setPassesWhen(event.target.value)} maxLength={2000} />
+            <Textarea id={field("passes")} className="min-h-20" value={passesWhen} onChange={(event) => setPassesWhen(event.target.value)} maxLength={2000} />
           </FormField>
           <FormField id={field("fails")} label="Fails when" {...errorOf("failsWhen")}>
-            <textarea id={field("fails")} className={TEXTAREA_CLASS} value={failsWhen} onChange={(event) => setFailsWhen(event.target.value)} maxLength={2000} />
+            <Textarea id={field("fails")} className="min-h-20" value={failsWhen} onChange={(event) => setFailsWhen(event.target.value)} maxLength={2000} />
           </FormField>
         </div>
       ) : null}

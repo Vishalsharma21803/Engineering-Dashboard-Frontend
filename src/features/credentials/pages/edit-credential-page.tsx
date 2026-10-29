@@ -235,10 +235,7 @@ export function EditCredentialPage() {
           Back to credentials
         </Link>
 
-        <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-          Azure DevOps
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+        <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950">
           Edit credential
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">

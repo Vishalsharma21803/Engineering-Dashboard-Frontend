@@ -4,8 +4,10 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { ArrowRightIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
 import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { CredentialAlertTone } from "@/features/credentials/components/credential-alert";
@@ -20,8 +22,6 @@ import { solidtimeKeys } from "../api/solidtime.keys";
 import { useSolidtimeConnections } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
 import { LoadErrorNotice } from "./load-error-notice";
-
-const SELECT = "h-9 rounded-lg border border-slate-300 bg-surface px-2.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 function errorText(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
@@ -157,7 +157,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
         <div className="flex max-w-sm flex-col gap-1">
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
             Choose the Solidtime organization
-            <select className={SELECT} defaultValue="" disabled={!memberships.data} onChange={(event) => event.target.value && update.mutate({ organizationId: event.target.value })}>
+            <SelectField size="sm" defaultValue="" disabled={!memberships.data} onValueChange={(selected) => selected && update.mutate({ organizationId: selected })}>
               <option value="" disabled>
                 {memberships.isLoading ? "Loading…" : !memberships.data ? "Organizations not loaded" : "Choose an organization"}
               </option>
@@ -166,7 +166,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
                   {membership.organization.name} ({membership.role})
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           {memberships.isError && !memberships.data ? <LoadErrorNotice what="Your Solidtime organizations" onRetry={() => void memberships.refetch()} isRetrying={memberships.isFetching} /> : null}
         </div>
@@ -175,13 +175,13 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
       <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Linked Azure DevOps organization
-          <select
-            className={SELECT}
+          <SelectField
+            size="sm"
             aria-label={`Azure organization for ${name}`}
             value={connection.azureCredentialId ?? ""}
             // Without the list, the current link cannot be shown; it would read "Not linked".
             disabled={!azure.data}
-            onChange={(event) => update.mutate({ azureCredentialId: event.target.value || null })}
+            onValueChange={(selected) => update.mutate({ azureCredentialId: selected || null })}
           >
             <option value="">Not linked</option>
             {(azure.data ?? []).map((credential) => (
@@ -189,7 +189,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
                 {getCredentialDisplayName(credential)}
               </option>
             ))}
-          </select>
+          </SelectField>
           {azure.isError && !azure.data ? <LoadErrorNotice what="Azure DevOps organizations" onRetry={() => void azure.refetch()} isRetrying={azure.isFetching} /> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
@@ -214,7 +214,8 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
       {connection.organizationId ? (
         <div>
           <Link to={`/time/${encodeURIComponent(connection.credentialId)}`} className={buttonClassName({ size: "sm" })}>
-            Open Time →
+            Open Time
+            <ArrowRightIcon />
           </Link>
         </div>
       ) : null}

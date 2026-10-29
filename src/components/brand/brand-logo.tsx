@@ -3,19 +3,22 @@ import { cn } from "@/utils/cn";
 
 interface BrandLogoProps {
   className?: string;
+  /** Classes for the wordmark, e.g. to keep it for screen readers only where space is short. */
+  textClassName?: string;
   inverted?: boolean;
   showSubtitle?: boolean;
 }
 
 export function BrandLogo({
   className,
+  textClassName,
   inverted = false,
   showSubtitle = true,
 }: BrandLogoProps) {
   return (
     <span className={cn("flex items-center gap-3", className)}>
       <BrandMark inverted={inverted} />
-      <span className="flex flex-col leading-tight">
+      <span className={cn("flex flex-col whitespace-nowrap leading-tight", textClassName)}>
         <span
           className={cn(
             "text-sm font-semibold tracking-tight",

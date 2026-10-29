@@ -4,17 +4,17 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const baseClasses =
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition duration-150 ease-out active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-60";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:
-    "bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline-indigo-600 disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:shadow-none",
+    "btn-primary bg-indigo-600 text-white shadow-[inset_0_1px_0_0_rgb(255_255_255/0.18),0_1px_2px_0_rgb(30_27_75/0.3)] hover:bg-indigo-500 focus-visible:outline-indigo-600 disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:shadow-none",
   secondary:
-    "border border-slate-300 bg-surface text-slate-700 shadow-sm hover:bg-slate-50 focus-visible:outline-slate-400",
+    "border border-slate-300 bg-surface text-slate-700 shadow-xs hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-slate-400",
   ghost:
     "text-slate-600 hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-slate-400",
   danger:
-    "bg-rose-600 text-white shadow-sm hover:bg-rose-500 focus-visible:outline-rose-600 disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:shadow-none",
+    "bg-rose-600 text-white shadow-[inset_0_1px_0_0_rgb(255_255_255/0.16),0_1px_2px_0_rgb(76_5_25/0.3)] hover:bg-rose-500 focus-visible:outline-rose-600 disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100 disabled:shadow-none",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

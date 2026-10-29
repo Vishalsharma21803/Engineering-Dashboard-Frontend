@@ -39,8 +39,7 @@ export function AzureEntryPage() {
   return (
     <section className="flex w-full flex-col gap-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Azure DevOps</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Choose an organization</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Choose an organization</h1>
       </div>
 
       {credentials.length === 0 ? (

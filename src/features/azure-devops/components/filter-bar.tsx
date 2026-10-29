@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/utils/cn";
 
 export interface FilterOption {
@@ -58,13 +59,11 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
           {filters.map((filter) => (
             <label key={filter.id} className="flex min-w-0 items-center">
               <span className="sr-only">{filter.label}</span>
-              <select
+              <SelectField
                 value={filter.value}
-                onChange={(event) => filter.onChange(event.target.value)}
-                className={cn(
-                  "h-9 w-full min-w-0 truncate rounded-lg border bg-surface pl-2.5 pr-7 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 sm:w-44",
-                  filter.value ? "border-indigo-300 font-medium text-indigo-700" : "border-slate-300 text-slate-700"
-                )}
+                onValueChange={(selected) => filter.onChange(selected)}
+                size="sm"
+                className={cn("sm:w-44", filter.value ? "border-indigo-300 font-medium text-indigo-700" : "text-slate-700")}
               >
                 <option value="">{filter.label}: All</option>
                 {filter.options.map((option) => (
@@ -73,7 +72,7 @@ export function FilterBar({ search, filters, shown, total, onClear }: FilterBarP
                     {option.count !== undefined ? ` (${option.count})` : ""}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           ))}
         </div>

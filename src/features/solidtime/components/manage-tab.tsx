@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Updating } from "@/components/ui/updating";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
+import { SelectField } from "@/components/ui/select-field";
 import { ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
@@ -73,14 +74,14 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
       ) : (
         <form onSubmit={submit} className="flex flex-wrap gap-2 sm:flex-nowrap" aria-label={`New ${kind.slice(0, -1)}`}>
           {kind === "tasks" ? (
-            <select aria-label="Project for the new task" className="h-9 rounded-lg border border-slate-300 bg-surface px-2 text-sm" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+            <SelectField aria-label="Project for the new task" size="sm" className="sm:w-56" value={projectId} onValueChange={(selected) => setProjectId(selected)}>
               <option value="">Choose a project</option>
               {(catalog.data?.projects ?? []).map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           ) : null}
           <Input aria-label={`New ${kind.slice(0, -1)} name`} placeholder={`New ${kind.slice(0, -1)} name`} className="h-9 min-w-0 flex-1" value={name} onChange={(event) => setName(event.target.value)} />
           <Button size="sm" type="submit" variant="secondary" disabled={isProposing || !name.trim() || (kind === "tasks" && !projectId)}>

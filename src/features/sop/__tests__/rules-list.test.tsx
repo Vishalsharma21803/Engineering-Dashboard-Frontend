@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthContext } from "@/features/auth/context/auth-context";
 import { mockBackend, renderWithProviders, type MockRoute } from "@/test/render";
+import { chooseOption } from "@/test/select";
 import { SopRulesPage } from "../pages/sop-rules-page";
 import type { CheckInfo, RuleListItem, RulesList } from "../types/rules-list.types";
 
@@ -125,7 +126,7 @@ describe("Rules list", () => {
   it("saves a level change at once as a set edit on the loaded version", async () => {
     const calls = renderPage({ routes: [{ method: "POST", path: "/api/sop/my-rules/edits", body: saved }] });
 
-    await userEvent.selectOptions(await screen.findByLabelText("Level for STR-01"), "off");
+    await chooseOption(await screen.findByLabelText("Level for STR-01"), "off");
 
     expect(await within(row("Title length")).findByRole("status")).toHaveTextContent("Level set to Off.");
     expect(edits(calls, "/api/sop/my-rules/edits")).toEqual([{ baseVersion: 3, edits: [{ op: "set", id: "STR-01", severity: "off" }] }]);
@@ -140,7 +141,7 @@ describe("Rules list", () => {
     const form = within(stageRule).getByRole("form", { name: "Settings for DEV-02" });
 
     expect(within(stageRule).getByText(/the AI review can clear this when it is written another way/)).toBeInTheDocument();
-    expect(within(form).getByLabelText("Stage")).toHaveValue("review");
+    expect(within(form).getByLabelText("Stage")).toHaveAttribute("data-value", "review");
     expect(within(form).getByRole("checkbox", { name: "PR number" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "Eta date" })).not.toBeChecked();
     const hours = within(form).getByLabelText("Hours after");
@@ -200,14 +201,14 @@ describe("Rules list", () => {
     expect(edits(calls, "/api/sop/my-rules/edits")).toEqual([]);
 
     await userEvent.type(form.getByLabelText("Title"), "Short titles");
-    await userEvent.selectOptions(form.getByLabelText("Check"), "title-length");
+    await chooseOption(form.getByLabelText("Check"), "title-length");
     expect(form.getByText(/does not end with a period/)).toBeInTheDocument();
     const max = form.getByLabelText("Max");
     await userEvent.clear(max);
     await userEvent.type(max, "60");
-    await userEvent.selectOptions(form.getByLabelText("When"), "before-active");
+    await chooseOption(form.getByLabelText("When"), "before-active");
     await userEvent.click(form.getByRole("checkbox", { name: "Story" }));
-    await userEvent.selectOptions(form.getByLabelText("Level"), "fail");
+    await chooseOption(form.getByLabelText("Level"), "fail");
     await userEvent.type(form.getByLabelText("Rule"), "Titles stay under 60 characters.");
     await userEvent.click(form.getByRole("button", { name: "Add rule" }));
 
@@ -253,7 +254,7 @@ describe("Rules list", () => {
     expect(form.queryByLabelText("Check")).not.toBeInTheDocument();
 
     await userEvent.type(form.getByLabelText("Title"), "Bugs name the OS");
-    await userEvent.selectOptions(form.getByLabelText("When"), "always");
+    await chooseOption(form.getByLabelText("When"), "always");
     await userEvent.click(form.getByRole("checkbox", { name: "Bug" }));
     await userEvent.type(form.getByLabelText("Rule"), "Every bug names the OS.");
     await userEvent.type(form.getByLabelText("Passes when"), "An OS is named.");
@@ -295,7 +296,7 @@ describe("Rules list", () => {
       ],
     });
 
-    await userEvent.selectOptions(await screen.findByLabelText("Level for STR-01"), "notice");
+    await chooseOption(await screen.findByLabelText("Level for STR-01"), "notice");
 
     expect(await within(row("Title length")).findByRole("alert")).toHaveTextContent(/changed elsewhere since you opened them\. The list has been reloaded/);
     // The list is loaded again so the next try uses the newer version.
@@ -364,9 +365,9 @@ describe("Rules list", () => {
     );
 
     await screen.findByText("Title length");
-    expect(screen.queryByLabelText("My rules")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "My rules" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByText("Advanced: edit as Markdown"));
-    expect(await screen.findByLabelText("My rules")).toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "My rules" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Export .md" })).toBeInTheDocument();
   });
 });

@@ -2,9 +2,9 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { Updating } from "@/components/ui/updating";
@@ -212,11 +212,11 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
             <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
             <label className="flex items-center gap-2">
               From
-              <Input type="date" className="h-9 w-40" value={from} max={to} onChange={(event) => event.target.value && setRange(event.target.value, to)} />
+              <DatePicker aria-label="From" size="sm" value={from} max={to} onChange={(picked) => picked && setRange(picked, to)} />
             </label>
             <label className="flex items-center gap-2">
               To
-              <Input type="date" className="h-9 w-40" value={to} min={from} max={today} onChange={(event) => event.target.value && setRange(from, event.target.value)} />
+              <DatePicker aria-label="To" size="sm" value={to} min={from} max={today} onChange={(picked) => picked && setRange(from, picked)} />
             </label>
             {accuracy.isFetching ? <Spinner className="size-4 text-indigo-600" /> : null}
           </div>
@@ -274,7 +274,7 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-700">
             Week starting
-            <Input type="date" className="h-9 w-40" value={week} max={today} onChange={(event) => event.target.value && setWeek(weekStart(event.target.value))} />
+            <DatePicker aria-label="Week starting" size="sm" value={week} max={today} onChange={(picked) => picked && setWeek(weekStart(picked))} />
           </label>
           <span className="text-sm text-slate-500">
             {formatDayLabel(week, { weekday: "short", day: "numeric", month: "short" })} – {formatDayLabel(shiftDay(week, 6), { weekday: "short", day: "numeric", month: "short" })}

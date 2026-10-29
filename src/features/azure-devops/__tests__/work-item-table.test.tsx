@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { pageWindow } from "@/utils/pagination";
 import { mockBackend, renderWithProviders } from "@/test/render";
+import { chooseOption } from "@/test/select";
 import { MyWorkTable, TeamWorkTable } from "../components/work-item-table";
 import type { DashboardTriage } from "../hooks/use-triage";
 import type { MyWorkPage, TeamWorkPage, WorkItemSummary } from "../types/azure.types";
@@ -108,7 +109,7 @@ describe("MyWorkTable", () => {
     const { requested } = renderMyWork("/?page=2", myWorkPage(2));
     await screen.findByText("Showing 11–20 of 27");
 
-    await userEvent.selectOptions(screen.getByLabelText("Type"), "Bug");
+    await chooseOption(screen.getByLabelText("Type"), "Bug");
     await waitFor(() => expect(requested().some((params) => params.get("type") === "Bug" && params.get("page") === "1")).toBe(true));
 
     await userEvent.type(screen.getByLabelText("Search ID, title or tag"), "crash");
@@ -140,7 +141,7 @@ describe("TeamWorkTable", () => {
     expect(screen.getByText("Unassigned")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Team work item pages" })).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByLabelText("Assignee"), "unassigned");
+    await chooseOption(screen.getByLabelText("Assignee"), "unassigned");
     await waitFor(() => expect(calls.some((call) => call.url.includes("assignee=unassigned") && call.url.includes("scope=open"))).toBe(true));
   });
 });

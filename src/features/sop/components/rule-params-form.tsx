@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { ParamSchema } from "../types/rules-list.types";
 import { paramLabel } from "../utils/rule-labels";
 import {
@@ -19,9 +21,6 @@ import {
 } from "../utils/rule-params";
 
 /** A select without a width, for callers that set their own. */
-export const SELECT_BASE_CLASS =
-  "h-9 min-w-0 rounded-lg border border-slate-300 bg-surface px-2 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
-export const SELECT_CLASS = `${SELECT_BASE_CLASS} w-full`;
 
 interface RuleParamsFieldsProps {
   schema: ParamSchema | undefined;
@@ -48,7 +47,7 @@ export function RuleParamsFields({ schema, draft, onChange, errors = {}, disable
           return (
             <div key={key} className="space-y-1.5">
               <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <input type="checkbox" checked={value === true} disabled={disabled} onChange={(event) => set(key, event.target.checked)} className="size-4 rounded border-slate-300" />
+                <Checkbox checked={value === true} disabled={disabled} onCheckedChange={(state) => set(key, state === true)} />
                 {paramLabel(key)}
               </label>
               {property.description ? <p className="text-xs text-slate-500">{property.description}</p> : null}
@@ -64,11 +63,10 @@ export function RuleParamsFields({ schema, draft, onChange, errors = {}, disable
               <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
                 {(property.items?.enum ?? []).map((option) => (
                   <label key={option} className="flex items-center gap-1.5 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={chosen.includes(option)}
-                      onChange={(event) => set(key, event.target.checked ? [...chosen, option] : chosen.filter((item) => item !== option))}
-                      className="size-4 rounded border-slate-300"
+                      onCheckedChange={(state) => set(key, state === true ? [...chosen, option] : chosen.filter((item) => item !== option))}
+                      
                     />
                     {paramLabel(option)}
                   </label>
@@ -84,14 +82,14 @@ export function RuleParamsFields({ schema, draft, onChange, errors = {}, disable
         if (kind === "enum") {
           return (
             <FormField key={key} id={id} label={label} {...(errors[key] ? { error: errors[key] } : property.description ? { hint: property.description } : {})}>
-              <select id={id} className={SELECT_CLASS} value={text} disabled={disabled} onChange={(event) => set(key, event.target.value)}>
+              <SelectField id={id} size="sm" value={text} disabled={disabled} onValueChange={(selected) => set(key, selected)}>
                 {text === "" ? <option value="">Choose…</option> : null}
                 {(property.enum ?? []).map((option) => (
                   <option key={option} value={option}>
                     {paramLabel(option)}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </FormField>
           );
         }

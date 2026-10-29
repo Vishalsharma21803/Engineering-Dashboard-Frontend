@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ErrorCard, StatTile } from "@/features/azure-devops/components/feedback";
-import { cn } from "@/utils/cn";
 import { ProjectsTab } from "../components/projects-tab";
 import { RuleSummaryTable } from "../components/rule-summary-table";
 import { RulebookEditor } from "../components/rulebook-editor";
@@ -207,8 +208,7 @@ export function SopRulesPage() {
   return (
     <section className="flex w-full min-w-0 flex-col gap-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">SOP</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">SOP rules</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">SOP rules</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
           Code checks every rule: an item is a to-do while the ticket is in its stage and a gap once the ticket moves on without it.
           When you open a ticket, your AI model reviews what code found, can clear a finding written another way, and drafts fixes.
@@ -216,30 +216,25 @@ export function SopRulesPage() {
         </p>
       </div>
 
-      <div role="tablist" className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-slate-200">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={cn(
-              "-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition",
-              tab === item.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:text-slate-950"
-            )}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={(value) => isTab(value) && setTab(value)} className="gap-6">
+        <TabsList variant="line">
+          <ActiveIndicator variant="underline" />
+          {TABS.map((item) => (
+            <TabsTrigger key={item.id} value={item.id}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <p className="-mt-2 text-sm text-slate-600">{TABS.find((item) => item.id === tab)?.description}</p>
+        <TabsContent value={tab} className="flex min-w-0 flex-col gap-6">
+          <p className="-mt-2 text-sm text-slate-600">{TABS.find((item) => item.id === tab)?.description}</p>
 
-      {tab === "projects" ? <ProjectsTab /> : null}
-      {tab === "personal" ? <RulesTab scope="personal" isOwner={isOwner} /> : null}
-      {tab === "default" ? <RulesTab scope="default" isOwner={isOwner} /> : null}
-      {tab === "effective" ? <EffectiveTab /> : null}
+          {tab === "projects" ? <ProjectsTab /> : null}
+          {tab === "personal" ? <RulesTab scope="personal" isOwner={isOwner} /> : null}
+          {tab === "default" ? <RulesTab scope="default" isOwner={isOwner} /> : null}
+          {tab === "effective" ? <EffectiveTab /> : null}
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

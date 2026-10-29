@@ -1,3 +1,4 @@
+import { Hint } from "@/components/ui/hint";
 import { cn } from "@/utils/cn";
 import type { StateCategory } from "../types/azure.types";
 import { workItemTypeStyle } from "../utils/work-item-types";
@@ -58,7 +59,7 @@ export function WorkItemStateBadge({ state, category }: { state: string; categor
 
 const PRIORITY_STYLES: Record<number, string> = {
   1: "bg-rose-600 text-white",
-  2: "bg-orange-500 text-white",
+  2: "bg-badge-high text-white",
   3: "bg-badge-muted text-white",
   4: "bg-slate-300 text-slate-700",
 };
@@ -69,14 +70,15 @@ export function PriorityBadge({ priority }: { priority: number | null }) {
   }
 
   return (
-    <span
-      title={`Priority ${priority}`}
-      className={cn(
-        "inline-flex h-5 min-w-7 shrink-0 items-center justify-center rounded px-1 text-[11px] font-bold",
-        PRIORITY_STYLES[priority] ?? "bg-slate-300 text-slate-700"
-      )}
-    >
-      P{priority}
-    </span>
+    <Hint label={`Priority ${priority}`}>
+      <span
+        className={cn(
+          "inline-flex h-5 min-w-7 shrink-0 cursor-default items-center justify-center rounded px-1 text-[11px] font-bold",
+          PRIORITY_STYLES[priority] ?? "bg-slate-300 text-slate-700"
+        )}
+      >
+        P{priority}
+      </span>
+    </Hint>
   );
 }

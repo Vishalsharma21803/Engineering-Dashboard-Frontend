@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SopReportCard } from "@/features/sop/components/sop-report-card";
+import { ArrowRightIcon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
 import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
@@ -199,9 +200,10 @@ export function ProjectOverviewPage() {
         </div>
         <Link
           to={`/azure/${encodeURIComponent(credentialId)}?project=${encodeURIComponent(project.id)}`}
-          className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-500"
         >
-          My work in this project →
+          My work in this project
+          <ArrowRightIcon />
         </Link>
       </div>
 

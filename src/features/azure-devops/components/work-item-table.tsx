@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { Hint } from "@/components/ui/hint";
 import { Pagination } from "@/components/ui/pagination";
 import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
@@ -195,9 +196,15 @@ export function WorkItemRows({ credentialId, rows, team, myId, triage, timeCell 
             <th role="columnheader" className="py-2 pl-4 pr-3 font-medium">Work item</th>
             <th role="columnheader" className="px-3 py-2 font-medium">Type</th>
             <th role="columnheader" className="px-3 py-2 font-medium">State</th>
-            <th role="columnheader" className="px-3 py-2 font-medium">Pri</th>
-            <th role="columnheader" className="px-3 py-2 font-medium" title="Original estimate (or story points), completed and remaining work">
-              Work
+            <th role="columnheader" className="px-3 py-2 font-medium">
+              <Hint label="Priority">
+                <span className="cursor-help underline decoration-slate-300 decoration-dotted underline-offset-4">Pri</span>
+              </Hint>
+            </th>
+            <th role="columnheader" className="px-3 py-2 font-medium">
+              <Hint label="Original estimate (or story points), completed and remaining work">
+                <span className="cursor-help underline decoration-slate-300 decoration-dotted underline-offset-4">Work</span>
+              </Hint>
             </th>
             <th role="columnheader" className="px-3 py-2 font-medium">{team ? "Assigned to" : "SOP compliance"}</th>
             {triage ? (

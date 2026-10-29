@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-import { cn } from "@/utils/cn";
+import { cnMerge as cn } from "@/utils/cn-merge";
 
 export function Card({
   className,

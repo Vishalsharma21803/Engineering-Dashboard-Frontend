@@ -84,7 +84,7 @@ export function EmptyState({ children, className }: { children: ReactNode; class
 
 export function SkeletonRows({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="animate-pulse space-y-2" aria-label="Loading">
+    <div className="skeleton space-y-2" aria-label="Loading">
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="h-12 rounded-lg bg-slate-100" />
       ))}
@@ -150,10 +150,10 @@ export function SectionCard({
 
 export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-surface p-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+    <div className="stat-tile rounded-xl border border-slate-200 bg-surface p-4 shadow-sm transition-colors hover:border-slate-300">
+      <p className="text-sm text-slate-500">{label}</p>
       {/* A div: the value may be a whole section (with its own paragraphs), not just a number. */}
-      <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{value}</div>
+      <div className="mt-1.5 text-[1.75rem] leading-8 font-semibold tracking-tight text-slate-950 tabular-nums">{value}</div>
       {hint ? <p className="mt-0.5 text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
@@ -168,7 +168,7 @@ export function ErrorToast({ message, onDismiss }: { message: string | null; onD
   return (
     <div
       role="alert"
-      className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-rose-200 bg-surface p-4 text-sm shadow-xl sm:left-auto sm:right-6 sm:mx-0"
+      className="toast-in fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-lg items-start gap-3 rounded-xl border border-rose-200 bg-surface p-4 text-sm shadow-xl sm:left-auto sm:right-6 sm:mx-0"
     >
       <span aria-hidden="true" className="mt-0.5 size-2.5 shrink-0 rounded-full bg-rose-500" />
       <div className="flex-1">

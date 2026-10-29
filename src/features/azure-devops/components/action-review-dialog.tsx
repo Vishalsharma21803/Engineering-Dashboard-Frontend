@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api-client";
 import { useApproveAction, useRejectAction } from "../hooks/use-actions";
@@ -24,32 +25,29 @@ type Outcome =
  * Approve before anything is sent to Azure DevOps (or Solidtime).
  */
 export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  const wasOpen = useRef(false);
   const approveMutation = useApproveAction();
   const rejectMutation = useRejectAction();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const isPending = approveMutation.isPending || rejectMutation.isPending;
 
+  // A fresh review starts each time the dialog opens (not when the open action refetches).
   useEffect(() => {
-    const dialog = dialogRef.current;
-
-    if (!dialog) {
-      return;
-    }
-
-    if (action && !dialog.open) {
+    if (action && !wasOpen.current) {
       setOutcome(null);
-      dialog.showModal();
     }
-
-    if (!action && dialog.open) {
-      dialog.close();
-    }
+    wasOpen.current = action !== null;
   }, [action]);
 
   const current = outcome?.action ?? action;
-  const platform = current?.kind.startsWith("SOLIDTIME_") ? "Solidtime" : "Azure DevOps";
-  const canDecide = current?.status === "PENDING" && outcome === null;
+  // Keeps the last action on screen while the dialog animates closed.
+  const [lastShown, setLastShown] = useState(current);
+  if (current && current !== lastShown) {
+    setLastShown(current);
+  }
+  const shown = current ?? lastShown;
+  const platform = shown?.kind.startsWith("SOLIDTIME_") ? "Solidtime" : "Azure DevOps";
+  const canDecide = shown?.status === "PENDING" && outcome === null;
 
   function handleApprove() {
     if (!action) {
@@ -93,119 +91,125 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
   }
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="action-review-title"
-      onCancel={(event) => {
-        if (isPending) {
-          event.preventDefault();
-        }
-      }}
-      onClose={() => {
-        if (!isPending) {
+    <Dialog
+      open={action !== null}
+      onOpenChange={(open) => {
+        if (!open && !isPending) {
           onClose();
         }
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-xl rounded-xl border border-slate-200 bg-surface p-0 text-slate-950 shadow-2xl backdrop:bg-backdrop/50"
     >
-      {current ? (
-        <div className="p-6">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-              {canDecide ? "Approval required" : "Action"} · {actionKindLabel(current.kind)}
-            </p>
-            <StatusBadge tone={ACTION_STATUS_TONES[current.status]}>{current.status}</StatusBadge>
-          </div>
-
-          <h2 id="action-review-title" className="mt-2 text-lg font-semibold tracking-tight">
-            {current.summary}
-          </h2>
-
-          <p className="mt-1 text-xs text-slate-500">
-            {current.organizationUrl}
-            {/* Solidtime organizations are ids, not names worth showing. */}
-            {current.kind.startsWith("SOLIDTIME_") ? "" : ` · ${current.projectId}`}
-            {current.status === "PENDING" ? ` · expires ${formatDateTime(current.expiresAt)}` : ""}
-          </p>
-
-          <table className="mt-4 w-full overflow-hidden rounded-lg border border-slate-200 text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2 font-medium">Field</th>
-                <th className="px-3 py-2 font-medium">Current</th>
-                <th className="px-3 py-2 font-medium">Proposed</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {current.preview.map((change) => (
-                <tr key={change.field}>
-                  <td className="px-3 py-2 font-medium text-slate-700">{change.field}</td>
-                  <td className="whitespace-pre-wrap px-3 py-2 text-slate-500">{formatValue(change.before)}</td>
-                  <td className="whitespace-pre-wrap px-3 py-2 font-medium text-slate-950">
-                    {formatValue(change.after)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {outcome?.kind === "executed" ? (
-            <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              <p className="font-medium">Executed in {platform}.</p>
-              <ul className="mt-1 space-y-0.5">
-                {outcome.verification.checks.map((check) => (
-                  <li key={check.check}>
-                    {check.passed ? "✓" : "✗"} Verified: {check.check}
-                  </li>
-                ))}
-              </ul>
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        // As before: only Escape or Close end the review, never a click on the backdrop.
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => {
+          if (isPending) {
+            event.preventDefault();
+          }
+        }}
+        className="block max-h-[calc(100dvh-2rem)] max-w-xl overflow-y-auto rounded-xl border-slate-200 bg-surface p-6 text-slate-950 shadow-2xl sm:max-w-xl"
+      >
+        {shown ? (
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-slate-500">
+                {canDecide ? "Approval required" : "Action"} · {actionKindLabel(shown.kind)}
+              </p>
+              <StatusBadge tone={ACTION_STATUS_TONES[shown.status]}>{shown.status}</StatusBadge>
             </div>
-          ) : null}
 
-          {outcome?.kind === "rejected" ? (
-            <p role="status" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Rejected. Nothing was changed in {platform}.
+            <DialogTitle className="mt-2 text-lg font-semibold tracking-tight">
+              {shown.summary}
+            </DialogTitle>
+
+            <p className="mt-1 text-xs text-slate-500">
+              {shown.organizationUrl}
+              {/* Solidtime organizations are ids, not names worth showing. */}
+              {shown.kind.startsWith("SOLIDTIME_") ? "" : ` · ${shown.projectId}`}
+              {shown.status === "PENDING" ? ` · expires ${formatDateTime(shown.expiresAt)}` : ""}
             </p>
-          ) : null}
 
-          {outcome?.kind === "failed" ? (
-            <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-              {outcome.message}
-            </p>
-          ) : null}
+            <table className="mt-4 w-full overflow-hidden rounded-lg border border-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Field</th>
+                  <th className="px-3 py-2 font-medium">Current</th>
+                  <th className="px-3 py-2 font-medium">Proposed</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {shown.preview.map((change) => (
+                  <tr key={change.field}>
+                    <td className="px-3 py-2 font-medium text-slate-700">{change.field}</td>
+                    <td className="whitespace-pre-wrap px-3 py-2 text-slate-500">{formatValue(change.before)}</td>
+                    <td className="whitespace-pre-wrap px-3 py-2 font-medium text-slate-950">
+                      {formatValue(change.after)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          {!outcome && current.errorMessage ? (
-            <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-              {current.errorMessage}
-            </p>
-          ) : null}
-
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={onClose} disabled={isPending} autoFocus>
-              Close
-            </Button>
-
-            {canDecide ? (
-              <>
-                <Button variant="secondary" onClick={handleReject} disabled={isPending}>
-                  {rejectMutation.isPending ? <Spinner className="size-4" /> : null}
-                  Reject
-                </Button>
-                <Button onClick={handleApprove} disabled={isPending}>
-                  {approveMutation.isPending ? (
-                    <>
-                      <Spinner className="size-4" />
-                      Executing...
-                    </>
-                  ) : (
-                    "Approve & execute"
-                  )}
-                </Button>
-              </>
+            {outcome?.kind === "executed" ? (
+              <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                <p className="font-medium">Executed in {platform}.</p>
+                <ul className="mt-1 space-y-0.5">
+                  {outcome.verification.checks.map((check) => (
+                    <li key={check.check}>
+                      {check.passed ? "✓" : "✗"} Verified: {check.check}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
+
+            {outcome?.kind === "rejected" ? (
+              <p role="status" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                Rejected. Nothing was changed in {platform}.
+              </p>
+            ) : null}
+
+            {outcome?.kind === "failed" ? (
+              <p role="alert" className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                {outcome.message}
+              </p>
+            ) : null}
+
+            {!outcome && shown.errorMessage ? (
+              <p className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                {shown.errorMessage}
+              </p>
+            ) : null}
+
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="secondary" onClick={onClose} disabled={isPending} autoFocus>
+                Close
+              </Button>
+
+              {canDecide ? (
+                <>
+                  <Button variant="secondary" onClick={handleReject} disabled={isPending}>
+                    {rejectMutation.isPending ? <Spinner className="size-4" /> : null}
+                    Reject
+                  </Button>
+                  <Button onClick={handleApprove} disabled={isPending}>
+                    {approveMutation.isPending ? (
+                      <>
+                        <Spinner className="size-4" />
+                        Executing...
+                      </>
+                    ) : (
+                      "Approve & execute"
+                    )}
+                  </Button>
+                </>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </dialog>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }

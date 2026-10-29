@@ -1,12 +1,13 @@
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 
+import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActionReviewDialog } from "@/features/azure-devops/components/action-review-dialog";
 import { EmptyState, ErrorCard, ErrorToast, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useActionReview } from "@/features/azure-devops/hooks/use-action-review";
 import { useActions } from "@/features/azure-devops/hooks/use-actions";
-import { cn } from "@/utils/cn";
 import { DraftTab } from "../components/draft-tab";
 import { ManageTab } from "../components/manage-tab";
 import { ProjectMapping } from "../components/project-mapping";
@@ -92,8 +93,8 @@ export function TimePage() {
       {connections.error ? <StaleDataBanner error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} /> : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">Solidtime · {connection.organizationName}</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Time</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Time</h1>
+          <p className="mt-1 text-sm font-medium text-slate-700">Solidtime · {connection.organizationName}</p>
           <p className="mt-1 text-sm text-slate-600">Every change to Solidtime is proposed first and runs only after you approve it.</p>
         </div>
         {(pending.data?.total ?? 0) > 0 ? (
@@ -108,53 +109,47 @@ export function TimePage() {
         <TicketTimeLookup connection={connection} onPropose={review.propose} isProposing={review.isProposing} />
       </div>
 
-      <div role="tablist" aria-label="Time sections" className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 sm:mx-0 sm:px-0">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            id={`time-tab-${item.id}`}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.id}
-            aria-controls="time-panel"
-            onClick={() => setSearchParams(item.id === "timesheet" ? {} : { tab: item.id })}
-            className={cn("-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium", tab === item.id ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-600 hover:text-slate-900")}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={(value) => setSearchParams(value === "timesheet" ? {} : { tab: value })} className="gap-6">
+        <TabsList variant="line" aria-label="Time sections" className="-mx-4 px-4 sm:mx-0 sm:px-0">
+          <ActiveIndicator variant="underline" />
+          {TABS.map((item) => (
+            <TabsTrigger key={item.id} value={item.id}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {/* The tabs start from "today", so they wait for the time zone it is counted in. */}
-      <div id="time-panel" role="tabpanel" aria-labelledby={`time-tab-${tab}`} className="flex flex-col gap-4">
-        {profile.isLoading ? (
-          <SkeletonRows rows={4} />
-        ) : (
-          <>
-            {profile.isError && !profile.data ? (
-              <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                Your Solidtime time zone could not be loaded, so days follow this browser's time zone ({browserTimeZone}).
-                <Button size="sm" variant="ghost" disabled={profile.isFetching} onClick={() => void profile.refetch()}>
-                  {profile.isFetching ? "Retrying..." : "Retry"}
-                </Button>
-              </p>
-            ) : null}
-            {/* Keyed on the zone: once it loads (after a retry), the tabs start again from the right "today". */}
-            <div key={timeZone ?? "browser"}>
-              {tab === "timesheet" ? <TimesheetTab {...props} /> : null}
-              {tab === "draft" ? <DraftTab {...props} /> : null}
-              {tab === "unlinked" ? <UnlinkedTab {...props} /> : null}
-              {tab === "reports" ? <ReportsTab connection={connection} today={props.today} /> : null}
-              {tab === "manage" ? (
-                <div className="flex flex-col gap-6">
-                  <ProjectMapping connection={connection} />
-                  <ManageTab {...props} />
-                </div>
+        {/* The tabs start from "today", so they wait for the time zone it is counted in. */}
+        <TabsContent value={tab} className="flex flex-col gap-4">
+          {profile.isLoading ? (
+            <SkeletonRows rows={4} />
+          ) : (
+            <>
+              {profile.isError && !profile.data ? (
+                <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                  Your Solidtime time zone could not be loaded, so days follow this browser's time zone ({browserTimeZone}).
+                  <Button size="sm" variant="ghost" disabled={profile.isFetching} onClick={() => void profile.refetch()}>
+                    {profile.isFetching ? "Retrying..." : "Retry"}
+                  </Button>
+                </p>
               ) : null}
-            </div>
-          </>
-        )}
-      </div>
+              {/* Keyed on the zone: once it loads (after a retry), the tabs start again from the right "today". */}
+              <div key={timeZone ?? "browser"}>
+                {tab === "timesheet" ? <TimesheetTab {...props} /> : null}
+                {tab === "draft" ? <DraftTab {...props} /> : null}
+                {tab === "unlinked" ? <UnlinkedTab {...props} /> : null}
+                {tab === "reports" ? <ReportsTab connection={connection} today={props.today} /> : null}
+                {tab === "manage" ? (
+                  <div className="flex flex-col gap-6">
+                    <ProjectMapping connection={connection} />
+                    <ManageTab {...props} />
+                  </div>
+                ) : null}
+              </div>
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />
       <ErrorToast message={review.proposeError} onDismiss={review.clearProposeError} />

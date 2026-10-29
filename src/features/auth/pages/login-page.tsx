@@ -70,10 +70,7 @@ export function LoginPage() {
   return (
     <Card className="p-6 sm:p-8">
       <div>
-        <p className="text-sm font-medium text-indigo-600">
-          Welcome back
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
           Sign in to your cockpit
         </h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">

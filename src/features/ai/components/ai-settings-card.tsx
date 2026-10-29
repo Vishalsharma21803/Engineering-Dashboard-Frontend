@@ -5,6 +5,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { cn } from "@/utils/cn";
 import { useAiCredentials, useAiModels, useAiPreference, useAiUsage, useUpdateAiPreference } from "../hooks/use-ai";
@@ -19,9 +21,6 @@ const EFFORT_LABELS: Record<AiEffort, { label: string; hint: string }> = {
   MEDIUM: { label: "Medium", hint: "Balanced (recommended)" },
   HIGH: { label: "High", hint: "Most thorough, costs more" },
 };
-
-const selectClassName =
-  "block h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm text-slate-950 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:bg-slate-50";
 
 /** Which provider, model and effort AI checks use, plus the daily spend guard. */
 export function AiSettingsCard() {
@@ -148,9 +147,9 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
       ) : (
         <dl aria-label="AI usage" className="grid border-y border-slate-200 bg-slate-50 sm:grid-cols-3">
           <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Spent today</dt>
+            <dt className="text-sm text-slate-500">Spent today</dt>
             <dd className="mt-1">
-              <span className="text-lg font-semibold text-slate-950">{usage.data ? formatUsd(usage.data.todayUsd) : "—"}</span>
+              <span className="text-lg font-semibold text-slate-950 tabular-nums">{usage.data ? formatUsd(usage.data.todayUsd) : "—"}</span>
               <span className="text-sm text-slate-500"> of {formatUsd(initial.dailyLimitUsd)}</span>
               <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
                 <span className={cn("block h-full rounded-full", spentShare >= 1 ? "bg-rose-500" : spentShare >= 0.8 ? "bg-amber-500" : "bg-indigo-500")} style={{ width: `${spentShare * 100}%` }} />
@@ -158,12 +157,12 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
             </dd>
           </div>
           <div className="border-b border-slate-200 px-5 py-3 sm:border-b-0 sm:border-r">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Calls today</dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-950">{usage.data ? usage.data.callsToday : "—"}</dd>
+            <dt className="text-sm text-slate-500">Calls today</dt>
+            <dd className="mt-1 text-lg font-semibold text-slate-950 tabular-nums">{usage.data ? usage.data.callsToday : "—"}</dd>
           </div>
           <div className="px-5 py-3">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">This month</dt>
-            <dd className="mt-1 text-lg font-semibold text-slate-950">
+            <dt className="text-sm text-slate-500">This month</dt>
+            <dd className="mt-1 text-lg font-semibold text-slate-950 tabular-nums">
               {usage.data ? formatUsd(usage.data.monthUsd) : "—"}
               <span className="block text-xs font-normal text-slate-500">Daily total resets at 00:00 UTC</span>
             </dd>
@@ -181,12 +180,11 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="ai-provider">Provider</Label>
-                <select
+                <SelectField
                   id="ai-provider"
-                  className={selectClassName}
                   value={provider ?? ""}
-                  onChange={(event) => {
-                    const next = (event.target.value || null) as AiProvider | null;
+                  onValueChange={(selected) => {
+                    const next = (selected || null) as AiProvider | null;
                     setProvider(next);
                     setModel(null);
                   }}
@@ -198,7 +196,7 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
                       {providersWithKeys.includes(option) ? "" : keysUnknown ? " (keys not loaded)" : " (add a key first)"}
                     </option>
                   ))}
-                </select>
+                </SelectField>
                 {keysUnknown ? (
                   <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-rose-600">
                     Your AI keys could not be loaded.
@@ -213,12 +211,11 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
 
               <div className="space-y-1.5">
                 <Label htmlFor="ai-model">Model</Label>
-                <select
+                <SelectField
                   id="ai-model"
-                  className={selectClassName}
                   value={model ?? ""}
                   disabled={provider === null || models.isLoading}
-                  onChange={(event) => setModel(event.target.value || null)}
+                  onValueChange={(selected) => setModel(selected || null)}
                 >
                   <option value="">{models.isLoading ? "Loading models…" : "Choose a model"}</option>
                   {(models.data ?? []).map((option) => (
@@ -227,7 +224,7 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
                       {option.free ? " · Free" : ""}
                     </option>
                   ))}
-                </select>
+                </SelectField>
                 {models.isError ? (
                   <p className="text-xs text-rose-600">{describeAiError(models.error, "Could not load models.")}</p>
                 ) : selectedModel ? (
@@ -242,12 +239,11 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
 
               <div className="space-y-1.5">
                 <Label htmlFor="ai-effort">Effort</Label>
-                <select
+                <SelectField
                   id="ai-effort"
-                  className={selectClassName}
                   value={efforts.length === 0 ? "" : efforts.includes(effort) ? effort : (efforts[0] ?? "")}
                   disabled={efforts.length === 0}
-                  onChange={(event) => setEffort(event.target.value as AiEffort)}
+                  onValueChange={(selected) => setEffort(selected as AiEffort)}
                 >
                   {efforts.length === 0 ? <option value="">{selectedModel ? "Not adjustable" : "Choose a model first"}</option> : null}
                   {efforts.map((option) => (
@@ -255,7 +251,7 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
                       {EFFORT_LABELS[option].label} · {EFFORT_LABELS[option].hint}
                     </option>
                   ))}
-                </select>
+                </SelectField>
                 {selectedModel && efforts.length === 0 ? <p className="text-xs text-slate-500">This model doesn't offer an effort setting.</p> : null}
               </div>
 
@@ -274,7 +270,7 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
 
           {needsConsent ? (
             <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <input type="checkbox" className="mt-0.5 size-4 shrink-0" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />
+              <Checkbox className="mt-0.5" checked={accepted} onCheckedChange={(state) => setAccepted(state === true)} />
               <span>
                 <strong>Data notice:</strong> free models are served by providers that may store or train on what they receive. Ticket titles,
                 descriptions and comments would be sent to them. I confirm this is allowed for my projects.

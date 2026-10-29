@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { mockBackend, renderWithProviders } from "@/test/render";
+import { chooseOption, openOptions } from "@/test/select";
 import { AddAiProviderForm } from "../components/add-ai-provider-form";
 import { AiProviderCard } from "../components/ai-provider-card";
 import { AiSettingsCard } from "../components/ai-settings-card";
@@ -56,8 +57,11 @@ describe("AddAiProviderForm", () => {
     renderWithProviders(<AddAiProviderForm existing={new Set(["CLAUDE"])} onDone={onDone} onCancel={vi.fn()} />);
 
     // A provider that already has a key cannot be added twice; the first free one is chosen.
-    expect(await screen.findByRole("option", { name: "Claude (Anthropic) (already added)" })).toBeDisabled();
-    expect(screen.getByLabelText("Provider")).toHaveValue("openrouter");
+    const provider = await screen.findByLabelText("Provider");
+    await waitFor(() => expect(provider).toHaveAttribute("data-value", "openrouter"));
+    await openOptions(provider);
+    expect(screen.getByRole("option", { name: "Claude (Anthropic) (already added)" })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.keyboard("{Escape}");
     await userEvent.type(screen.getByLabelText("Label (optional)"), "Team key");
     await userEvent.type(screen.getByLabelText("API key"), KEY);
     await userEvent.click(screen.getByRole("button", { name: "Save & validate" }));
@@ -129,9 +133,9 @@ describe("AiSettingsCard", () => {
     const calls = setup();
     renderWithProviders(<AiSettingsCard />);
 
-    await userEvent.selectOptions(await screen.findByLabelText("Provider"), "OPENROUTER");
+    await chooseOption(await screen.findByLabelText("Provider"), "OPENROUTER");
     await waitFor(() => expect(screen.getByLabelText("Model")).not.toBeDisabled());
-    await userEvent.selectOptions(screen.getByLabelText("Model"), freeModel.id);
+    await chooseOption(screen.getByLabelText("Model"), freeModel.id);
 
     expect(screen.getByText(/This model doesn't offer an effort setting/)).toBeInTheDocument();
     expect(screen.getByText(/Data notice/)).toBeInTheDocument();
@@ -178,9 +182,9 @@ describe("AiSettingsCard", () => {
 
     // Choosing a provider without a model is not saveable either.
     await userEvent.type(limit, "2");
-    await userEvent.selectOptions(screen.getByLabelText("Provider"), "OPENROUTER");
+    await chooseOption(screen.getByLabelText("Provider"), "OPENROUTER");
     expect(save).toBeDisabled();
-    await userEvent.selectOptions(screen.getByLabelText("Provider"), "");
+    await chooseOption(screen.getByLabelText("Provider"), "");
     expect(save).toBeDisabled();
     expect(calls.some((call) => call.method === "PUT")).toBe(false);
   });
@@ -220,8 +224,9 @@ describe("AiSettingsCard", () => {
     setup();
     renderWithProviders(<AiSettingsCard />);
 
-    const claudeOption = (await screen.findByRole("option", { name: /Claude \(Anthropic\) \(add a key first\)/ })) as HTMLOptionElement;
-    expect(claudeOption.disabled).toBe(true);
+    await openOptions(await screen.findByLabelText("Provider"));
+    expect(await screen.findByRole("option", { name: /Claude \(Anthropic\) \(add a key first\)/ })).toHaveAttribute("aria-disabled", "true");
+    await userEvent.keyboard("{Escape}");
     const strip = screen.getByLabelText("AI usage");
     await waitFor(() => expect(strip).toHaveTextContent("Spent today$0.12 of $2.00"));
     expect(strip).toHaveTextContent("Calls today4");

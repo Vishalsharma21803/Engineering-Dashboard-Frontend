@@ -40,7 +40,7 @@ function CredentialsSkeleton() {
     <div className="space-y-3" aria-label="Loading credentials">
       {[0, 1, 2].map((item) => (
         <Card key={item} className="p-5">
-          <div className="animate-pulse space-y-3">
+          <div className="skeleton space-y-3">
             <div className="flex gap-2">
               <div className="h-6 w-28 rounded-full bg-slate-100" />
               <div className="h-6 w-24 rounded-full bg-slate-100" />
@@ -239,10 +239,7 @@ export function CredentialsPage() {
     <section className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-            Workspace
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
             Credentials
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">

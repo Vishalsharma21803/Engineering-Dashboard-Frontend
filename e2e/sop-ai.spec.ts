@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { addAiKey } from "./helpers/credentials.js";
+import { choose, openOptions } from "./helpers/select.js";
 
 const BACKEND = "http://localhost:3100";
 // Accepted by the fake provider in backend/tests/support/fake-ai.ts; it fails every AI rule it is asked about.
@@ -33,8 +34,8 @@ test("opening a ticket reviews it with the developer's own AI model; My work nev
   await page.goto("/credentials");
   await addAiKey(page, "CLAUDE", CLAUDE_KEY);
   await expect(page.getByText(/Key works/)).toBeVisible();
-  await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
-  await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");
+  await choose(page.getByLabel("Provider", { exact: true }), "CLAUDE");
+  await choose(page.getByLabel("Model", { exact: true }), "claude-haiku-5-5");
   await page.getByRole("button", { name: "Save AI settings" }).click();
   await expect(page.getByText(/^Saved /)).toBeVisible();
 
@@ -56,7 +57,8 @@ test("opening a ticket reviews it with the developer's own AI model; My work nev
   // Back on My work, the saved review counts for that ticket only.
   await page.goto("/azure");
   await expect(page.getByRole("table").getByText("T-05 · AI")).toHaveCount(1);
-  await expect(page.getByLabel("SOP")).toContainText("T-05 · Approach is described (1)");
+  await expect((await openOptions(page.getByLabel("SOP"))).filter({ hasText: "T-05 · Approach is described (1)" })).toHaveCount(1);
+  await page.keyboard.press("Escape");
 
   const response = await request.get(`${BACKEND}/__e2e/requests`);
   const { requests } = (await response.json()) as { requests: Array<{ isWrite: boolean }> };
@@ -80,8 +82,8 @@ test("an AI fix is applied only through the approval dialog", async ({ page, req
   await expect(page).toHaveURL("/credentials");
   await addAiKey(page, "CLAUDE", CLAUDE_KEY);
   await expect(page.getByText(/Key works/)).toBeVisible();
-  await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
-  await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");
+  await choose(page.getByLabel("Provider", { exact: true }), "CLAUDE");
+  await choose(page.getByLabel("Model", { exact: true }), "claude-haiku-5-5");
   await page.getByRole("button", { name: "Save AI settings" }).click();
   await expect(page.getByText(/^Saved /)).toBeVisible();
 

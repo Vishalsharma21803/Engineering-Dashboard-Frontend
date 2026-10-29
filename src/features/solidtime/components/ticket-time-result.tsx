@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { StatTile } from "@/features/azure-devops/components/feedback";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import type { TicketTimeResponse } from "../api/solidtime.api";
@@ -98,12 +99,12 @@ export function TicketTimeResult({ data, azureCredentialId, onPropose, isProposi
           <label className="text-xs font-medium text-amber-900" htmlFor={`over-estimate-${ticket.id}`}>
             Why did it take longer?
           </label>
-          <textarea
+          <Textarea
             id={`over-estimate-${ticket.id}`}
             value={reason}
             rows={2}
             onChange={(event) => setReason(event.target.value)}
-            className="w-full rounded-md border border-amber-300 bg-surface px-2 py-1.5 text-sm"
+            className="min-h-0 border-amber-300 px-2 py-1.5"
           />
           <div>
             <Button

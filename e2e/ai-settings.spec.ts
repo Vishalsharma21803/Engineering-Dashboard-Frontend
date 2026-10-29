@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { addAiKey } from "./helpers/credentials.js";
+import { choose } from "./helpers/select.js";
 
 const BACKEND = "http://localhost:3100";
 // Keys accepted by the fake providers in backend/tests/support/fake-ai.ts.
@@ -33,8 +34,8 @@ test("a developer adds their own AI keys and picks a free model with consent", a
   await expect(page.getByText(/Free-model requests today: 3 of 50/)).toBeVisible();
 
   // Settings: free model requires the data notice
-  await page.getByLabel("Provider", { exact: true }).selectOption("OPENROUTER");
-  await page.getByLabel("Model", { exact: true }).selectOption("deepseek/deepseek-chat:free");
+  await choose(page.getByLabel("Provider", { exact: true }), "OPENROUTER");
+  await choose(page.getByLabel("Model", { exact: true }), "deepseek/deepseek-chat:free");
   const save = page.getByRole("button", { name: "Save AI settings" });
   await expect(save).toBeDisabled();
   await page.getByRole("checkbox", { name: /Data notice/ }).check();
@@ -42,14 +43,14 @@ test("a developer adds their own AI keys and picks a free model with consent", a
   await expect(page.getByText(/^Saved /)).toBeVisible();
 
   // Switch to Claude Sonnet with High effort
-  await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
-  await page.getByLabel("Model", { exact: true }).selectOption("claude-sonnet-5-5");
-  await page.getByLabel("Effort", { exact: true }).selectOption("HIGH");
+  await choose(page.getByLabel("Provider", { exact: true }), "CLAUDE");
+  await choose(page.getByLabel("Model", { exact: true }), "claude-sonnet-5-5");
+  await choose(page.getByLabel("Effort", { exact: true }), "HIGH");
   await save.click();
   await expect(page.getByText(/^Saved /)).toBeVisible();
-  await expect(page.getByLabel("Effort", { exact: true })).toHaveValue("HIGH");
+  await expect(page.getByLabel("Effort", { exact: true })).toHaveAttribute("data-value", "HIGH");
   await page.reload();
-  await expect(page.getByLabel("Model", { exact: true })).toHaveValue("claude-sonnet-5-5");
+  await expect(page.getByLabel("Model", { exact: true })).toHaveAttribute("data-value", "claude-sonnet-5-5");
 
   // SOP owner can restrict OpenRouter models
   await expect(page.getByRole("heading", { name: /OpenRouter models offered/ })).toBeVisible();
@@ -75,8 +76,8 @@ test("a developer adds an OpenCode key and picks a paid OpenCode model", async (
   await expect(page.getByText(/free models only inside the OpenCode app/)).toBeVisible();
   await expect(page.locator(`input[value="${OPENCODE_KEY}"]`)).toHaveCount(0);
 
-  await page.getByLabel("Provider", { exact: true }).selectOption("OPENCODE");
-  await page.getByLabel("Model", { exact: true }).selectOption("glm-5.3-flash");
+  await choose(page.getByLabel("Provider", { exact: true }), "OPENCODE");
+  await choose(page.getByLabel("Model", { exact: true }), "glm-5.3-flash");
   await page.getByRole("button", { name: "Save AI settings" }).click();
   await expect(page.getByText(/^Saved /)).toBeVisible();
 });

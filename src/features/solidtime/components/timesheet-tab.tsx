@@ -3,6 +3,8 @@ import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Hint } from "@/components/ui/hint";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
 import { Updating } from "@/components/ui/updating";
@@ -190,15 +192,19 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
             ))}
           </div>
           <div className="inline-flex items-center gap-1">
-            <Button size="sm" variant="secondary" aria-label={`Previous ${unit}`} onClick={() => goTo(shiftDay(anchor, -step))}>
-              ←
-            </Button>
+            <Hint label={`Previous ${unit}`}>
+              <Button size="sm" variant="secondary" aria-label={`Previous ${unit}`} onClick={() => goTo(shiftDay(anchor, -step))}>
+                <ChevronLeftIcon />
+              </Button>
+            </Hint>
             <Button size="sm" variant="secondary" disabled={isCurrent} onClick={() => goTo(today)}>
               {mode === "week" ? "This week" : "Today"}
             </Button>
-            <Button size="sm" variant="secondary" aria-label={`Next ${unit}`} onClick={() => goTo(shiftDay(anchor, step))}>
-              →
-            </Button>
+            <Hint label={`Next ${unit}`}>
+              <Button size="sm" variant="secondary" aria-label={`Next ${unit}`} onClick={() => goTo(shiftDay(anchor, step))}>
+                <ChevronRightIcon />
+              </Button>
+            </Hint>
           </div>
           <p className="flex items-center gap-2 text-sm font-semibold text-slate-900" aria-live="polite">
             {rangeLabel}
@@ -257,7 +263,7 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
                             {formatDayLabel(day.day, { weekday: "short" })}
                           </span>
                           <span className="text-lg font-semibold leading-none text-slate-950">{Number(day.day.slice(8))}</span>
-                          <span className={cn("text-xs tabular-nums", day.seconds === 0 ? "text-slate-400" : reached ? "text-emerald-700" : "text-slate-700")}>
+                          <span className={cn("text-xs tabular-nums", day.seconds === 0 ? "text-slate-500" : reached ? "text-emerald-700" : "text-slate-700")}>
                             <span className="sm:hidden">{Math.round(hours * 10) / 10} h</span>
                             <span className="hidden sm:inline">{formatDuration(day.seconds)}</span>
                           </span>

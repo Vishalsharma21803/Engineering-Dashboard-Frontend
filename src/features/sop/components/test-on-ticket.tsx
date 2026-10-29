@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ErrorCard } from "@/features/azure-devops/components/feedback";
 import { useProjects } from "@/features/azure-devops/hooks/use-projects";
 import { getLastCredential, resolveDefaultProject } from "@/features/azure-devops/utils/last-project";
@@ -13,8 +15,6 @@ import { ApiError } from "@/lib/api-client";
 import { testRulesOnTicket } from "../api/sop.api";
 import type { RulebookScope } from "../types/sop.types";
 import { SopResultPanel } from "./sop-result-panel";
-
-const SELECT_CLASS = "h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 /** Tries the rules in the editor (or the saved ones) on one real ticket. Reads only. */
 export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookScope; content: string; allowDraft: boolean }) {
@@ -62,11 +62,10 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
           {azure.length > 1 ? (
             <label className="flex w-full flex-col gap-1.5 text-sm font-medium text-slate-700 sm:w-56">
               Organization
-              <select
-                className={SELECT_CLASS}
+              <SelectField
                 value={credentialId}
-                onChange={(event) => {
-                  setChosenCredential(event.target.value);
+                onValueChange={(selected) => {
+                  setChosenCredential(selected);
                   setChosenProject(null);
                 }}
               >
@@ -75,12 +74,12 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
                     {getCredentialDisplayName(credential)}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           ) : null}
           <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium text-slate-700 sm:w-56 sm:flex-none">
             Project
-            <select className={SELECT_CLASS} value={projectId} onChange={(event) => setChosenProject(event.target.value)}>
+            <SelectField value={projectId} onValueChange={(selected) => setChosenProject(selected)}>
               {projects.isLoading ? <option value="">Loading projects…</option> : null}
               {projects.error && !projects.data ? <option value="">Projects could not be loaded</option> : null}
               {(projects.data?.projects ?? []).map((project) => (
@@ -88,7 +87,7 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
                   {project.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <label className="flex w-32 flex-col gap-1.5 text-sm font-medium text-slate-700">
             Ticket #
@@ -108,7 +107,7 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
         </div>
         {allowDraft ? (
           <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" className="size-4 shrink-0" checked={useDraft} onChange={(event) => setUseDraft(event.target.checked)} />
+            <Checkbox checked={useDraft} onCheckedChange={(state) => setUseDraft(state === true)} />
             Use the rules in the editor (unsaved)
           </label>
         ) : null}

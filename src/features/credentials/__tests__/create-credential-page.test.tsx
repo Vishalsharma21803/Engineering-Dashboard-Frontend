@@ -1,8 +1,9 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { mockBackend, renderWithProviders } from "@/test/render";
+import { chooseOption, openOptions } from "@/test/select";
 import { CreateCredentialPage } from "../pages/create-credential-page";
 
 /** A slice of the backend registry (GET /api/credentials/platforms). */
@@ -40,14 +41,15 @@ describe("CreateCredentialPage", () => {
 
     // Integrations only (AI providers have their own section); Azure DevOps first.
     const select = await screen.findByLabelText("Platform");
-    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Azure DevOps", "Solidtime"]);
+    expect((await openOptions(select)).map((option) => option.textContent)).toEqual(["Azure DevOps", "Solidtime"]);
+    await userEvent.keyboard("{Escape}");
     expect(screen.getByLabelText("Organization URL")).toBeInTheDocument();
 
-    await userEvent.selectOptions(select, "solidtime");
+    await chooseOption(select, "solidtime");
     expect(screen.getByLabelText("Solidtime address")).toBeInTheDocument();
     expect(screen.queryByLabelText("Organization URL")).not.toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByLabelText("Platform"), "azure");
+    await chooseOption(screen.getByLabelText("Platform"), "azure");
     await userEvent.type(screen.getByLabelText("Label (optional)"), "Team");
     await userEvent.type(screen.getByLabelText("Organization URL"), "https://dev.azure.com/acme");
     await userEvent.type(screen.getByLabelText("Personal access token"), "pat-0123456789abcdefghijkl");
@@ -65,7 +67,7 @@ describe("CreateCredentialPage", () => {
     ]);
     renderWithProviders(<CreateCredentialPage />, { path: "/credentials/new", route: "/credentials/new?platform=solidtime" });
 
-    expect(await screen.findByLabelText("Platform")).toHaveValue("solidtime");
+    expect(await screen.findByLabelText("Platform")).toHaveAttribute("data-value", "solidtime");
     await userEvent.type(screen.getByLabelText("Solidtime address"), "https://evil.example");
     await userEvent.type(screen.getByLabelText("API token"), "st-token-0123456789abcdefghij");
     await userEvent.click(screen.getByRole("button", { name: "Save credential" }));

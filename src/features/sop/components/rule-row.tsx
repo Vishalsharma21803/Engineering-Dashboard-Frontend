@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { cn } from "@/utils/cn";
 import { useEditRules } from "../hooks/use-sop";
@@ -10,7 +11,7 @@ import type { RulebookScope, RuleSeverity } from "../types/sop.types";
 import { ruleEditErrorText } from "../utils/rule-edit-errors";
 import { AI_REVIEW_NOTES, ITEM_KINDS, SEVERITY_LABELS, SEVERITY_ORDER, checkerLabel, itemTypeLabel } from "../utils/rule-labels";
 import { paramEntries } from "../utils/rule-params";
-import { RuleParamsForm, SELECT_BASE_CLASS } from "./rule-params-form";
+import { RuleParamsForm } from "./rule-params-form";
 
 const SEVERITY_TONE: Record<RuleSeverity, "danger" | "warning" | "info" | "neutral"> = {
   fail: "danger",
@@ -85,13 +86,14 @@ export function RuleRow({ rule, check, scope, editable, baseVersion, onSaved }: 
         <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
           {busy ? <Spinner className="size-4 text-slate-400" /> : null}
           {editable ? (
-            <select
+            <SelectField
               aria-label={`Level for ${rule.id}`}
-              className={cn(SELECT_BASE_CLASS, "w-32")}
+              size="sm"
+              className="w-32"
               value={level}
               disabled={busy}
-              onChange={(event) => {
-                const severity = event.target.value as RuleSeverity;
+              onValueChange={(selected) => {
+                const severity = selected as RuleSeverity;
                 void send({ op: "set", id: rule.id, severity }, `Level set to ${SEVERITY_LABELS[severity]}.`, `level set to ${SEVERITY_LABELS[severity]}`);
               }}
             >
@@ -100,7 +102,7 @@ export function RuleRow({ rule, check, scope, editable, baseVersion, onSaved }: 
                   {SEVERITY_LABELS[value]}
                 </option>
               ))}
-            </select>
+            </SelectField>
           ) : (
             <StatusBadge tone={SEVERITY_TONE[rule.severity]}>{SEVERITY_LABELS[rule.severity]}</StatusBadge>
           )}

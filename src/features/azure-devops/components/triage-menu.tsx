@@ -1,6 +1,8 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useState, type ReactNode } from "react";
 
+import { DatePicker } from "@/components/ui/date-picker";
+import { Hint } from "@/components/ui/hint";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/utils/cn";
 import type { DashboardTriage, TriageTarget } from "../hooks/use-triage";
 import type { ResolvedTriage, TriageStatus } from "../types/triage.types";
@@ -48,32 +50,14 @@ interface TriageMenuProps {
   resolved: ResolvedTriage;
 }
 
-const MENU_WIDTH = 272;
-const MENU_HEIGHT_ESTIMATE = 420;
-
-/**
- * Fixed position next to the trigger (rendered in a portal, so neither table
- * overflow nor card stacking contexts clip it), kept inside the viewport.
- */
-function placeNear(rect: DOMRect): CSSProperties {
-  const width = Math.min(MENU_WIDTH, window.innerWidth - 16);
-  const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
-  const spaceBelow = window.innerHeight - rect.bottom - 12;
-  const above = spaceBelow < MENU_HEIGHT_ESTIMATE && rect.top > spaceBelow;
-
-  return above
-    ? { position: "fixed", left, width, bottom: window.innerHeight - rect.top + 4, maxHeight: rect.top - 12 }
-    : { position: "fixed", left, width, top: rect.bottom + 4, maxHeight: Math.max(160, spaceBelow) };
-}
-
 function MenuButton({ onClick, children, tone = "default" }: { onClick: () => void; children: ReactNode; tone?: "default" | "danger" }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "block w-full rounded-md px-2.5 py-1.5 text-left text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-500",
-        tone === "danger" ? "text-rose-700 hover:bg-rose-50" : "text-slate-700 hover:bg-slate-100"
+        "flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500",
+        tone === "danger" ? "text-rose-700 hover:bg-rose-50 focus-visible:bg-rose-50" : "text-slate-700 hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent"
       )}
     >
       {children}
@@ -84,7 +68,7 @@ function MenuButton({ onClick, children, tone = "default" }: { onClick: () => vo
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="py-1.5" role="group" aria-label={title}>
-      <p className="truncate px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="truncate px-2.5 pb-1 text-xs font-medium text-slate-500">{title}</p>
       {children}
     </div>
   );
@@ -93,69 +77,10 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 /** Snooze / acknowledge / abandon an item or its whole project. Cockpit-only. */
 export function TriageMenu({ triage, itemKey, projectName, label, resolved }: TriageMenuProps) {
   const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<CSSProperties>({});
   const [customDate, setCustomDate] = useState("");
   // Captured when the menu opens so snooze presets stay stable while it is open.
   const [now, setNow] = useState(() => new Date());
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const panelId = useId();
   const disabled = !triage.ready || triage.isSaving;
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function onPointerDown(event: PointerEvent) {
-      const target = event.target as Node;
-      if (!panelRef.current?.contains(target) && !buttonRef.current?.contains(target)) {
-        setOpen(false);
-      }
-    }
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        buttonRef.current?.focus();
-      }
-    }
-
-    // The panel is fixed-positioned, so keep it next to its trigger while the page moves.
-    function follow(event: Event) {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      if (rect && !panelRef.current?.contains(event.target as Node)) {
-        setPosition(placeNear(rect));
-      }
-    }
-
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", follow, true);
-    window.addEventListener("resize", follow);
-    panelRef.current?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
-
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", follow, true);
-      window.removeEventListener("resize", follow);
-    };
-  }, [open]);
-
-  function toggle() {
-    const rect = buttonRef.current?.getBoundingClientRect();
-
-    if (!open) {
-      setNow(new Date());
-    }
-
-    if (!open && rect) {
-      setPosition(placeNear(rect));
-    }
-
-    setOpen(!open);
-  }
 
   function apply(target: TriageTarget, status: TriageStatus, until?: Date) {
     triage.mark(target, status, until);
@@ -171,100 +96,98 @@ export function TriageMenu({ triage, itemKey, projectName, label, resolved }: Tr
   );
 
   return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={toggle}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setNow(new Date());
+        }
+        setOpen(next);
+      }}
+    >
+      <Hint label="Snooze, acknowledge or abandon">
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={`Triage ${label}`}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-surface text-slate-500 outline-none transition hover:border-slate-300 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-indigo-300 data-[state=open]:bg-indigo-50 data-[state=open]:text-indigo-700"
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="size-4">
+              <path d="M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm5.5 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
+            </svg>
+          </button>
+        </PopoverTrigger>
+      </Hint>
+
+      <PopoverContent
+        align="end"
+        collisionPadding={8}
         aria-label={`Triage ${label}`}
-        title="Snooze, acknowledge or abandon"
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-surface text-slate-500 outline-none transition hover:border-slate-300 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="max-h-(--radix-popover-content-available-height) w-68 max-w-[calc(100vw-1rem)] divide-y divide-slate-100 overflow-y-auto rounded-xl border-slate-200 p-1.5 text-left shadow-xl"
       >
-        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="size-4">
-          <path d="M3 10a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm5.5 0a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0ZM15.5 8.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
-        </svg>
-      </button>
-
-      {open
-        ? createPortal(
-            <div
-              ref={panelRef}
-              id={panelId}
-              role="dialog"
-              aria-label={`Triage ${label}`}
-              style={position}
-              className="z-50 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-surface p-1.5 text-left shadow-xl"
+        {itemKey ? (
+          <Group title="This item">
+            {ownMark ? <MenuButton onClick={() => { triage.clear(ownMark); setOpen(false); }}>Restore to my list</MenuButton> : null}
+            {presets.map((preset) => (
+              <MenuButton key={preset.label} onClick={() => apply({ itemKey }, "SNOOZED", preset.until)}>
+                Snooze · {preset.label.toLowerCase()}
+              </MenuButton>
+            ))}
+            <form
+              className="flex items-center gap-1.5 px-2.5 py-1.5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (customUntil) apply({ itemKey }, "SNOOZED", customUntil);
+              }}
             >
-              {itemKey ? (
-                <Group title="This item">
-                  {ownMark ? <MenuButton onClick={() => { triage.clear(ownMark); setOpen(false); }}>Restore to my list</MenuButton> : null}
-                  {presets.map((preset) => (
-                    <MenuButton key={preset.label} onClick={() => apply({ itemKey }, "SNOOZED", preset.until)}>
-                      Snooze · {preset.label.toLowerCase()}
-                    </MenuButton>
-                  ))}
-                  <form
-                    className="flex items-center gap-1.5 px-2.5 py-1.5"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (customUntil) apply({ itemKey }, "SNOOZED", customUntil);
-                    }}
-                  >
-                    <label className="sr-only" htmlFor={`${panelId}-date`}>
-                      Snooze until date
-                    </label>
-                    <input
-                      id={`${panelId}-date`}
-                      type="date"
-                      value={customDate}
-                      min={toDateInputValue(addDays(now, 1))}
-                      max={toDateInputValue(addDays(now, 364))}
-                      onChange={(event) => setCustomDate(event.target.value)}
-                      className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!customUntil}
-                      className="rounded-md bg-inverse px-2 py-1 text-xs font-medium text-on-inverse disabled:opacity-40"
-                    >
-                      Snooze
-                    </button>
-                  </form>
-                  <MenuButton onClick={() => apply({ itemKey }, "ACKNOWLEDGED")}>Acknowledge · keep, move down</MenuButton>
-                  <MenuButton tone="danger" onClick={() => apply({ itemKey }, "ABANDONED")}>
-                    Abandon · hide until restored
-                  </MenuButton>
-                </Group>
-              ) : null}
+              <DatePicker
+                aria-label="Snooze until date"
+                placeholder="Until a date…"
+                size="sm"
+                value={customDate}
+                min={toDateInputValue(addDays(now, 1))}
+                max={toDateInputValue(addDays(now, 364))}
+                onChange={setCustomDate}
+                className="h-8 flex-1 px-2 text-xs"
+              />
+              <button
+                type="submit"
+                disabled={!customUntil}
+                className="h-8 rounded-md bg-inverse px-2.5 text-xs font-medium text-on-inverse transition-opacity disabled:opacity-40"
+              >
+                Snooze
+              </button>
+            </form>
+            <MenuButton onClick={() => apply({ itemKey }, "ACKNOWLEDGED")}>Acknowledge · keep, move down</MenuButton>
+            <MenuButton tone="danger" onClick={() => apply({ itemKey }, "ABANDONED")}>
+              Abandon · hide until restored
+            </MenuButton>
+          </Group>
+        ) : null}
 
-              {projectName ? (
-                <Group title={`Whole project · ${projectName}`}>
-                  {projectMark ? (
-                    <MenuButton onClick={() => { triage.clear(projectMark); setOpen(false); }}>Restore project</MenuButton>
-                  ) : null}
-                  {presets.slice(0, 2).map((preset) => (
-                    <MenuButton key={preset.label} onClick={() => apply({ projectName }, "SNOOZED", preset.until)}>
-                      Snooze project · {preset.label.toLowerCase()}
-                    </MenuButton>
-                  ))}
-                  <MenuButton onClick={() => apply({ projectName }, "ACKNOWLEDGED")}>Acknowledge project</MenuButton>
-                  <MenuButton tone="danger" onClick={() => apply({ projectName }, "ABANDONED")}>
-                    Abandon project
-                  </MenuButton>
-                </Group>
-              ) : null}
+        {projectName ? (
+          <Group title={`Whole project · ${projectName}`}>
+            {projectMark ? (
+              <MenuButton onClick={() => { triage.clear(projectMark); setOpen(false); }}>Restore project</MenuButton>
+            ) : null}
+            {presets.slice(0, 2).map((preset) => (
+              <MenuButton key={preset.label} onClick={() => apply({ projectName }, "SNOOZED", preset.until)}>
+                Snooze project · {preset.label.toLowerCase()}
+              </MenuButton>
+            ))}
+            <MenuButton onClick={() => apply({ projectName }, "ACKNOWLEDGED")}>Acknowledge project</MenuButton>
+            <MenuButton tone="danger" onClick={() => apply({ projectName }, "ABANDONED")}>
+              Abandon project
+            </MenuButton>
+          </Group>
+        ) : null}
 
-              <p className="px-2.5 pb-1 pt-2 text-[11px] leading-4 text-slate-400">
-                Only changes your Cockpit view. Nothing is changed in Azure DevOps.
-              </p>
-            </div>,
-            document.body
-          )
-        : null}
-    </>
+        <p className="px-2.5 pb-1 pt-2 text-[11px] leading-4 text-slate-500">
+          Only changes your Cockpit view. Nothing is changed in Azure DevOps.
+        </p>
+      </PopoverContent>
+    </Popover>
   );
 }
 

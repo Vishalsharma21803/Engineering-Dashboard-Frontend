@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { addAiKey, connectSolidtime } from "./helpers/credentials.js";
+import { choose } from "./helpers/select.js";
 
 const BACKEND = "http://localhost:3100";
 // Accepted by the fake Solidtime in backend/tests/support/fake-solidtime.ts (an Employee in one organization).
@@ -94,15 +95,15 @@ test("drafts yesterday from Azure, fills the missing hours with AI, and saves th
   // The developer's own AI model (the fake provider answers 1 h per ticket).
   await addAiKey(page, "CLAUDE", "sk-ant-test-valid-key-0123456789abcdef");
   await expect(page.getByText(/Key works/)).toBeVisible();
-  await page.getByLabel("Provider", { exact: true }).selectOption("CLAUDE");
-  await page.getByLabel("Model", { exact: true }).selectOption("claude-haiku-5-5");
+  await choose(page.getByLabel("Provider", { exact: true }), "CLAUDE");
+  await choose(page.getByLabel("Model", { exact: true }), "claude-haiku-5-5");
   await page.getByRole("button", { name: "Save AI settings" }).click();
   await expect(page.getByText(/^Saved /)).toBeVisible();
 
   await page.goto("/time");
   await page.getByRole("tab", { name: "Draft from Azure" }).click();
   await page.getByRole("button", { name: "Previous day" }).click();
-  await expect(page.getByLabel("Day", { exact: true })).toHaveValue(day);
+  await expect(page.getByLabel("Day", { exact: true })).toHaveAttribute("data-value", day);
   const list = page.getByRole("list", { name: "Drafted entries" });
 
   // #102: hours from Completed Work, placed and ready; #103: activity only, waiting for hours.

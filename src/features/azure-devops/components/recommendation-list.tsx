@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { Hint } from "@/components/ui/hint";
 import { Pagination } from "@/components/ui/pagination";
 import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
@@ -230,12 +231,11 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
               resolved={resolved}
             />
           </div>
-          <span
-            className="ml-auto whitespace-nowrap pl-1 text-right text-xs tabular-nums text-slate-400 sm:ml-0"
-            title="Priority score: higher means more urgent. The list is sorted by it."
-          >
-            score {recommendation.score}
-          </span>
+          <Hint label="Priority score: higher means more urgent. The list is sorted by it.">
+            <span className="ml-auto cursor-default whitespace-nowrap pl-1 text-right text-xs tabular-nums text-slate-500 sm:ml-0">
+              score {recommendation.score}
+            </span>
+          </Hint>
         </div>
       </li>
     );
@@ -292,7 +292,7 @@ export function RecommendationList({ credentialId, projectId, dashboardToken, wo
           ) : (
             <>
               {active.length > 0 ? (
-                <ol className="space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
+                <ol className="stagger space-y-2">{active.map((entry) => renderItem(entry, entry.rank))}</ol>
               ) : data.activeTotal === 0 ? (
                 <EmptyState>
                   Nothing needs your attention right now

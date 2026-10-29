@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import type { Credential } from "../types/credential.types";
 import { getCredentialDisplayName } from "../utils/credential-display";
@@ -18,96 +19,75 @@ export function CredentialDeleteDialog({
   onClose,
   onConfirm,
 }: CredentialDeleteDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+  // Keeps the name on screen while the dialog animates closed.
+  const [lastShown, setLastShown] = useState(credential);
+  if (credential && credential !== lastShown) {
+    setLastShown(credential);
+  }
+  const shown = credential ?? lastShown;
 
-  useEffect(() => {
-    const dialog = dialogRef.current;
-
-    if (!dialog) {
-      return;
-    }
-
-    if (credential && !dialog.open) {
-      dialog.showModal();
-    }
-
-    if (!credential && dialog.open) {
-      dialog.close();
-    }
-  }, [credential]);
-
-  const displayName = credential
-    ? getCredentialDisplayName(credential)
+  const displayName = shown
+    ? getCredentialDisplayName(shown)
     : "this credential";
 
   return (
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="delete-credential-title"
-      aria-describedby="delete-credential-description"
-      onCancel={(event) => {
-        if (isPending) {
-          event.preventDefault();
-        }
-      }}
-      onClose={() => {
-        if (!isPending) {
+    <Dialog
+      open={credential !== null}
+      onOpenChange={(open) => {
+        if (!open && !isPending) {
           onClose();
         }
       }}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-slate-200 bg-surface p-0 text-slate-950 shadow-2xl backdrop:bg-backdrop/50"
     >
-      {credential ? (
-        <div className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-600">
-            Destructive action
-          </p>
+      <DialogContent
+        showCloseButton={false}
+        // As before: only Escape or Cancel close it, never a click on the backdrop.
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => {
+          if (isPending) {
+            event.preventDefault();
+          }
+        }}
+        className="block max-w-md rounded-xl border-slate-200 bg-surface p-6 text-slate-950 shadow-2xl sm:max-w-md"
+      >
+        <DialogTitle className="text-xl font-semibold tracking-tight">
+          Delete credential?
+        </DialogTitle>
 
-          <h2
-            id="delete-credential-title"
-            className="mt-2 text-xl font-semibold tracking-tight"
+        <DialogDescription className="mt-3 text-sm leading-6 text-slate-600">
+          This permanently deletes{" "}
+          <span className="font-semibold text-slate-950">
+            {displayName}
+          </span>{" "}
+          and its encrypted PAT. This cannot be undone.
+        </DialogDescription>
+
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="secondary"
+            onClick={onClose}
+            disabled={isPending}
+            autoFocus
           >
-            Delete credential?
-          </h2>
+            Cancel
+          </Button>
 
-          <p
-            id="delete-credential-description"
-            className="mt-3 text-sm leading-6 text-slate-600"
+          <Button
+            variant="danger"
+            onClick={onConfirm}
+            disabled={isPending}
           >
-            This permanently deletes{" "}
-            <span className="font-semibold text-slate-950">
-              {displayName}
-            </span>{" "}
-            and its encrypted PAT. This cannot be undone.
-          </p>
-
-          <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="secondary"
-              onClick={onClose}
-              disabled={isPending}
-              autoFocus
-            >
-              Cancel
-            </Button>
-
-            <Button
-              variant="danger"
-              onClick={onConfirm}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <>
-                  <Spinner className="size-4" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete credential"
-              )}
-            </Button>
-          </div>
+            {isPending ? (
+              <>
+                <Spinner className="size-4" />
+                Deleting...
+              </>
+            ) : (
+              "Delete credential"
+            )}
+          </Button>
         </div>
-      ) : null}
-    </dialog>
+      </DialogContent>
+    </Dialog>
   );
 }

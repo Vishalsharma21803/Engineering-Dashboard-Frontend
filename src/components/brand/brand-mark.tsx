@@ -13,10 +13,8 @@ export function BrandMark({
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-xl shadow-sm",
-        inverted
-          ? "bg-surface text-slate-950"
-          : "bg-brand text-on-brand",
+        "inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-[inset_0_1px_0_0_rgb(255_255_255/0.25),0_2px_8px_-2px_rgb(49_30_160/0.5)]",
+        inverted && "ring-1 ring-white/15",
         className
       )}
     >

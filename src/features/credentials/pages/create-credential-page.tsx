@@ -4,11 +4,10 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Spinner } from "@/components/ui/spinner";
+import { SelectField } from "@/components/ui/select-field";
 import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { usePlatforms, type ConnectResult } from "../api/platform.api";
 import { PlatformForm } from "../components/platform-form";
-
-const SELECT = "h-10 w-full rounded-lg border border-slate-300 bg-surface px-3 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
 
 /** The success message for the Credentials page. */
 function addedMessage(result: ConnectResult): string {
@@ -68,13 +67,13 @@ export function CreateCredentialPage() {
             {/* A failed background refresh keeps the form (and what was typed) on screen. */}
             {platforms.error ? <StaleDataBanner error={platforms.error} onRetry={() => void platforms.refetch()} isRetrying={platforms.isFetching} /> : null}
             <FormField id="platform" label="Platform" hint={platform.description}>
-              <select id="platform" className={SELECT} value={platform.id} disabled={saving} onChange={(event) => setSearchParams({ platform: event.target.value }, { replace: true })}>
+              <SelectField id="platform" value={platform.id} disabled={saving} onValueChange={(selected) => setSearchParams({ platform: selected }, { replace: true })}>
                 {integrations.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </FormField>
 
             <div className="border-t border-slate-100 pt-6">

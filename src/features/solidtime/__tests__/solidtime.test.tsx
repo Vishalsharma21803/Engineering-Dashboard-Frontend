@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -438,20 +438,22 @@ describe("ReportsTab", () => {
     ticketsWithoutEstimate: 0,
   };
 
-  it("says a start after the end is invalid and shows no figures from the previous range", async () => {
+  it("never offers a start after the end, and loads the range picked in the calendar", async () => {
     const calls = mockBackend([{ path: `${base}/reports/accuracy`, body: { accuracy: report } }]);
     renderWithProviders(<ReportsTab connection={connection} today={today} />);
 
     expect(await screen.findByText("Tickets compared")).toBeInTheDocument();
     const reads = calls.length;
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: shiftDay(today, 1) } });
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("is after the end date");
-    expect(screen.queryByText("Tickets compared")).not.toBeInTheDocument();
+    // The From calendar opens on the current start (September); the day after the end date cannot be picked.
+    await userEvent.click(screen.getByLabelText("From"));
+    await userEvent.click(screen.getByRole("button", { name: /next month/i }));
+    const dayButton = (date: string) => document.querySelector<HTMLButtonElement>(`[data-day="${new Date(`${date}T00:00`).toLocaleDateString()}"]`)!;
+    expect(dayButton(shiftDay(today, 1))).toBeDisabled();
     expect(calls).toHaveLength(reads);
 
-    fireEvent.change(screen.getByLabelText("From"), { target: { value: shiftDay(today, -6) } });
+    await userEvent.click(dayButton(shiftDay(today, -6)));
+    expect(screen.getByLabelText("From")).toHaveAttribute("data-value", shiftDay(today, -6));
     expect(await screen.findByText("Tickets compared")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

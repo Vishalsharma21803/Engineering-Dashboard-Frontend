@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { Checkbox } from "@/components/ui/checkbox";
 import { StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useOpenRouterAllowlist, useSetOpenRouterAllowlist } from "../hooks/use-ai";
 import type { AiModelOption } from "../types/ai.types";
@@ -67,11 +68,10 @@ function AllowlistEditor({ initialIds, options }: { initialIds: string[]; option
         {visible.map((model) => (
           <li key={model.id}>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={selected.includes(model.id)}
-                onChange={(event) =>
-                  setSelected(event.target.checked ? [...selected, model.id] : selected.filter((id) => id !== model.id))
+                onCheckedChange={(state) =>
+                  setSelected(state === true ? [...selected, model.id] : selected.filter((id) => id !== model.id))
                 }
               />
               <span className="font-mono text-xs text-slate-700">{model.id}</span>

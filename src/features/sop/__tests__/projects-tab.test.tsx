@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { AuthContext } from "@/features/auth/context/auth-context";
 import { mockBackend, renderWithProviders } from "@/test/render";
+import { chooseOption } from "@/test/select";
 import { ProjectsTab } from "../components/projects-tab";
 import type { ProjectSettings } from "../types/sop.types";
 
@@ -113,9 +114,9 @@ describe("ProjectsTab", () => {
     await userEvent.click(within(within(table).getByRole("row", { name: /Beta/ })).getByRole("button", { name: "Set up" }));
 
     const form = await screen.findByRole("form", { name: "Set up Beta" });
-    expect(within(form).getByLabelText("Stage for Estimations")).toHaveValue("estimation");
-    await userEvent.selectOptions(within(form).getByLabelText("Stage for Closed"), "done");
-    await userEvent.selectOptions(within(form).getByLabelText("Stage for New"), "");
+    expect(within(form).getByLabelText("Stage for Estimations")).toHaveAttribute("data-value", "estimation");
+    await chooseOption(within(form).getByLabelText("Stage for Closed"), "done");
+    await chooseOption(within(form).getByLabelText("Stage for New"), "");
     await userEvent.clear(within(form).getByLabelText("Team time zone"));
     await userEvent.type(within(form).getByLabelText("Team time zone"), "Asia/Kolkata");
     // Not an SOP owner: the branch pattern is shown read-only.
