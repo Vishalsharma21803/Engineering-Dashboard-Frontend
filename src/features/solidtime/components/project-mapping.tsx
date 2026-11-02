@@ -80,7 +80,7 @@ function MappingList({ connection, azureCredentialId }: { connection: SolidtimeC
           })}
         </ul>
       )}
-      {save.error ? <p role="alert" className="text-sm text-rose-600">The mapping could not be saved.</p> : null}
+      {save.error ? <p role="alert" className="text-sm text-rose-600">The mapping could not be saved: {save.error.message}</p> : null}
     </section>
   );
 }

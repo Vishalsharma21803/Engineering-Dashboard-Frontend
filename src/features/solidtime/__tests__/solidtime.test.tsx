@@ -87,9 +87,11 @@ describe("DraftTab", () => {
     remainingWork: null,
     completedWorkAdded: 0,
     completedWorkRemoved: 0,
+    remainingWorkLowered: 0,
     alreadyTrackedHours: 0,
     hours: null,
     hoursSource: null,
+    hoursBasis: null,
     start: null,
     end: null,
     solidtimeProjectId: null,
@@ -106,10 +108,10 @@ describe("DraftTab", () => {
     busy: [{ start: at("00:00"), end: at("00:30") }],
     truncated: false,
     rows: [
-      row({ ticketId: 102, title: "Fix flaky test", activity: [{ at: at("03:00"), what: "Completed Work 0 → 2" }], completedWorkAdded: 2, hours: 2, hoursSource: "completed-work", anchor: at("03:00"), start: at("01:00"), end: at("03:00"), description: "#102 Fix flaky test", solidtimeProjectId: alpha.id, projectSource: "ticket" }),
-      row({ ticketId: 103, title: "Crash on save", activity: [{ at: at("06:00"), what: "Commented" }], anchor: at("06:00"), description: "#103 Crash on save" }),
-      row({ ticketId: 104, title: "Already logged", activity: [{ at: at("07:00"), what: "Completed Work 0 → 1" }], completedWorkAdded: 1, alreadyTrackedHours: 1, hours: 0, hoursSource: "completed-work", anchor: at("07:00"), description: "#104 Already logged", note: "Already tracked in Solidtime." }),
-      row({ ticketId: 105, title: "Unticked", activity: [{ at: at("08:00"), what: "Commented" }], anchor: at("08:00"), description: "#105 Unticked", projectMatches: ["Beta", "BETA-"] }),
+      row({ ticketId: 102, title: "Fix flaky test", activity: [{ at: at("03:00"), what: "Completed Work 0 → 2" }], completedWorkAdded: 2, hours: 2, hoursSource: "completed-work", hoursBasis: "Completed Work raised by 2 h", anchor: at("03:00"), start: at("01:00"), end: at("03:00"), description: "#102 Fix flaky test", solidtimeProjectId: alpha.id, projectSource: "ticket" }),
+      row({ ticketId: 103, title: "Crash on save", activity: [{ at: at("06:00"), what: "Commented" }], hours: 1, hoursSource: "activity", hoursBasis: "1 change at 06:00", anchor: at("06:00"), start: at("05:00"), end: at("06:00"), description: "#103 Crash on save" }),
+      row({ ticketId: 104, title: "Already logged", activity: [{ at: at("07:00"), what: "Completed Work 0 → 1" }], completedWorkAdded: 1, alreadyTrackedHours: 1, hours: 0, hoursSource: "completed-work", hoursBasis: "Completed Work raised by 1 h", anchor: at("07:00"), description: "#104 Already logged", note: "Already tracked in Solidtime." }),
+      row({ ticketId: 105, title: "Lowered", activity: [{ at: at("08:00"), what: "Remaining Work 4 → 2.5" }], remainingWorkLowered: 1.5, hours: 1.5, hoursSource: "remaining-work", hoursBasis: "Remaining Work lowered by 1.5 h", anchor: at("08:00"), start: at("06:30"), end: at("08:00"), description: "#105 Lowered", projectMatches: ["Beta", "BETA-"] }),
     ],
   };
   const render = (routes: Parameters<typeof mockBackend>[0] = []) => {
@@ -118,19 +120,29 @@ describe("DraftTab", () => {
     renderWithProviders(<DraftTab connection={connection} onPropose={onPropose} isProposing={false} today={day} />);
     return { calls, onPropose };
   };
+  const checked = (ticketId: number, hours: number, ruleHours: number, reason = "Checked.") => ({ ticketId, ruleHours, hours, confidence: "medium", reason, start: null, end: null });
 
-  it("pre-fills rows from Completed Work and proposes the chosen ones as one batch", async () => {
+  it("pre-fills rows from the evidence, says where the hours come from, and proposes the chosen ones as one batch", async () => {
     const { onPropose } = render();
     const list = await screen.findByRole("list", { name: "Drafted entries" });
-    expect(within(list).getByRole("checkbox", { name: "Include #103" })).not.toBeChecked();
     expect(within(list).getByLabelText("Start for #102")).toHaveValue("01:00");
     expect(within(list).getByLabelText("Hours for #102")).toHaveValue(2);
     expect(within(list).getByLabelText("End for #102")).toHaveValue("03:00");
+    expect(within(list).getByRole("checkbox", { name: "Include #103" })).toBeChecked();
+    expect(within(list).getByLabelText("Hours for #103")).toHaveValue(1);
+    expect(within(list).getByText("Hours from: 1 change at 06:00.")).toBeInTheDocument();
+    expect(within(list).getByText("From your activity")).toBeInTheDocument();
+    expect(within(list).getByText("Remaining Work −1.5 h")).toBeInTheDocument();
+    expect(within(list).getByText("Hours from: Completed Work raised by 1 h, minus 1 h already in Solidtime.")).toBeInTheDocument();
     expect(within(list).getByText("Used for this ticket before")).toBeInTheDocument();
     expect(within(list).getAllByText("No match: choose a project")).toHaveLength(2);
     expect(within(list).getByText("2 projects match (Beta, BETA-): choose one")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Propose 1 entry…" }));
+    // 8 h target − 0.5 h tracked − 4.5 h drafted: shown, not spread over the tickets.
+    expect(screen.getByText(/of your 8 h target is not on any ticket/)).toHaveTextContent("3 h of your 8 h target is not on any ticket");
 
+    await userEvent.click(within(list).getByRole("checkbox", { name: "Include #103" }));
+    await userEvent.click(within(list).getByRole("checkbox", { name: "Include #105" }));
+    await userEvent.click(screen.getByRole("button", { name: "Propose 1 entry…" }));
     expect(onPropose.mock.calls[0]?.[0]).toMatchObject({
       kind: "SOLIDTIME_ENTRIES_CREATE",
       params: { entries: [expect.objectContaining({ description: "#102 Fix flaky test", projectId: alpha.id, start: at("01:00"), end: at("03:00") })] },
@@ -140,8 +152,8 @@ describe("DraftTab", () => {
   it("fills the times when I enter hours, and blocks rows that are not complete", async () => {
     render();
     const list = await screen.findByRole("list", { name: "Drafted entries" });
-    await userEvent.click(within(list).getByRole("checkbox", { name: "Include #103" }));
-    expect(screen.getByRole("button", { name: "Propose 2 entries…" })).toBeDisabled();
+    await userEvent.clear(within(list).getByLabelText("Hours for #103"));
+    expect(screen.getByRole("button", { name: "Propose 3 entries…" })).toBeDisabled();
     expect(within(list).getByText("Enter the hours (up to 24).")).toBeInTheDocument();
 
     await userEvent.type(within(list).getByLabelText("Hours for #103"), "1.5");
@@ -149,38 +161,54 @@ describe("DraftTab", () => {
     expect(within(list).getByLabelText("Start for #103")).toHaveValue("04:30");
     expect(within(list).getByLabelText("End for #103")).toHaveValue("06:00");
     expect(within(list).getByText("Entered by you")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Propose 2 entries…" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Propose 3 entries…" })).toBeEnabled();
   });
 
-  it("asks the AI only about rows without hours, counting the planned ones, and fills them in", async () => {
+  it("asks the AI to check only evidence hours I did not change, and shows what it changed", async () => {
     const { calls } = render([
-      {
-        method: "POST",
-        path: `${base}/draft/estimate`,
-        body: { estimate: { day, availableHours: 5.5, model: "claude-haiku-5-5", costUsd: 0.0012, estimates: [{ ticketId: 103, hours: 1.25, confidence: "medium", reason: "One comment and a long gap." , start: at("04:45"), end: at("06:00") }] } },
-      },
+      { method: "POST", path: `${base}/draft/estimate`, body: { estimate: { day, model: "claude-haiku-5-5", costUsd: 0.0012, estimates: [{ ...checked(103, 1.25, 1, "One comment after a long gap."), start: at("04:45"), end: at("06:00") }] } } },
     ]);
     const drafted = await screen.findByRole("list", { name: "Drafted entries" });
     expect(within(drafted).getByText("Already in Solidtime")).toBeInTheDocument();
-    // Ticked then unticked by me: left out of the AI request.
+    // Unticked by me: left out of the AI request.
     await userEvent.click(within(drafted).getByRole("checkbox", { name: "Include #105" }));
-    await userEvent.click(within(drafted).getByRole("checkbox", { name: "Include #105" }));
-    await userEvent.click(screen.getByRole("button", { name: "Suggest hours with AI" }));
+    await userEvent.click(screen.getByRole("button", { name: "Check hours with AI" }));
 
     const list = screen.getByRole("list", { name: "Drafted entries" });
-    expect(await within(list).findByText("AI: One comment and a long gap.")).toBeInTheDocument();
-    expect(calls.find((call) => call.method === "POST")?.body).toEqual({ day, ticketIds: [103], plannedHours: 2, planned: [{ start: at("01:00"), end: at("03:00") }] });
-    expect(within(list).getByRole("checkbox", { name: "Include #103" })).toBeChecked();
+    expect(await within(list).findByText("AI: One comment after a long gap. (the rules said 1 h)")).toBeInTheDocument();
+    expect(calls.find((call) => call.method === "POST")?.body).toEqual({ day, ticketIds: [103], planned: [{ start: at("01:00"), end: at("03:00") }] });
+    expect(within(list).getByLabelText("Hours for #103")).toHaveValue(1.25);
     expect(within(list).getByLabelText("Start for #103")).toHaveValue("04:45");
     expect(within(list).getByText("AI · medium confidence")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("claude-haiku-5-5");
+    expect(screen.getByRole("status")).toHaveTextContent("AI (claude-haiku-5-5) checked 1 ticket: kept 0, changed #103.");
     expect(screen.getByRole("button", { name: "Propose 2 entries…" })).toBeEnabled();
+  });
+
+  it("says which tickets the AI kept and which it did not answer for", async () => {
+    render([{ method: "POST", path: `${base}/draft/estimate`, body: { estimate: { day, model: "m", costUsd: 0, estimates: [checked(103, 1, 1, "Fits the activity.")] } } }]);
+    const list = await screen.findByRole("list", { name: "Drafted entries" });
+    await userEvent.click(screen.getByRole("button", { name: "Check hours with AI" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("AI (m) checked 1 ticket: kept 1.");
+    expect(screen.getByRole("status")).toHaveTextContent("No result for #105 (no answer, or no longer needs checking): their hours are unchanged.");
+    expect(within(list).getByText("AI: Fits the activity.")).toBeInTheDocument();
+    expect(within(list).getByLabelText("Hours for #105")).toHaveValue(1.5);
+  });
+
+  it("says why the AI button is off instead of doing nothing", async () => {
+    render();
+    const list = await screen.findByRole("list", { name: "Drafted entries" });
+    await userEvent.clear(within(list).getByLabelText("Hours for #103"));
+    await userEvent.type(within(list).getByLabelText("Hours for #103"), "1");
+    await userEvent.click(within(list).getByRole("checkbox", { name: "Include #105" }));
+    const button = screen.getByRole("button", { name: "Check hours with AI" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(/Nothing to check/);
   });
 
   it("points to the AI settings when no model is set up", async () => {
     render([{ method: "POST", path: `${base}/draft/estimate`, status: 422, body: { message: "Choose an AI provider and model on the Credentials page first", reason: "AI_NOT_CONFIGURED" } }]);
     await screen.findByRole("list", { name: "Drafted entries" });
-    await userEvent.click(screen.getByRole("button", { name: "Suggest hours with AI" }));
+    await userEvent.click(screen.getByRole("button", { name: "Check hours with AI" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose an AI provider");
     expect(screen.getByRole("link", { name: "Open AI settings" })).toHaveAttribute("href", "/credentials");
   });

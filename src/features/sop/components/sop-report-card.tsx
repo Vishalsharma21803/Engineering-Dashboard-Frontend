@@ -161,7 +161,7 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
                 />
               </Updating>
             </details>
-            {remove.error ? <p role="alert" className="text-sm text-rose-600">Could not delete that report. Please try again.</p> : null}
+            {remove.error ? <p role="alert" className="text-sm text-rose-600">Could not delete that report: {remove.error.message}</p> : null}
 
             {runId ? (
               <ReportRun key={runId} credentialId={credentialId} projectId={projectId} runId={runId} onMissing={() => selectRun(null, { replace: true })} />

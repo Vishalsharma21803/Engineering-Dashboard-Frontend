@@ -43,6 +43,11 @@ export function UserMenu() {
         </span>
       </div>
 
+      {logout.error ? (
+        <p role="alert" className="max-w-48 text-xs text-rose-600">
+          Sign-out failed: {logout.error.message}
+        </p>
+      ) : null}
       <Hint label="Sign out" side="bottom">
         <Button
           variant="ghost"

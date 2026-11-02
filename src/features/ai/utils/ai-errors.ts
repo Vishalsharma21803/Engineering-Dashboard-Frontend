@@ -15,5 +15,5 @@ export function describeAiError(error: unknown, fallback: string): string {
     return field ?? error.message ?? fallback;
   }
 
-  return fallback;
+  return error instanceof Error && error.message ? `${fallback} (${error.message})` : fallback;
 }

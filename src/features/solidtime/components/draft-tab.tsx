@@ -20,7 +20,7 @@ import { cn } from "@/utils/cn";
 import { estimateDraft, getDraft } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import { useCatalog } from "../hooks/use-solidtime";
-import type { DayDraft, DraftEstimate, DraftRow, ProjectSource, SolidtimeConnection } from "../types/solidtime.types";
+import type { DayDraft, DraftEstimate, DraftRow, HoursSource, ProjectSource, SolidtimeConnection } from "../types/solidtime.types";
 import { formatDayLabel, formatHours, shiftDay, zonedClock, zonedInstant } from "../utils/time";
 import { LoadErrorNotice } from "./load-error-notice";
 
@@ -28,7 +28,7 @@ const HOUR = 3_600_000;
 /** AI errors that are fixed on the Credentials page. */
 const AI_SETUP_REASONS = new Set(["AI_NOT_CONFIGURED", "AI_KEY_REQUIRED", "AI_MODEL_UNAVAILABLE", "DATA_COLLECTION_NOT_ACCEPTED", "AI_KEY_INVALID", "DAILY_LIMIT_REACHED"]);
 
-type HoursFrom = "completed-work" | "ai" | "you" | null;
+type HoursFrom = HoursSource | "ai" | "you" | null;
 
 interface Editable {
   include: boolean;
@@ -43,7 +43,7 @@ interface Editable {
   startEdited: boolean;
   /** I unticked the row: the AI leaves it alone. */
   unticked: boolean;
-  ai: { confidence: string; reason: string } | null;
+  ai: { confidence: string; reason: string; ruleHours: number } | null;
 }
 
 function parseHours(text: string): number | null {
@@ -59,7 +59,7 @@ function editableFrom(row: DraftRow, timeZone: string): Editable {
     projectId: row.solidtimeProjectId ?? "",
     start: row.start ? zonedClock(row.start, timeZone) : "",
     hours: hours === null ? "" : String(hours),
-    // A Completed Work row with 0 h is already in Solidtime: it keeps that source and is never estimated.
+    // A row with 0 h is already in Solidtime: it keeps its source and is never checked by the AI.
     hoursFrom: row.hoursSource,
     startEdited: false,
     unticked: false,
@@ -83,6 +83,9 @@ function HoursBadge({ edit, row }: { edit: Editable; row: DraftRow }) {
   if (edit.hoursFrom === "completed-work") {
     return parseHours(edit.hours) === null ? <StatusBadge tone="neutral">Already in Solidtime</StatusBadge> : <StatusBadge tone="success">Completed Work +{row.completedWorkAdded} h</StatusBadge>;
   }
+  if ((edit.hoursFrom === "remaining-work" || edit.hoursFrom === "activity") && parseHours(edit.hours) === null) return <StatusBadge tone="neutral">Already in Solidtime</StatusBadge>;
+  if (edit.hoursFrom === "remaining-work") return <StatusBadge tone="success">Remaining Work −{row.remainingWorkLowered} h</StatusBadge>;
+  if (edit.hoursFrom === "activity") return <StatusBadge tone="neutral">From your activity</StatusBadge>;
   if (edit.hoursFrom === "ai") return <StatusBadge tone="info">AI · {edit.ai?.confidence ?? "?"} confidence</StatusBadge>;
   if (edit.hoursFrom === "you") return <StatusBadge tone="neutral">Entered by you</StatusBadge>;
   return <StatusBadge tone="warning">Needs hours</StatusBadge>;
@@ -93,13 +96,32 @@ function aiErrorText(error: unknown): { text: string; setup: boolean } {
     return { text: error.message, setup: AI_SETUP_REASONS.has(error.reason ?? "") };
   }
 
-  return { text: "The AI could not suggest hours. Try again.", setup: false };
+  return { text: `The AI could not check the hours${error instanceof Error && error.message ? `: ${error.message}` : "."} Try again.`, setup: false };
+}
+
+const ticketList = (ids: number[]) => ids.map((id) => `#${id}`).join(", ");
+
+/** What the AI did: which rule hours it kept, which it changed, and which tickets it did not answer for. */
+function aiSummary(estimate: DraftEstimate, asked: number[]): string {
+  const changed = estimate.estimates.filter((item) => item.hours !== item.ruleHours).map((item) => item.ticketId);
+  const kept = estimate.estimates.length - changed.length;
+  const answered = new Set(estimate.estimates.map((item) => item.ticketId));
+  const missing = asked.filter((id) => !answered.has(id));
+  return [
+    `AI (${estimate.model}) checked ${estimate.estimates.length} ticket${estimate.estimates.length === 1 ? "" : "s"}: kept ${kept}${changed.length > 0 ? `, changed ${ticketList(changed)}` : ""}.`,
+    missing.length > 0 ? `No result for ${ticketList(missing)} (no answer, or no longer needs checking): their hours are unchanged.` : null,
+    `About $${estimate.costUsd.toFixed(4)}. Check each row before proposing.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /**
- * Draft a day from Azure DevOps: tickets I changed that day, hours from my
- * Completed Work increases (minus what Solidtime already has), projects from
- * my mapping or earlier entries, and AI hours for the rest on request.
+ * Draft a day from Azure DevOps: tickets I changed that day, hours from the
+ * evidence (Completed Work raised, Remaining Work lowered, else the time
+ * before my changes; minus what Solidtime already has), projects from my
+ * mapping or earlier entries, and an AI check of the evidence hours on request.
+ * Hours not on any ticket are shown, never spread over the tickets.
  * Review, adjust, then propose the whole day for one approval.
  */
 export function DraftTab({ connection, onPropose, isProposing, today }: { connection: SolidtimeConnection; onPropose: (input: ProposeActionInput) => void; isProposing: boolean; today: string }) {
@@ -114,18 +136,25 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
     staleTime: Infinity,
   });
   /** Rebuild reads Azure DevOps and Solidtime fresh (refresh=true), into the same cache entry the tab shows. */
-  const rebuild = () =>
+  const rebuild = () => {
+    // Rebuild replaces the edits on purpose: no "reloaded" notice for it.
+    setRebuildAsked(true);
+    estimate.reset();
     void queryClient
       .fetchQuery({ queryKey: solidtimeKeys.draft(connection.credentialId, day), queryFn: () => getDraft(connection.credentialId, day, { refresh: true }), retry: retryUnlessClientError, staleTime: 0 })
       // The failure is shown from the query's own error state.
       .catch(() => undefined);
+  };
+  const [rebuildAsked, setRebuildAsked] = useState(false);
   const data = draft.data;
   const timeZone = data?.timeZone ?? "UTC";
   const initial = useMemo(() => Object.fromEntries((data?.rows ?? []).map((row) => [row.ticketId, editableFrom(row, data?.timeZone ?? "UTC")])) as Record<number, Editable>, [data]);
   // Edits belong to the draft they were made on; a new draft starts from its own suggestions.
   const [edits, setEdits] = useState<{ source: DayDraft | undefined; rows: Record<number, Editable> }>({ source: undefined, rows: {} });
   const rows = edits.source === data && data !== undefined ? edits.rows : initial;
-  const [aiResult, setAiResult] = useState<{ source: DayDraft; estimate: DraftEstimate } | null>(null);
+  // The same day came back as a new draft (e.g. refetched after an approval) without me asking: my edits were replaced.
+  const editsReplaced = !rebuildAsked && data !== undefined && edits.source !== undefined && edits.source !== data && edits.source.day === data.day;
+  const [aiResult, setAiResult] = useState<{ source: DayDraft; estimate: DraftEstimate; asked: number[] } | null>(null);
 
   const dayStart = data ? zonedInstant(data.day, "00:00", timeZone) : null;
   const dayEnd = data ? zonedInstant(shiftDay(data.day, 1), "00:00", timeZone) : null;
@@ -160,7 +189,10 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
     return other ? `Overlaps #${other.ticketId} in this draft.` : null;
   }
 
-  const save = (next: Record<number, Editable>) => setEdits({ source: data, rows: next });
+  const save = (next: Record<number, Editable>) => {
+    setRebuildAsked(false);
+    setEdits({ source: data, rows: next });
+  };
   const set = (ticketId: number, change: Partial<Editable>) => save({ ...rows, [ticketId]: { ...rows[ticketId]!, ...change } });
 
   /** New hours keep the entry's end (at first: my last change on the ticket) unless I set the start myself. */
@@ -181,24 +213,23 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
     set(row.ticketId, { hours: text, hoursFrom: cleared ? null : "you", ai: null, start, ...(hours !== null ? { include: true, unticked: false } : {}) });
   }
 
-  // Rows whose hours do not come from Completed Work or from me, and that I did not untick.
+  // Rows whose hours were worked out from Remaining Work or activity (and are not already in Solidtime), not changed or unticked by me.
   const toEstimate = allRows.filter((row) => {
     const edit = rows[row.ticketId];
-    return row.hoursSource !== "completed-work" && edit !== undefined && edit.hoursFrom !== "you" && !edit.unticked;
+    return (row.hoursSource === "remaining-work" || row.hoursSource === "activity") && (row.hours ?? 0) > 0 && edit !== undefined && edit.hoursFrom !== "you" && !edit.unticked;
   });
   const estimate = useMutation({
-    mutationFn: () => {
-      const asked = new Set(toEstimate.map((row) => row.ticketId));
+    mutationFn: (askedIds: number[]) => {
+      const asked = new Set(askedIds);
       const others = chosen.filter((row) => !asked.has(row.ticketId));
-      const plannedHours = others.reduce((sum, row) => sum + (parseHours(rows[row.ticketId]!.hours) ?? 0), 0);
       // Where the other rows sit now, so the AI rows are placed around them.
       const planned = others.flatMap((row) => {
         const slot = slots.get(row.ticketId);
         return slot && typeof slot !== "string" ? [{ start: new Date(slot.start).toISOString(), end: new Date(slot.end).toISOString() }] : [];
       });
-      return estimateDraft(connection.credentialId, { day: data!.day, ticketIds: [...asked], plannedHours: Math.min(24, Math.round(plannedHours * 100) / 100), planned });
+      return estimateDraft(connection.credentialId, { day: data!.day, ticketIds: [...asked], planned });
     },
-    onSuccess: (result) => {
+    onSuccess: (result, asked) => {
       if (!data) return;
       const next = { ...rows };
 
@@ -208,14 +239,16 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
         // Rows I changed while the AI was answering keep my changes.
         if (!row || !edit || edit.hoursFrom === "you" || edit.unticked) continue;
         const start = edit.startEdited ? edit.start : item.start ? zonedClock(item.start, timeZone) : edit.start || (dayStart && item.hours > 0 ? startBefore(Date.parse(row.anchor), item.hours, dayStart, timeZone) : "");
-        next[item.ticketId] = { ...edit, hours: item.hours > 0 ? String(item.hours) : "", hoursFrom: "ai", ai: { confidence: item.confidence, reason: item.reason }, include: item.hours > 0, start };
+        next[item.ticketId] = { ...edit, hours: String(item.hours), hoursFrom: "ai", ai: { confidence: item.confidence, reason: item.reason, ruleHours: item.ruleHours }, include: true, start };
       }
 
       save(next);
-      setAiResult({ source: data, estimate: result });
+      setAiResult({ source: data, estimate: result, asked });
     },
   });
-  const shownAi = aiResult && aiResult.source === data ? aiResult.estimate : null;
+  const shownAi = aiResult && aiResult.source === data ? aiResult : null;
+  // Why "Check hours with AI" is off, shown next to it (a disabled button shows no tooltip).
+  const aiBlocked = data && data.rows.length > 0 && toEstimate.length === 0 ? "Nothing to check: the AI checks hours worked out from Remaining Work or activity, and those rows are already in Solidtime, entered by you or unticked." : null;
   const aiError = estimate.error ? aiErrorText(estimate.error) : null;
 
   function propose() {
@@ -241,6 +274,8 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
   };
   const target = data?.targetHours ?? connection.dailyTargetHours;
   const tracked = data?.trackedHours ?? 0;
+  // What the evidence does not explain: shown for me to place, never spread over the tickets.
+  const unallocated = Math.floor((target - tracked - plannedHours) * 4 + 1e-9) / 4;
   const percent = (hours: number) => `${Math.min(100, Math.max(0, (hours / Math.max(target, 0.25)) * 100))}%`;
 
   return (
@@ -272,10 +307,21 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
               Rebuild
             </Button>
           </div>
-          <Button size="sm" disabled={!data || toEstimate.length === 0 || estimate.isPending} onClick={() => estimate.mutate()} title={toEstimate.length === 0 ? "Every row already has hours from Completed Work or from you." : undefined}>
-            {estimate.isPending ? <Spinner className="size-4" /> : <span aria-hidden="true">✦</span>}
-            Suggest hours with AI
-          </Button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {aiBlocked ? (
+              <p id="ai-blocked" className="max-w-xs text-right text-xs text-slate-500">
+                {aiBlocked}
+              </p>
+            ) : estimate.isPending ? (
+              <p className="text-xs text-slate-500" aria-live="polite">
+                Asking your AI model; this can take a minute.
+              </p>
+            ) : null}
+            <Button size="sm" disabled={!data || toEstimate.length === 0 || estimate.isPending} aria-describedby={aiBlocked ? "ai-blocked" : undefined} onClick={() => estimate.mutate(toEstimate.map((row) => row.ticketId))}>
+              {estimate.isPending ? <Spinner className="size-4" /> : <span aria-hidden="true">✦</span>}
+              Check hours with AI
+            </Button>
+          </div>
         </div>
 
         <div aria-label="Day summary" className="flex flex-col gap-2">
@@ -304,6 +350,11 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
               <span className="size-2.5 rounded-sm bg-slate-100 ring-1 ring-slate-200" /> Left to your target
             </span>
           </div>
+          {data && data.rows.length > 0 && unallocated >= 0.25 ? (
+            <p className="text-sm text-slate-600">
+              <span className="font-medium text-slate-900">{formatHours(unallocated)}</span> of your {formatHours(target)} target is not on any ticket. Meetings, reviews or other work? Add it on the Timesheet tab; it is not spread over these tickets.
+            </p>
+          ) : null}
         </div>
 
         {aiError ? (
@@ -321,16 +372,22 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
         ) : null}
         {shownAi ? (
           <p role="status" className="text-sm text-slate-600">
-            {shownAi.model === null
-              ? "Your day already reaches its target, so the AI was not asked."
-              : `AI (${shownAi.model}) shared ${formatHours(shownAi.availableHours)} across ${shownAi.estimates.length} ticket${shownAi.estimates.length === 1 ? "" : "s"} · about $${shownAi.costUsd.toFixed(4)}. Check each row before proposing.`}
+            {aiSummary(shownAi.estimate, shownAi.asked)}
           </p>
         ) : null}
       </Card>
 
+      {editsReplaced ? (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>This day was loaded again (for example after an approval changed Solidtime), so your unsaved edits and AI hours were replaced. Rows already in Solidtime now say so.</span>
+          <Button size="sm" variant="secondary" onClick={() => save(initial)}>
+            OK
+          </Button>
+        </div>
+      ) : null}
       {/* A failed Rebuild keeps the draft and the edits made on it. */}
       {draft.error && data ? <StaleDataBanner error={draft.error} onRetry={rebuild} isRetrying={draft.isFetching} /> : null}
-      {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
+      {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" error={catalog.error} onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
 
       {draft.isLoading ? (
         <SkeletonRows rows={4} />
@@ -419,7 +476,18 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                     </label>
                   </div>
 
-                  {edit.ai ? <p className="mt-2 text-xs text-sky-800">AI: {edit.ai.reason || "No reason given."}</p> : null}
+                  {row.hoursBasis ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Hours from: {row.hoursBasis}
+                      {row.alreadyTrackedHours ? `, minus ${row.alreadyTrackedHours} h already in Solidtime` : ""}.
+                    </p>
+                  ) : null}
+                  {edit.ai ? (
+                    <p className="mt-2 text-xs text-sky-800">
+                      AI: {edit.ai.reason || "No reason given."}
+                      {parseHours(edit.hours) !== edit.ai.ruleHours ? ` (the rules said ${edit.ai.ruleHours} h)` : ""}
+                    </p>
+                  ) : null}
                   {row.note ? <p className="mt-2 text-xs text-amber-700">{row.note}</p> : null}
                   {problem ? <p className="mt-2 text-xs font-medium text-rose-600">{problem}</p> : null}
                   {overlap ? <p className="mt-2 text-xs text-amber-700">{overlap}</p> : null}

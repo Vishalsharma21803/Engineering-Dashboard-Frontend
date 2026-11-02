@@ -113,6 +113,7 @@ export function AiProviderCard({ credential, initialNotice = null }: AiProviderC
               Cancel
             </Button>
           </div>
+          {apiKey.trim() !== "" && apiKey.trim().length < 20 ? <p className="text-xs text-slate-500">API keys are at least 20 characters.</p> : null}
         </form>
       ) : null}
     </CredentialCardFrame>

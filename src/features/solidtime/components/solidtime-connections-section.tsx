@@ -142,6 +142,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
           <Button size="sm" variant="secondary" onClick={() => { setReplacing(false); setNewToken(""); }}>
             Cancel
           </Button>
+          {newToken.trim() !== "" && newToken.trim().length < 20 ? <p className="w-full text-xs text-slate-500">API tokens are at least 20 characters.</p> : null}
         </form>
       ) : null}
 
@@ -168,7 +169,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
               ))}
             </SelectField>
           </label>
-          {memberships.isError && !memberships.data ? <LoadErrorNotice what="Your Solidtime organizations" onRetry={() => void memberships.refetch()} isRetrying={memberships.isFetching} /> : null}
+          {memberships.isError && !memberships.data ? <LoadErrorNotice what="Your Solidtime organizations" error={memberships.error} onRetry={() => void memberships.refetch()} isRetrying={memberships.isFetching} /> : null}
         </div>
       ) : null}
 
@@ -190,7 +191,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
               </option>
             ))}
           </SelectField>
-          {azure.isError && !azure.data ? <LoadErrorNotice what="Azure DevOps organizations" onRetry={() => void azure.refetch()} isRetrying={azure.isFetching} /> : null}
+          {azure.isError && !azure.data ? <LoadErrorNotice what="Azure DevOps organizations" error={azure.error} onRetry={() => void azure.refetch()} isRetrying={azure.isFetching} /> : null}
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
           Daily target (hours)

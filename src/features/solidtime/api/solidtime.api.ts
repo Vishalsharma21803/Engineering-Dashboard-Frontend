@@ -89,7 +89,7 @@ export async function getDraft(credentialId: string, day: string, options: { ref
 }
 
 /** Asks the user's AI model for hours on drafted rows. Writes nothing; spends AI credit. */
-export async function estimateDraft(credentialId: string, input: { day: string; ticketIds: number[]; plannedHours: number; planned: Array<{ start: string; end: string }> }) {
+export async function estimateDraft(credentialId: string, input: { day: string; ticketIds: number[]; planned: Array<{ start: string; end: string }> }) {
   return (await apiRequest<{ estimate: DraftEstimate }>(read(credentialId, "/draft/estimate"), { method: "POST", body: input })).estimate;
 }
 

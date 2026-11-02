@@ -88,7 +88,7 @@ test("adds a manual entry and fixes an entry with no ticket", async ({ page, req
   await expect(page.getByText("Every entry names a ticket.")).toBeVisible();
 });
 
-test("drafts yesterday from Azure, fills the missing hours with AI, and saves the day through one approval", async ({ page, request }) => {
+test("drafts yesterday from Azure with hours from the evidence, has the AI check them, and saves the day through one approval", async ({ page, request }) => {
   const { day } = (await (await request.post(`${BACKEND}/__e2e/draft-activity`)).json()) as { day: string };
   await setUp(page);
 
@@ -106,17 +106,24 @@ test("drafts yesterday from Azure, fills the missing hours with AI, and saves th
   await expect(page.getByLabel("Day", { exact: true })).toHaveAttribute("data-value", day);
   const list = page.getByRole("list", { name: "Drafted entries" });
 
-  // #102: hours from Completed Work, placed and ready; #103: activity only, waiting for hours.
+  // #102: hours from Completed Work; #103: from the time before my changes, capped at its 1 h Remaining Work. Both placed and ready.
   await expect(list.getByText("Completed Work +2 h")).toBeVisible();
   await expect(list.getByLabel("Hours for #102")).toHaveValue("2");
   await expect(list.getByLabel("End for #102")).toHaveValue("11:00");
-  await expect(list.getByRole("checkbox", { name: "Include #103" })).not.toBeChecked();
-  await expect(page.getByLabel("Day summary")).toContainText("0.5 h already in Solidtime");
-
-  await page.getByRole("button", { name: "Suggest hours with AI" }).click();
-  await expect(page.getByRole("status")).toContainText("claude-haiku-5-5");
-  await expect(list.getByText("AI: Fake estimate for #103.")).toBeVisible();
   await expect(list.getByRole("checkbox", { name: "Include #103" })).toBeChecked();
+  await expect(list.getByLabel("Hours for #103")).toHaveValue("1");
+  await expect(list.getByText("Hours from: 2 changes between 13:00 and 15:00, capped at its 1 h Remaining Work.")).toBeVisible();
+  await expect(page.getByLabel("Day summary")).toContainText("0.5 h already in Solidtime");
+  // The rest of the target is shown, not spread over the tickets.
+  // #101: I lowered its Remaining Work 6 → 4 that day, so 2 h.
+  await expect(list.getByText("Hours from: Remaining Work lowered by 2 h.")).toBeVisible();
+  await expect(page.getByText(/2\.5 h of your 8 h target is not on any ticket/)).toBeVisible();
+
+  // The fake model answers 1 h each: kept for #103 (1 h), and the least allowed for #101 (half of 2 h).
+  await page.getByRole("button", { name: "Check hours with AI" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "claude-haiku-5-5" })).toContainText("checked 2 tickets: kept 1, changed #101");
+  await expect(list.getByText("AI: Fake estimate for #101. (the rules said 2 h)")).toBeVisible();
+  await expect(list.getByText("AI: Fake estimate for #103.")).toBeVisible();
   await expect(list.getByLabel("Hours for #103")).toHaveValue("1");
   // Ends at the last change on #103 (15:00).
   await expect(list.getByLabel("End for #103")).toHaveValue("15:00");

@@ -106,7 +106,7 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
       </label>
       {catalog.isError && !catalog.data ? (
         <div className="sm:col-span-2">
-          <LoadErrorNotice what="Projects and tasks" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} />
+          <LoadErrorNotice what="Projects and tasks" error={catalog.error} onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} />
         </div>
       ) : null}
       <label className="flex flex-col gap-1 text-sm text-slate-700">

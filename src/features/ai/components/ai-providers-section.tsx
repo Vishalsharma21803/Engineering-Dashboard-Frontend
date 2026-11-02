@@ -37,9 +37,12 @@ export function AiProvidersSection() {
           </p>
         </div>
         {!adding ? (
-          <Button size="sm" variant="secondary" disabled={allAdded || !credentials.data} title={allAdded ? "Every provider already has a key" : undefined} onClick={() => setAdding(true)}>
-            + Add AI provider
-          </Button>
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <Button size="sm" variant="secondary" disabled={allAdded || !credentials.data} onClick={() => setAdding(true)}>
+              + Add AI provider
+            </Button>
+            {allAdded ? <p className="text-xs text-slate-500">Every provider already has a key.</p> : null}
+          </div>
         ) : null}
       </div>
 

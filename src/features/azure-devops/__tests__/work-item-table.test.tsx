@@ -22,6 +22,8 @@ const triage: DashboardTriage = {
   savedVersion: 1,
   isLoading: false,
   loadError: null,
+  retryLoad: () => undefined,
+  isRetryingLoad: false,
   isSaving: false,
   saveError: null,
   clearSaveError: () => undefined,

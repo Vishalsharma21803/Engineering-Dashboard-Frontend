@@ -103,6 +103,10 @@ export function TimePage() {
           <Link to="/actions" className={buttonClassName({ size: "sm", variant: "secondary" })}>
             {pending.data?.total} awaiting approval
           </Link>
+        ) : pending.error && !pending.data ? (
+          <Link to="/actions" className={buttonClassName({ size: "sm", variant: "secondary" })}>
+            Approvals could not be checked
+          </Link>
         ) : null}
       </div>
 

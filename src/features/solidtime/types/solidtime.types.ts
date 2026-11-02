@@ -144,6 +144,7 @@ export interface TimeVsEstimate {
 }
 
 export type ProjectSource = "mapping" | "ticket" | "azure-project" | "name";
+export type HoursSource = "completed-work" | "remaining-work" | "activity";
 
 export interface DraftRow {
   ticketId: number;
@@ -157,10 +158,16 @@ export interface DraftRow {
   activity: Array<{ at: string; what: string }>;
   completedWorkAdded: number;
   completedWorkRemoved: number;
+  /** What I lowered Remaining Work by that day (hours). */
+  remainingWorkLowered: number;
   alreadyTrackedHours: number;
+  /** Hours from the evidence in `hoursSource`, minus what Solidtime already has for the ticket that day. */
   hours: number | null;
-  hoursSource: "completed-work" | null;
-  /** Where an entry would preferably end: my last Completed Work increase, else my last activity. */
+  /** Strongest evidence first: Completed Work raised, Remaining Work lowered, else the time before my changes. */
+  hoursSource: HoursSource | null;
+  /** The evidence in words, e.g. "Remaining Work lowered by 2 h". */
+  hoursBasis: string | null;
+  /** Where an entry would preferably end: where its evidence ends (my last such change). */
   anchor: string;
   start: string | null;
   end: string | null;
@@ -184,6 +191,8 @@ export interface DayDraft {
 
 export interface HoursEstimate {
   ticketId: number;
+  /** The rule hours the AI checked. */
+  ruleHours: number;
   hours: number;
   confidence: "low" | "medium" | "high";
   reason: string;
@@ -193,9 +202,8 @@ export interface HoursEstimate {
 
 export interface DraftEstimate {
   day: string;
-  availableHours: number;
   estimates: HoursEstimate[];
-  model: string | null;
+  model: string;
   costUsd: number;
 }
 

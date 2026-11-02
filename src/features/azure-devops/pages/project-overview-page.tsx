@@ -70,6 +70,7 @@ function PagedList<T>({
 
   return (
     <>
+      {stale}
       <Updating active={query.isPlaceholderData}>
         <ul className="divide-y divide-slate-100">{query.data.items.map(render)}</ul>
       </Updating>

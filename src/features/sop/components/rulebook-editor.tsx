@@ -36,7 +36,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [validating, setValidating] = useState(false);
   /** The live check could not reach the server (saving still checks the rules). */
-  const [validationFailed, setValidationFailed] = useState(false);
+  const [validationFailed, setValidationFailed] = useState<boolean | string>(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [saveErrors, setSaveErrors] = useState<RuleProblem[]>([]);
   /** Read-only rulebooks open on the readable rule list; editable ones on the editor. */
@@ -59,10 +59,10 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
             setValidationFailed(false);
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (current) {
             setValidation(null);
-            setValidationFailed(true);
+            setValidationFailed(error instanceof Error && error.message ? error.message : true);
           }
         })
         .finally(() => current && setValidating(false));
@@ -117,8 +117,8 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
       setContent(old.content);
       setSaveErrors([]);
       setMessage({ tone: "success", text: `Loaded version ${version} into the editor. Save to restore it as a new version.` });
-    } catch {
-      setMessage({ tone: "error", text: "Could not load that version." });
+    } catch (error) {
+      setMessage({ tone: "error", text: `Could not load that version${error instanceof ApiError ? `: ${error.message}` : "."}` });
     }
   }
 
@@ -138,7 +138,12 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
     event.target.value = "";
 
     if (file) {
-      setContent(await file.text());
+      try {
+        setContent(await file.text());
+      } catch (error) {
+        setMessage({ tone: "error", text: `${file.name} could not be read${error instanceof Error ? `: ${error.message}` : "."}` });
+        return;
+      }
       setSaveErrors([]);
       setMessage({ tone: "success", text: `Imported ${file.name}. Review it, then save.` });
     }
@@ -224,7 +229,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
               <RuleSummaryTable cards={validation.summary.cards} />
             ) : (
               <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-600">
-                {validating ? "Reading the rules…" : content.trim() === "" ? "No rules yet." : "No rules to show. Fix the problems in Markdown first."}
+                {validating ? "Reading the rules…" : content.trim() === "" ? "No rules yet." : validationFailed ? "The rules could not be checked right now, so they cannot be shown. Your text is unchanged." : "No rules to show. Fix the problems in Markdown first."}
                 {canSave && !validating ? (
                   <>
                     {" "}
@@ -306,7 +311,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
               </span>
             ) : validationFailed ? (
               <span role="alert" className="text-amber-700">
-                Could not check the rules right now; they are checked again when you save.
+                Could not check the rules right now{typeof validationFailed === "string" ? ` (${validationFailed})` : ""}; they are checked again when you save.
               </span>
             ) : null}
             {message ? (

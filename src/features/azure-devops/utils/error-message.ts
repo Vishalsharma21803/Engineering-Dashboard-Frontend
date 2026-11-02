@@ -10,7 +10,7 @@ export interface ErrorDescription {
 /** Turns backend reasons (see backend errors.ts) into guidance. */
 export function describeError(error: unknown, fallback = "Something went wrong."): ErrorDescription {
   if (!(error instanceof ApiError)) {
-    return { title: "Unexpected error", message: fallback, fixCredential: false };
+    return { title: "Unexpected error", message: error instanceof Error && error.message ? error.message : fallback, fixCredential: false };
   }
 
   switch (error.reason) {
@@ -35,7 +35,8 @@ export function describeError(error: unknown, fallback = "Something went wrong."
     case "AZURE_UPSTREAM_ERROR":
       return {
         title: "Azure DevOps unavailable",
-        message: "Azure DevOps could not be reached. Try again shortly.",
+        // The server adds why (a timeout, a 5xx…) after the colon.
+        message: error.message.includes(": ") ? `${error.message.replace(/\.+$/, "")}. Try again shortly.` : "Azure DevOps could not be reached. Try again shortly.",
         fixCredential: false,
       };
     default:

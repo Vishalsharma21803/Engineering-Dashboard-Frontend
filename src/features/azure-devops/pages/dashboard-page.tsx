@@ -134,8 +134,11 @@ export function DashboardPage() {
       </div>
 
       {triage.loadError ? (
-        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-          Your snoozed, acknowledged and abandoned marks could not be loaded, so everything is shown. Reload to try again.
+        <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          Your snoozed, acknowledged and abandoned marks could not be loaded ({triage.loadError instanceof Error ? triage.loadError.message : "unknown error"}), so everything is shown.
+          <Button size="sm" variant="ghost" disabled={triage.isRetryingLoad} onClick={triage.retryLoad}>
+            {triage.isRetryingLoad ? "Retrying…" : "Retry"}
+          </Button>
         </p>
       ) : null}
 

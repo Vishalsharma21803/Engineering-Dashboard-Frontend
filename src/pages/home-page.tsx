@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { ChevronRightIcon } from "@/components/ui/icons";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
+import { LoadErrorNotice } from "@/features/solidtime/components/load-error-notice";
 
 /** 24px stroke glyphs, drawn like the Azure DevOps header icon. */
 const AREA_ICONS = {
@@ -73,6 +74,7 @@ export function HomePage() {
         </p>
       </div>
 
+      {credentials.isError ? <LoadErrorNotice what="Your credentials" error={credentials.error} onRetry={() => void credentials.refetch()} isRetrying={credentials.isFetching} /> : null}
       {needsAzure ? (
         <Card className="flex flex-col gap-4 border-indigo-200 bg-indigo-50 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>

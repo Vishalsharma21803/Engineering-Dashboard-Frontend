@@ -123,6 +123,11 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
           Fix the {run.data.errors.length} problem(s) in the editor first.
         </p>
       ) : null}
+      {run.data && !run.data.result && run.data.errors.length === 0 ? (
+        <p role="alert" className="text-sm text-rose-600">
+          The test ran but returned no result. Try again.
+        </p>
+      ) : null}
       {run.data?.result ? (
         <div>
           <p className="mb-2 text-sm text-slate-700">

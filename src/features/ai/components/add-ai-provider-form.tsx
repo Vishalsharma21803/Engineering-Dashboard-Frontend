@@ -41,7 +41,7 @@ export function AddAiProviderForm({ existing, onDone, onCancel }: { existing: Se
           <Spinner className="size-4" /> Loading providers…
         </p>
       ) : !platforms.data || !platform ? (
-        <ErrorCard error={platforms.error} onRetry={() => void platforms.refetch()} />
+        <ErrorCard error={platforms.error ?? new Error("No AI provider can be added right now.")} onRetry={() => void platforms.refetch()} />
       ) : (
         <div className="space-y-6">
           {/* A failed background refresh keeps the form (and the typed key) on screen. */}

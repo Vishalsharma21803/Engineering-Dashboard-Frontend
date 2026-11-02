@@ -58,9 +58,13 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
       {readError ? (
         <p role="alert" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
           Your Solidtime timer could not be read: {readError}
-          <Button size="sm" variant="ghost" onClick={() => void timer.refetch()}>
-            Retry
+          <Button size="sm" variant="ghost" disabled={timer.isFetching} onClick={() => void timer.refetch()}>
+            {timer.isFetching ? "Retrying…" : "Retry"}
           </Button>
+        </p>
+      ) : timer.error ? (
+        <p role="status" className="text-xs text-amber-700">
+          The timer could not be refreshed ({timer.error instanceof ApiError ? timer.error.message : "Solidtime could not be reached"}); it shows the last state read.
         </p>
       ) : null}
       <form
@@ -89,7 +93,7 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
           Start timer…
         </Button>
       </form>
-      {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
+      {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" error={catalog.error} onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
     </div>
   );
 }

@@ -26,6 +26,9 @@ export interface DashboardTriage {
   savedVersion: number;
   isLoading: boolean;
   loadError: unknown;
+  /** Loads the marks again after a failure. */
+  retryLoad: () => void;
+  isRetryingLoad: boolean;
   isSaving: boolean;
   saveError: string | null;
   clearSaveError: () => void;
@@ -162,6 +165,8 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
     savedVersion,
     isLoading: query.isLoading,
     loadError: query.error,
+    retryLoad: () => void query.refetch(),
+    isRetryingLoad: query.isFetching,
     isSaving: upsert.isPending || remove.isPending,
     saveError,
     clearSaveError: () => setSaveError(null),

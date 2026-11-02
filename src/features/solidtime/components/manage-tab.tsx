@@ -89,7 +89,7 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
           </Button>
         </form>
       )}
-      {kind === "tasks" && catalog.isError && !catalog.data ? <LoadErrorNotice what="Projects for new tasks" onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
+      {kind === "tasks" && catalog.isError && !catalog.data ? <LoadErrorNotice what="Projects for new tasks" error={catalog.error} onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
     </section>
   );
 }
