@@ -104,7 +104,8 @@ export async function getVerification(credentialId: string, input: { from: strin
   return (await apiRequest<{ verification: TimeVerification }>(read(credentialId, `/verification?${query.toString()}`))).verification;
 }
 
-export const weeklyCsvUrl = (credentialId: string, week: string) => read(credentialId, `/reports/weekly.csv?week=${week}`);
+/** Time per person, day and ticket between two days, with each ticket's estimate figures. */
+export const timeCsvUrl = (credentialId: string, from: string, to: string) => read(credentialId, `/reports/time.csv?from=${from}&to=${to}`);
 
 type ListKind = "projects" | "tasks" | "tags" | "clients";
 

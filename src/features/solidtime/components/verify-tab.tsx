@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
-import { DateRangePicker, type DateRangePreset } from "@/components/ui/date-range-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Spinner } from "@/components/ui/spinner";
 import { Updating } from "@/components/ui/updating";
 import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
@@ -17,23 +17,9 @@ import { cn } from "@/utils/cn";
 import { getVerification } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import type { SolidtimeConnection, VerificationItem, VerificationStatus } from "../types/solidtime.types";
-import { formatDayLabel, formatHours, shiftDay, weekStart } from "../utils/time";
+import { rangePresets } from "../utils/range-presets";
+import { formatDayLabel, formatHours } from "../utils/time";
 import { TicketTimeLookup } from "./ticket-time-lookup";
-
-/** Quick ranges, weeks starting on Monday (as on the timesheet). */
-function rangePresets(today: string): DateRangePreset[] {
-  const monday = weekStart(today);
-  const monthStart = `${today.slice(0, 8)}01`;
-  const lastMonthEnd = shiftDay(monthStart, -1);
-  return [
-    { label: "This week", from: monday, to: today },
-    { label: "Last week", from: shiftDay(monday, -7), to: shiftDay(monday, -1) },
-    { label: "Last 7 days", from: shiftDay(today, -6), to: today },
-    { label: "Last 30 days", from: shiftDay(today, -29), to: today },
-    { label: "This month", from: monthStart, to: today },
-    { label: "Last month", from: `${lastMonthEnd.slice(0, 8)}01`, to: lastMonthEnd },
-  ];
-}
 
 /** At most this many tickets go into one combined approval (the backend's limit). */
 const BATCH_LIMIT = 50;

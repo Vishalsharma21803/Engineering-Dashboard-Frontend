@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { DatePicker } from "@/components/ui/date-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pagination } from "@/components/ui/pagination";
@@ -15,27 +16,22 @@ import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retr
 import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
 import { ApiError, apiDownload } from "@/lib/api-client";
 import { cn } from "@/utils/cn";
-import { getAccuracy, weeklyCsvUrl } from "../api/solidtime.api";
+import { getAccuracy, timeCsvUrl } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import type { AccuracyRow, AccuracyTicket, SolidtimeConnection } from "../types/solidtime.types";
+import { rangePresets } from "../utils/range-presets";
 import { formatDayLabel, formatHours, shiftDay, weekStart } from "../utils/time";
 
 const TABLE = "w-full text-left text-sm";
 const HEAD = "border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500";
-/** More than this share over the estimate is flagged. */
-const OVER_WARNING = 1.2;
+const percentOf = (share: number | null) => (share === null ? "—" : `${Math.round(share * 100)}%`);
 
-const percentOf = (ratio: number | null) => (ratio === null ? "—" : `${Math.round(ratio * 100)}%`);
+/** Green when every ticket is within its estimate, amber from 80%, red below. */
+const complianceTone = (share: number | null) =>
+  share === null ? "text-slate-950" : share >= 1 ? "text-emerald-700" : share >= 0.8 ? "text-amber-700" : "text-rose-700";
 
-function signedHours(hours: number): string {
-  const rounded = Math.round(hours * 100) / 100;
-  return `${rounded > 0 ? "+" : ""}${rounded} h`;
-}
-
-function RatioBadge({ ratio }: { ratio: number }) {
-  if (ratio > OVER_WARNING) return <StatusBadge tone="danger">{percentOf(ratio)} · over</StatusBadge>;
-  if (ratio > 1) return <StatusBadge tone="warning">{percentOf(ratio)} · slightly over</StatusBadge>;
-  return <StatusBadge tone="success">{percentOf(ratio)} · within estimate</StatusBadge>;
+function EstimateBadge({ ticket }: { ticket: AccuracyTicket }) {
+  return ticket.withinEstimate ? <StatusBadge tone="success">Within estimate</StatusBadge> : <StatusBadge tone="danger">Over by {formatHours(ticket.overByHours)}</StatusBadge>;
 }
 
 function TicketTable({ page, azureCredentialId, onPage, busy }: { page: Page<AccuracyTicket>; azureCredentialId: string | null; onPage: (next: number) => void; busy: boolean }) {
@@ -46,10 +42,10 @@ function TicketTable({ page, azureCredentialId, onPage, busy }: { page: Page<Acc
           <thead className={HEAD}>
             <tr>
               <th className="px-4 py-2.5 font-medium">Ticket</th>
-              <th className="px-4 py-2.5 text-right font-medium">Tracked</th>
+              <th className="px-4 py-2.5 text-right font-medium">In period</th>
+              <th className="px-4 py-2.5 text-right font-medium">Total tracked</th>
               <th className="px-4 py-2.5 text-right font-medium">Estimate</th>
-              <th className="px-4 py-2.5 text-right font-medium">Difference</th>
-              <th className="px-4 py-2.5 text-right font-medium">Of estimate</th>
+              <th className="px-4 py-2.5 text-right font-medium">Compliance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -72,13 +68,11 @@ function TicketTable({ page, azureCredentialId, onPage, busy }: { page: Page<Acc
                     {ticket.type} · {ticket.projectName}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-slate-900">{formatHours(ticket.trackedHours)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-slate-600">{formatHours(ticket.periodHours)}</td>
+                <td className={cn("px-4 py-3 text-right tabular-nums", ticket.withinEstimate ? "text-slate-900" : "font-medium text-rose-700")}>{formatHours(ticket.trackedHours)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-slate-600">{formatHours(ticket.estimateHours)}</td>
-                <td className={cn("px-4 py-3 text-right tabular-nums", ticket.trackedHours > ticket.estimateHours ? "font-medium text-rose-700" : "text-slate-600")}>
-                  {signedHours(ticket.trackedHours - ticket.estimateHours)}
-                </td>
                 <td className="px-4 py-3 text-right">
-                  <RatioBadge ratio={ticket.ratio} />
+                  <EstimateBadge ticket={ticket} />
                 </td>
               </tr>
             ))}
@@ -103,7 +97,7 @@ function GroupTable({ title, column, page, onPage, busy }: { title: string; colu
               <th className="px-4 py-2.5 text-right font-medium">Tickets</th>
               <th className="px-4 py-2.5 text-right font-medium">Tracked</th>
               <th className="px-4 py-2.5 text-right font-medium">Estimate</th>
-              <th className="px-4 py-2.5 text-right font-medium">Of estimate</th>
+              <th className="px-4 py-2.5 text-right font-medium">Compliance</th>
               <th className="px-4 py-2.5 text-right font-medium">Went over</th>
             </tr>
           </thead>
@@ -114,7 +108,7 @@ function GroupTable({ title, column, page, onPage, busy }: { title: string; colu
                 <td className="px-4 py-3 text-right tabular-nums">{row.tickets}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatHours(row.trackedHours)}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-slate-600">{formatHours(row.estimateHours)}</td>
-                <td className="px-4 py-3 text-right">{row.ratio === null ? "—" : <RatioBadge ratio={row.ratio} />}</td>
+                <td className={cn("px-4 py-3 text-right font-semibold tabular-nums", complianceTone(row.compliance))}>{percentOf(row.compliance)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">
                   {row.overEstimate} of {row.tickets}
                 </td>
@@ -134,11 +128,13 @@ const PRESETS = [
   { days: 90, label: "Last 90 days" },
 ];
 
-/** Estimate accuracy (team when the role allows) and the weekly CSV export. */
+/** Estimate compliance (team when the role allows) and the time CSV export. */
 export function ReportsTab({ connection, today }: { connection: SolidtimeConnection; today: string }) {
   const [from, setFrom] = useState(shiftDay(today, -29));
   const [to, setTo] = useState(today);
-  const [week, setWeek] = useState(weekStart(shiftDay(today, -7)));
+  // The export: this week (Monday to today) unless another day or range is chosen.
+  const [csvFrom, setCsvFrom] = useState(() => weekStart(today));
+  const [csvTo, setCsvTo] = useState(today);
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const personPage = usePageParam("personPage");
@@ -171,10 +167,10 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
     setDownloading(true);
 
     try {
-      const blob = await apiDownload(weeklyCsvUrl(connection.credentialId, week));
+      const blob = await apiDownload(timeCsvUrl(connection.credentialId, csvFrom, csvTo));
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
-      link.download = `time-${week}.csv`;
+      link.download = `time-${csvFrom}-to-${csvTo}.csv`;
       link.click();
       // Released after the browser has started the download.
       window.setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
@@ -193,10 +189,10 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
         <Card className="flex flex-col gap-3 p-4">
           <div>
             <h3 id="accuracy-title" className="text-base font-semibold text-slate-950">
-              Estimate accuracy
+              Estimate compliance
             </h3>
             <p className="mt-0.5 text-sm text-slate-600">
-              How {scope} time tracked in Solidtime compares with each ticket's Original Estimate in Azure DevOps. Only tickets with an estimate and time in the period count.
+              A ticket is compliant when its total time in Solidtime is at most its Original Estimate in Azure DevOps; finishing early counts as fully compliant. Covers tickets with an estimate that had {scope} time in the period.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
@@ -242,11 +238,11 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatTile label="Tickets compared" value={data.totals.tickets} hint={data.ticketsWithoutEstimate ? `${data.ticketsWithoutEstimate} more had no estimate` : undefined} />
-                <StatTile label="Tracked" value={formatHours(data.totals.trackedHours)} hint={`estimated ${formatHours(data.totals.estimateHours)}`} />
+                <StatTile label="Total tracked" value={formatHours(data.totals.trackedHours)} hint={`estimated ${formatHours(data.totals.estimateHours)}`} />
                 <StatTile
-                  label="Of estimate"
-                  value={<span className={cn(data.totals.ratio !== null && data.totals.ratio > OVER_WARNING ? "text-rose-700" : data.totals.ratio !== null && data.totals.ratio > 1 ? "text-amber-700" : "text-emerald-700")}>{percentOf(data.totals.ratio)}</span>}
-                  hint="100% = exactly on estimate"
+                  label="Compliance"
+                  value={<span className={complianceTone(data.totals.compliance)}>{percentOf(data.totals.compliance)}</span>}
+                  hint={`${data.totals.withinEstimate} of ${data.totals.tickets} within estimate`}
                 />
                 <StatTile label="Went over" value={`${data.totals.overEstimate} of ${data.totals.tickets}`} hint="tickets past their estimate" />
               </div>
@@ -264,26 +260,53 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
         )}
       </section>
 
-      <Card className="flex flex-col gap-3 p-4" aria-labelledby="weekly-title">
+      <Card className="flex flex-col gap-3 p-4" aria-labelledby="export-title">
         <div>
-          <h3 id="weekly-title" className="text-base font-semibold text-slate-950">
-            Weekly export
+          <h3 id="export-title" className="text-base font-semibold text-slate-950">
+            Time export
           </h3>
-          <p className="mt-0.5 text-sm text-slate-600">A CSV of {scope} time per person, day and ticket for one week (Monday to Sunday).</p>
+          <p className="mt-0.5 text-sm text-slate-600">
+            A CSV of {scope} time per person, day and ticket. Each row also has the ticket's type, state, Original Estimate, total tracked time, Azure Completed and Remaining Work, and whether it stayed within its estimate.
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-700">
-            Week starting
-            <DatePicker aria-label="Week starting" size="sm" value={week} max={today} onChange={(picked) => picked && setWeek(weekStart(picked))} />
-          </label>
-          <span className="text-sm text-slate-500">
-            {formatDayLabel(week, { weekday: "short", day: "numeric", month: "short" })} – {formatDayLabel(shiftDay(week, 6), { weekday: "short", day: "numeric", month: "short" })}
-          </span>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+          <DatePicker
+            aria-label="Export day"
+            size="sm"
+            value={csvFrom === csvTo ? csvFrom : ""}
+            displayValue={csvFrom === csvTo && csvFrom === today ? "Today" : undefined}
+            placeholder="One day"
+            max={today}
+            onChange={(picked) => {
+              if (!picked) return;
+              setCsvFrom(picked);
+              setCsvTo(picked);
+            }}
+            className={csvFrom === csvTo ? "border-indigo-300 bg-indigo-50 font-medium text-indigo-800" : "text-slate-600"}
+          />
+          <DateRangePicker
+            aria-label="Export range"
+            from={csvFrom}
+            to={csvTo}
+            active={csvFrom !== csvTo}
+            presets={rangePresets(today)}
+            max={today}
+            maxDays={366}
+            placeholder="Range"
+            onChange={(nextFrom, nextTo) => {
+              setCsvFrom(nextFrom);
+              setCsvTo(nextTo);
+            }}
+          />
           <Button size="sm" variant="secondary" disabled={downloading} onClick={() => void download()}>
             {downloading ? <Spinner className="size-4" /> : null}
             Download CSV
           </Button>
         </div>
+        <p className="text-xs text-slate-500" aria-live="polite">
+          The file covers {formatDayLabel(csvFrom, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+          {csvTo === csvFrom ? "." : ` to ${formatDayLabel(csvTo, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}, both days included.`}
+        </p>
         {downloadError ? (
           <p role="alert" className="text-sm text-rose-600">
             {downloadError}

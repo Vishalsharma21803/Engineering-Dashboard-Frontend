@@ -444,8 +444,16 @@ describe("ReportsTab", () => {
     from: shiftDay(today, -29),
     to: today,
     team: false,
-    totals: { tickets: 3, trackedHours: 12, estimateHours: 10, ratio: 1.2, overEstimate: 1 },
-    byTicket: page,
+    totals: { tickets: 3, trackedHours: 12, estimateHours: 10, withinEstimate: 2, compliance: 0.67, overEstimate: 1 },
+    byTicket: {
+      ...page,
+      total: 2,
+      totalPages: 1,
+      items: [
+        { ticketId: 101, title: "Implement login", type: "Task", projectName: "Alpha", periodHours: 3, trackedHours: 6, estimateHours: 4, withinEstimate: false, overByHours: 2 },
+        { ticketId: 102, title: "Fix flaky test", type: "Task", projectName: "Alpha", periodHours: 1, trackedHours: 3, estimateHours: 3, withinEstimate: true, overByHours: 0 },
+      ],
+    },
     byPerson: page,
     byType: page,
     ticketsWithoutEstimate: 0,
@@ -469,5 +477,27 @@ describe("ReportsTab", () => {
     expect(screen.getByLabelText("From")).toHaveAttribute("data-value", shiftDay(today, -6));
     expect(await screen.findByText("Tickets compared")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows compliance as tickets within their estimate, and exports the chosen range as CSV", async () => {
+    const calls = mockBackend([
+      { path: `${base}/reports/accuracy`, body: { accuracy: report } },
+      { path: `${base}/reports/time.csv`, body: "csv" },
+    ]);
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:csv"), revokeObjectURL: vi.fn() }));
+    renderWithProviders(<ReportsTab connection={connection} today={today} />);
+
+    expect(await screen.findByText("67%")).toBeInTheDocument();
+    expect(screen.getByText("2 of 3 within estimate")).toBeInTheDocument();
+    const tickets = screen.getByRole("table", { name: "Tickets compared" });
+    expect(within(tickets).getByText("Over by 2 h")).toBeInTheDocument();
+    expect(within(tickets).getByText("Within estimate")).toBeInTheDocument();
+
+    // This week by default; Last week is Monday 19 to Sunday 25 October.
+    expect(screen.getByText(/The file covers Mon, Oct 26, 2026 to Thu, Oct 29, 2026, both days included\./)).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Export range"));
+    await userEvent.click(screen.getByRole("button", { name: "Last week" }));
+    await userEvent.click(screen.getByRole("button", { name: "Download CSV" }));
+    await waitFor(() => expect(calls.some((call) => call.url.includes("/reports/time.csv?from=2026-10-19&to=2026-10-25"))).toBe(true));
   });
 });

@@ -199,13 +199,16 @@ export interface DraftEstimate {
   costUsd: number;
 }
 
+/** Estimate compliance: a ticket is within its estimate when its total tracked time is at most its Original Estimate. */
 export interface AccuracyRow {
   key: string;
   label: string;
   tickets: number;
   trackedHours: number;
   estimateHours: number;
-  ratio: number | null;
+  withinEstimate: number;
+  /** withinEstimate ÷ tickets (1 = all within). */
+  compliance: number;
   overEstimate: number;
 }
 
@@ -214,16 +217,20 @@ export interface AccuracyTicket {
   title: string;
   type: string;
   projectName: string;
+  /** Hours inside the chosen period. */
+  periodHours: number;
+  /** Total tracked over all time. */
   trackedHours: number;
   estimateHours: number;
-  ratio: number;
+  withinEstimate: boolean;
+  overByHours: number;
 }
 
 export interface AccuracyReport {
   from: string;
   to: string;
   team: boolean;
-  totals: { tickets: number; trackedHours: number; estimateHours: number; ratio: number | null; overEstimate: number };
+  totals: { tickets: number; trackedHours: number; estimateHours: number; withinEstimate: number; compliance: number | null; overEstimate: number };
   byTicket: Page<AccuracyTicket>;
   byPerson: Page<AccuracyRow>;
   byType: Page<AccuracyRow>;
