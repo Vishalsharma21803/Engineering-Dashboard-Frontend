@@ -1,9 +1,10 @@
-import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 
 import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import { ActionReviewDialog } from "@/features/azure-devops/components/action-review-dialog";
 import { EmptyState, ErrorCard, ErrorToast, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { useActionReview } from "@/features/azure-devops/hooks/use-action-review";
@@ -12,22 +13,25 @@ import { DraftTab } from "../components/draft-tab";
 import { ManageTab } from "../components/manage-tab";
 import { ProjectMapping } from "../components/project-mapping";
 import { ReportsTab } from "../components/reports-tab";
-import { TicketTimeLookup } from "../components/ticket-time-lookup";
 import { TimerBar } from "../components/timer-bar";
 import { TimesheetTab } from "../components/timesheet-tab";
 import { UnlinkedTab } from "../components/unlinked-tab";
+import { VerifyTab } from "../components/verify-tab";
 import { useSolidtimeConnections, useSolidtimeProfile } from "../hooks/use-solidtime";
 import { localDay } from "../utils/time";
 
 const TABS = [
   { id: "timesheet", label: "Timesheet" },
   { id: "draft", label: "Draft from Azure" },
+  { id: "verify", label: "Compare with Azure" },
   { id: "unlinked", label: "No ticket" },
   { id: "reports", label: "Reports" },
   { id: "manage", label: "Projects & tags" },
 ] as const;
 
 type Tab = (typeof TABS)[number]["id"];
+
+const isTab = (value: string | null): value is Tab => TABS.some((item) => item.id === value);
 
 /** /time: opens the first Solidtime connection, or explains how to add one. */
 export function TimeIndexPage() {
@@ -58,13 +62,11 @@ export function TimeIndexPage() {
 /** Time tracking with Solidtime: every change is proposed and runs only after approval. */
 export function TimePage() {
   const { credentialId = "" } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useUrlTab(isTab, "timesheet");
   const connections = useSolidtimeConnections();
   const review = useActionReview();
   const pending = useActions({ status: "PENDING", credentialId });
   const profile = useSolidtimeProfile(credentialId);
-  const requested = searchParams.get("tab");
-  const tab: Tab = TABS.some((item) => item.id === requested) ? (requested as Tab) : "timesheet";
 
   if (connections.isLoading) return <SkeletonRows rows={4} />;
   if (!connections.data) return <ErrorCard error={connections.error} onRetry={() => void connections.refetch()} isRetrying={connections.isFetching} />;
@@ -104,12 +106,9 @@ export function TimePage() {
         ) : null}
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <TimerBar {...props} />
-        <TicketTimeLookup connection={connection} onPropose={review.propose} isProposing={review.isProposing} />
-      </div>
+      <TimerBar {...props} />
 
-      <Tabs value={tab} onValueChange={(value) => setSearchParams(value === "timesheet" ? {} : { tab: value })} className="gap-6">
+      <Tabs value={tab} onValueChange={(value) => isTab(value) && setTab(value)} className="gap-6">
         <TabsList variant="line" aria-label="Time sections" className="-mx-4 px-4 sm:mx-0 sm:px-0">
           <ActiveIndicator variant="underline" />
           {TABS.map((item) => (
@@ -137,6 +136,7 @@ export function TimePage() {
               <div key={timeZone ?? "browser"}>
                 {tab === "timesheet" ? <TimesheetTab {...props} /> : null}
                 {tab === "draft" ? <DraftTab {...props} /> : null}
+                {tab === "verify" ? <VerifyTab {...props} /> : null}
                 {tab === "unlinked" ? <UnlinkedTab {...props} /> : null}
                 {tab === "reports" ? <ReportsTab connection={connection} today={props.today} /> : null}
                 {tab === "manage" ? (

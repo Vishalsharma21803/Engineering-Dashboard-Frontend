@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
 
 import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ErrorCard, StatTile } from "@/features/azure-devops/components/feedback";
 import { ProjectsTab } from "../components/projects-tab";
@@ -199,10 +199,7 @@ function EffectiveTab() {
 export function SopRulesPage() {
   const { user } = useAuth();
   // The tab lives in the URL (?tab=projects) so other pages can link to it; anything unknown is "My rules".
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requested = searchParams.get("tab");
-  const tab: Tab = isTab(requested) ? requested : "personal";
-  const setTab = (next: Tab) => setSearchParams(next === "personal" ? {} : { tab: next }, { replace: true });
+  const [tab, setTab] = useUrlTab(isTab, "personal", { replace: true });
   const isOwner = user?.isSopAdmin ?? false;
 
   return (

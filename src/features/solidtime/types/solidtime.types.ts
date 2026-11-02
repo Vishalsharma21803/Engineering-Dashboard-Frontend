@@ -134,6 +134,10 @@ export interface TimeVsEstimate {
   estimateHours: number | null;
   overEstimate: boolean;
   suggested: { completedWork: number; remainingWork: number | null };
+  /** Azure's Completed Work is the tracked time, within a minute. */
+  completedInSync: boolean;
+  /** Azure's Remaining Work follows from it (or there is no estimate to follow). */
+  remainingInSync: boolean;
   inSync: boolean;
   /** "team": everyone's time; "mine": only my own (my Solidtime role cannot read others'). */
   basis: "team" | "mine";
@@ -224,4 +228,39 @@ export interface AccuracyReport {
   byPerson: Page<AccuracyRow>;
   byType: Page<AccuracyRow>;
   ticketsWithoutEstimate: number;
+}
+
+/**
+ * Time → Verify, per ticket, Completed Work in Azure against the Solidtime total:
+ * matched · missing (no Completed Work in Azure) · mismatch (Azure has less) · azure-higher (never lowered) ·
+ * remaining (Completed Work equal, only Remaining Work out of date) · running (my timer is on it) ·
+ * cannot-update (the type has no Completed Work).
+ */
+export type VerificationStatus = "missing" | "mismatch" | "azure-higher" | "remaining" | "running" | "cannot-update" | "matched";
+
+export interface VerificationItem {
+  ticketId: number;
+  title: string;
+  type: string;
+  state: string;
+  projectName: string;
+  /** My hours on it in the chosen period. */
+  periodHours: number;
+  /** Solidtime total over all time (the team's when visible, else mine). */
+  trackedHours: number;
+  azure: { completedWork: number | null; remainingWork: number | null; originalEstimate: number | null };
+  suggested: { completedWork: number; remainingWork: number | null };
+  status: VerificationStatus;
+  /** Resolved, closed or removed: the work is done. */
+  finished: boolean;
+}
+
+export interface TimeVerification {
+  from: string;
+  to: string;
+  basis: "team" | "mine";
+  items: VerificationItem[];
+  notFound: Array<{ ticketId: number; periodHours: number }>;
+  unlinkedHours: number;
+  counts: Record<VerificationStatus, number>;
 }

@@ -24,7 +24,8 @@ export function TicketTimeResult({ data, azureCredentialId, onPropose, isProposi
   const [reason, setReason] = useState("");
   const { time, ticket, comparison } = data;
   const total = time.teamSeconds ?? time.mySeconds;
-  const upToDate = comparison !== null && ticket !== null && (ticket.completedWork ?? 0) === comparison.suggested.completedWork;
+  // Within a minute is the same time (decided on the server: 40 min matches 0.66 h).
+  const upToDate = comparison !== null && ticket !== null && comparison.completedInSync;
 
   return (
     <div className="flex flex-col gap-4">

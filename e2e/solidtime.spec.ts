@@ -142,13 +142,16 @@ test("looks up a ticket's total time on the Time page, updates Azure from it, an
   await setUp(page);
 
   await page.goto("/time");
+  // The ticket ID search lives in Time → Compare with Azure.
+  await page.getByRole("tab", { name: "Compare with Azure" }).click();
   const lookup = page.getByRole("form", { name: "Ticket time lookup" });
   await lookup.getByLabel("Ticket ID").fill("101");
   await lookup.getByRole("button", { name: "Check" }).click();
-  await expect(page.getByRole("link", { name: "#101 Implement login" })).toBeVisible();
+  // The ticket also appears in the Verify list below, so look inside the lookup's card.
+  await expect(lookup.locator("xpath=..").getByRole("link", { name: "#101 Implement login" })).toBeVisible();
   // An Employee role sees only its own time: the update is offered with a warning.
   await expect(page.getByText("Total (your time)")).toBeVisible();
-  await expect(page.getByRole("note")).toContainText("Based on your own time only");
+  await expect(page.getByRole("note").filter({ hasText: "Based on your own time only" })).toBeVisible();
 
   await page.getByRole("button", { name: "Update Azure to 2 h…" }).click();
   const dialog = page.getByRole("dialog");
@@ -160,8 +163,40 @@ test("looks up a ticket's total time on the Time page, updates Azure from it, an
   expect(workItem.fields["Microsoft.VSTS.Scheduling.RemainingWork"]).toBe(6);
 
   // The ticket page reads the time when asked, and now matches.
-  await page.getByRole("link", { name: "#101 Implement login" }).click();
+  await lookup.locator("xpath=..").getByRole("link", { name: "#101 Implement login" }).click();
   await page.getByRole("button", { name: "Check time in Solidtime" }).click();
   await expect(page.getByText("Azure Completed Work already matches Solidtime (2 h).")).toBeVisible();
   await expect(page.getByRole("button", { name: "Azure already up to date" })).toBeDisabled();
+});
+
+test("verifies the period's tickets against Azure and updates the missing ones in one approval, never lowering Azure", async ({ page, request }) => {
+  // #101 has 4 h in Azure but only 1 h in Solidtime; #102 and #103 have no Completed Work in Azure yet.
+  await request.post(`${BACKEND}/__e2e/solidtime-entry`, { data: { description: "#101 Implement login", hours: 1 } });
+  await request.post(`${BACKEND}/__e2e/solidtime-entry`, { data: { description: "#102 Fix flaky test", hours: 2 } });
+  await request.post(`${BACKEND}/__e2e/solidtime-entry`, { data: { description: "#103 Crash on save", hours: 1 } });
+  await setUp(page);
+
+  await page.goto("/time");
+  await page.getByRole("tab", { name: "Compare with Azure" }).click();
+  await expect(page.getByText(/3 tickets/)).toBeVisible();
+  await expect(page.getByText(/2 missing in Azure · 1 Azure higher/)).toBeVisible();
+  const list = page.getByRole("list", { name: "Tickets" });
+  await expect(list.getByRole("listitem").filter({ hasText: "#101 Implement login" })).toContainText("Azure has more; never lowered.");
+  await expect(list.getByRole("listitem").filter({ hasText: "#102 Fix flaky test" })).toContainText("Gap+2 h");
+
+  await page.getByRole("button", { name: "Update 2 in Azure…" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Update time on 2 tickets: #102, #103")).toBeVisible();
+  await dialog.getByRole("button", { name: "Approve & execute" }).click();
+  await expect(dialog.getByText("Executed in Azure DevOps.")).toBeVisible();
+  await expect(dialog.getByText("#102: Completed Work 2 h")).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  const completed = async (id: number) =>
+    ((await (await request.get(`${BACKEND}/__e2e/work-items/${id}`)).json()) as { workItem: { fields: Record<string, unknown> } }).workItem.fields["Microsoft.VSTS.Scheduling.CompletedWork"];
+  expect(await completed(102)).toBe(2);
+  expect(await completed(103)).toBe(1);
+  expect(await completed(101)).toBe(4);
+  await expect(page.getByText(/2 matched/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /in Azure…/ })).toHaveCount(0);
 });

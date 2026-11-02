@@ -11,5 +11,6 @@ export const solidtimeKeys = {
   ticketTimes: (credentialId: string) => ["solidtime", credentialId, "ticket-times"] as const,
   draft: (credentialId: string, day: string) => ["solidtime", credentialId, "draft", day] as const,
   accuracy: (credentialId: string) => ["solidtime", credentialId, "accuracy"] as const,
+  verification: (credentialId: string, from: string, to: string) => ["solidtime", credentialId, "verification", from, to] as const,
   list: (credentialId: string, kind: string) => ["solidtime", credentialId, "list", kind] as const,
 };

@@ -262,7 +262,7 @@ describe("ticket time", () => {
   const response = (basis: "team" | "mine") => ({
     time: { ticketId: 101, mySeconds: 3 * 3600, teamSeconds: basis === "team" ? 5 * 3600 : null, people: null, running: false },
     ticket,
-    comparison: { trackedHours: basis === "team" ? 5 : 3, estimateHours: 8, overEstimate: false, suggested: { completedWork: basis === "team" ? 5 : 3, remainingWork: basis === "team" ? 3 : 5 }, inSync: false, basis },
+    comparison: { trackedHours: basis === "team" ? 5 : 3, estimateHours: 8, overEstimate: false, suggested: { completedWork: basis === "team" ? 5 : 3, remainingWork: basis === "team" ? 3 : 5 }, completedInSync: false, remainingInSync: false, inSync: false, basis },
   });
 
   it("looks a ticket up by id on the Time page and proposes Azure's time fields from the total", async () => {
@@ -308,12 +308,25 @@ describe("ticket time", () => {
   it("disables the update when Azure's Completed Work already equals the total, even if Remaining differs", async () => {
     const same = response("team");
     same.ticket = { ...ticket, completedWork: 5, remainingWork: 1 };
+    same.comparison = { ...same.comparison, completedInSync: true };
     mockBackend([{ path: `${base}/tickets/101/time`, body: same }]);
     renderWithProviders(<TicketTimeLookup connection={connection} onPropose={vi.fn()} isProposing={false} />);
     await userEvent.type(screen.getByLabelText("Ticket ID"), "101");
     await userEvent.click(screen.getByRole("button", { name: "Check" }));
     expect(await screen.findByRole("button", { name: "Azure already up to date" })).toBeDisabled();
     expect(screen.getByText("Azure Completed Work already matches Solidtime (5 h).")).toBeInTheDocument();
+  });
+
+  it("treats time within a minute as the same: 40 min (0.67 h) matches Azure's 0.66 h", async () => {
+    const forty = response("team");
+    forty.time = { ...forty.time, teamSeconds: 40 * 60 };
+    forty.ticket = { ...ticket, completedWork: 0.66 };
+    forty.comparison = { ...forty.comparison, trackedHours: 0.67, suggested: { completedWork: 0.67, remainingWork: 7.33 }, completedInSync: true };
+    mockBackend([{ path: `${base}/tickets/101/time`, body: forty }]);
+    renderWithProviders(<TicketTimeLookup connection={connection} onPropose={vi.fn()} isProposing={false} />);
+    await userEvent.type(screen.getByLabelText("Ticket ID"), "101");
+    await userEvent.click(screen.getByRole("button", { name: "Check" }));
+    expect(await screen.findByRole("button", { name: "Azure already up to date" })).toBeDisabled();
   });
 });
 

@@ -4,17 +4,8 @@ import type { Matcher } from "react-day-picker";
 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/utils/cn";
-
-/** "YYYY-MM-DD", as a native date input reads and writes it, to a local date. */
-function parseDay(value: string | undefined): Date | undefined {
-  const match = value ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
-  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : undefined;
-}
-
-function formatDay(date: Date): string {
-  return [date.getFullYear(), date.getMonth() + 1, date.getDate()].map((part, index) => String(part).padStart(index === 0 ? 4 : 2, "0")).join("-");
-}
+import { cnMerge as cn } from "@/utils/cn-merge";
+import { formatDay, parseDay } from "@/utils/day";
 
 interface DatePickerProps {
   /** "YYYY-MM-DD", or "" for no date. */
@@ -26,6 +17,8 @@ interface DatePickerProps {
   id?: string;
   "aria-label"?: string;
   placeholder?: string;
+  /** Shown instead of the date, e.g. "Today". */
+  displayValue?: string;
   disabled?: boolean;
   size?: "sm" | "default";
   className?: string;
@@ -44,6 +37,7 @@ export function DatePicker({
   id,
   "aria-label": ariaLabel,
   placeholder = "Pick a date",
+  displayValue,
   disabled,
   size = "default",
   className,
@@ -82,14 +76,16 @@ export function DatePicker({
           )}
         >
           <CalendarIcon aria-hidden="true" className="size-4 shrink-0 text-slate-500" />
-          <span className={cn("truncate", !selected && "text-slate-500")}>
-            {selected ? selected.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : placeholder}
+          <span className={cn("truncate", !selected && !displayValue && "text-slate-500")}>
+            {displayValue ?? (selected ? selected.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : placeholder)}
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto rounded-xl p-0 shadow-lg">
         <Calendar
           mode="single"
+          // Weeks start on Monday, like the timesheet and the "This week" / "Last week" ranges.
+          weekStartsOn={1}
           selected={selected}
           defaultMonth={opensOn}
           startMonth={first}

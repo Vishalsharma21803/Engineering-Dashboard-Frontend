@@ -16,6 +16,7 @@ export const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   WORK_ITEM_EDIT_TEXT: "Replace text",
   WORK_ITEM_SET_CATEGORY: "Set category",
   WORK_ITEM_ADD_TAGS: "Add tags",
+  WORK_ITEMS_UPDATE_TIME: "Update time on tickets",
   PIPELINE_QUEUE_RUN: "Queue pipeline run",
   BUILD_RETRY_STAGE: "Retry failed stage",
   BUILD_CANCEL: "Cancel run",

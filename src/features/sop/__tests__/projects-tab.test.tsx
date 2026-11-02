@@ -132,5 +132,5 @@ describe("ProjectsTab", () => {
       timeZone: "Asia/Kolkata",
     });
     expect(body.settings.stages.ready).toBeUndefined();
-  });
+  }, 15_000); // Steps through several dropdowns (Radix in jsdom): about 4 s when the whole suite runs in parallel.
 });

@@ -12,6 +12,7 @@ import type {
   SolidtimeTask,
   TicketInfo,
   TicketTime,
+  TimeVerification,
   TimeVsEstimate,
   Timer,
   Timesheet,
@@ -95,6 +96,12 @@ export async function estimateDraft(credentialId: string, input: { day: string; 
 export async function getAccuracy(credentialId: string, input: { from: string; to: string; personPage: number; typePage: number; ticketPage: number }) {
   const query = new URLSearchParams({ from: input.from, to: input.to, personPage: String(input.personPage), typePage: String(input.typePage), ticketPage: String(input.ticketPage) });
   return (await apiRequest<{ accuracy: AccuracyReport }>(read(credentialId, `/reports/accuracy?${query.toString()}`))).accuracy;
+}
+
+/** Time → Verify: each ticket I logged time on in the period, its Solidtime total next to Azure (always read fresh). */
+export async function getVerification(credentialId: string, input: { from: string; to: string }) {
+  const query = new URLSearchParams({ from: input.from, to: input.to, refresh: "true" });
+  return (await apiRequest<{ verification: TimeVerification }>(read(credentialId, `/verification?${query.toString()}`))).verification;
 }
 
 export const weeklyCsvUrl = (credentialId: string, week: string) => read(credentialId, `/reports/weekly.csv?week=${week}`);

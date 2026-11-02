@@ -37,7 +37,7 @@ export function TicketTimeLookup({ connection, onPropose, isProposing }: { conne
 
   return (
     // With a result, the card takes the full width (its figures need the room).
-    <Card className={cn("flex flex-col gap-3 px-4 py-3", ticketId !== null && "lg:col-span-2")}>
+    <Card className={cn("flex flex-col justify-center gap-3 p-4", ticketId !== null && "lg:col-span-2")}>
       <form onSubmit={submit} aria-label="Ticket time lookup" className="flex flex-wrap items-center gap-2">
         <label className="flex min-w-0 flex-1 items-center gap-2 text-sm font-medium text-slate-700">
           <span className="whitespace-nowrap">Ticket time</span>
