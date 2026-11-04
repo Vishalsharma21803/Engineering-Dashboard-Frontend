@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
@@ -15,8 +16,10 @@ import { CredentialCardFrame, type CardNotice } from "@/features/credentials/com
 import { EditIcon, ShieldIcon, TrashIcon } from "@/features/credentials/components/credential-icons";
 import { deleteCredential } from "@/features/credentials/api/credential.api";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
+import { dropCredentialCaches } from "@/features/credentials/hooks/use-delete-credential";
 import { getCredentialDisplayName } from "@/features/credentials/utils/credential-display";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { listMemberships, updateConnection, validateConnection, type ConnectionChange } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import { useSolidtimeConnections } from "../hooks/use-solidtime";
@@ -24,12 +27,9 @@ import type { SolidtimeConnection } from "../types/solidtime.types";
 import { LoadErrorNotice } from "./load-error-notice";
 
 function errorText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    const field = error.errors?.[0];
-    return field ? `${error.message}: ${field.message}` : error.message;
-  }
-
-  return fallback;
+  const field = error instanceof ApiError ? error.errors[0] : undefined;
+  const message = errorMessage(error, fallback);
+  return field ? `${message}: ${field.message}` : message;
 }
 
 /** A message for the top of the Credentials page, the same place Azure DevOps reports to. */
@@ -42,16 +42,19 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
   const [alert, setAlert] = useState(String(connection.timerAlertHours));
   const [newToken, setNewToken] = useState("");
   const [replacing, setReplacing] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   /** Validation and token results, shown in this card. */
   const [notice, setNotice] = useState<CardNotice | null>(null);
   const memberships = useQuery({
     queryKey: solidtimeKeys.memberships(connection.credentialId),
-    queryFn: () => listMemberships(connection.credentialId),
+    queryFn: ({ signal }) => listMemberships(connection.credentialId, signal),
     enabled: connection.organizationId === null,
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: solidtimeKeys.all });
   const name = connection.label ?? connection.baseUrl.replace(/^https?:\/\//, "");
-  const update = useMutation({ mutationFn: (change: ConnectionChange) => updateConnection(connection.credentialId, change), onSuccess: refresh });
+  // gcTime 0: a token change keeps the token in the variables; they are not kept after the call.
+  // One change at a time (the controls below are disabled while one is saving), so `update.error` is always the latest call's.
+  const update = useMutation({ mutationFn: (change: ConnectionChange) => updateConnection(connection.credentialId, change), onSuccess: refresh, gcTime: 0 });
   const check = useMutation({
     mutationFn: () => validateConnection(connection.credentialId),
     onSuccess: async (result) => {
@@ -67,6 +70,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
   const remove = useMutation({
     mutationFn: () => deleteCredential(connection.credentialId),
     onSuccess: async () => {
+      dropCredentialCaches(queryClient, connection.credentialId);
       await refresh();
       onNotice({ tone: "success", message: `${name} disconnected.` });
     },
@@ -102,14 +106,25 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
             disabled={remove.isPending}
             aria-label={`Disconnect ${name}`}
             onClick={() => {
-              if (window.confirm(`Disconnect ${name}? Your time in Solidtime is not affected.`)) {
-                remove.mutate();
-              }
+              remove.reset();
+              setConfirmingDisconnect(true);
             }}
           >
             {remove.isPending ? <Spinner className="size-3.5" /> : <TrashIcon />}
             Disconnect
           </Button>
+          <ConfirmDialog
+            open={confirmingDisconnect}
+            title={`Disconnect ${name}?`}
+            description="Your time in Solidtime is not affected."
+            confirmLabel="Disconnect"
+            pendingLabel="Disconnecting…"
+            destructive
+            isPending={remove.isPending}
+            error={remove.error ? errorText(remove.error, `Could not disconnect ${name}.`) : null}
+            onConfirm={() => remove.mutate(undefined, { onSuccess: () => setConfirmingDisconnect(false) })}
+            onOpenChange={setConfirmingDisconnect}
+          />
         </>
       }
     >
@@ -158,7 +173,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
         <div className="flex max-w-sm flex-col gap-1">
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
             Choose the Solidtime organization
-            <SelectField size="sm" defaultValue="" disabled={!memberships.data} onValueChange={(selected) => selected && update.mutate({ organizationId: selected })}>
+            <SelectField size="sm" defaultValue="" disabled={!memberships.data || update.isPending} onValueChange={(selected) => selected && update.mutate({ organizationId: selected })}>
               <option value="" disabled>
                 {memberships.isLoading ? "Loading…" : !memberships.data ? "Organizations not loaded" : "Choose an organization"}
               </option>
@@ -181,7 +196,7 @@ function ConnectionCard({ connection, onNotice }: { connection: SolidtimeConnect
             aria-label={`Azure organization for ${name}`}
             value={connection.azureCredentialId ?? ""}
             // Without the list, the current link cannot be shown; it would read "Not linked".
-            disabled={!azure.data}
+            disabled={!azure.data || update.isPending}
             onValueChange={(selected) => update.mutate({ azureCredentialId: selected || null })}
           >
             <option value="">Not linked</option>

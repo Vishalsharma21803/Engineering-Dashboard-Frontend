@@ -7,9 +7,10 @@ import type {
   ValidateCredentialResponse,
 } from "../types/credential.types";
 
-export async function listCredentials() {
+export async function listCredentials(signal?: AbortSignal) {
   const response = await apiRequest<CredentialListResponse>(
-    "/api/credentials"
+    "/api/credentials",
+    { signal }
   );
 
   return response.credentials;

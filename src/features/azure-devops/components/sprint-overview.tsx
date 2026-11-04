@@ -127,8 +127,9 @@ export function SprintOverview({ overview, unavailable = false, sprintMode, hour
               )}
             </div>
             {elapsed !== null ? (
-              <Hint label={`Today: ${Math.round(elapsed * 100)}% of the sprint has passed`}>
-                <span className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 cursor-default rounded-full bg-slate-700" style={{ left: `${elapsed * 100}%` }}>
+              <Hint label={`Today: ${Math.round(elapsed * 100)}% of the sprint has passed`} focusable>
+                {/* A 24px touch target around the thin mark. */}
+                <span className="absolute -top-1 h-4 w-0.5 -translate-x-1/2 cursor-default rounded-full bg-slate-700 outline-none before:absolute before:-inset-x-[11px] before:-inset-y-1 before:content-[''] focus-visible:ring-2 focus-visible:ring-indigo-500" style={{ left: `${elapsed * 100}%` }}>
                   <span className="sr-only">Today</span>
                 </span>
               </Hint>

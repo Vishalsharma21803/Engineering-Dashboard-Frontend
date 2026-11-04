@@ -29,4 +29,17 @@ describe("ActionsPage", () => {
     await userEvent.click(within(history).getByRole("button", { name: "Next" }));
     await waitFor(() => expect(calls.some((call) => call.url.includes("history=true") && call.url.includes("page=2"))).toBe(true));
   });
+
+  it("shows statuses in words, and the standalone page links back to Time when opened from there", async () => {
+    mockBackend([
+      { path: "/api/actions", body: { actions: pageOf(decided.slice(0, 1)) } },
+      { path: "/api/audit-logs", body: { auditLogs: pageOf([]) } },
+    ]);
+    renderWithProviders(<ActionsPage />, { path: "/actions", route: "/actions?from=time" });
+
+    expect(screen.getByRole("link", { name: "Back to Time" })).toHaveAttribute("href", "/time");
+    expect(screen.getByText(/Every change Cockpit makes to Azure DevOps or Solidtime is proposed first/)).toBeInTheDocument();
+    expect((await screen.findAllByText("Succeeded")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("SUCCEEDED")).not.toBeInTheDocument();
+  });
 });

@@ -106,4 +106,15 @@ describe("SopResultPanel", () => {
     expect(screen.getByText("Suggestion:").closest("p")).toHaveTextContent("Name it.");
     expect(screen.getByLabelText(/Ready to post · Add comment/)).toHaveValue("Found in Chrome 120.");
   });
+
+  it("says when part of the ticket's long history was not read", () => {
+    renderWithProviders(<SopResultPanel result={{ ...result, historyTruncated: true }} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Part of this ticket's long history was not read, so some SOP checks may be incomplete.");
+  });
+
+  it("says when the server no longer applies part of a review of this revision", () => {
+    renderWithProviders(<SopResultPanel result={{ ...result, aiReview: { status: "DONE", checkedAt: new Date().toISOString(), outdated: true } }} ai={ai} />);
+    expect(screen.getByText(/Part of this review is out of date/)).toBeInTheDocument();
+    expect(screen.queryByText(/The ticket changed since the last review/)).not.toBeInTheDocument();
+  });
 });

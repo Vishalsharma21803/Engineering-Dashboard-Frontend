@@ -1,8 +1,11 @@
+import { Suspense } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { GlobalErrorToaster } from "@/components/ui/global-error-toaster";
+import { PageLoader } from "@/components/ui/page-loader";
 import { Spinner } from "@/components/ui/spinner";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { UserMenu } from "@/features/auth/components/user-menu";
@@ -121,8 +124,12 @@ export function RootLayout() {
       </header>
 
       <main className="mx-auto flex w-full min-w-0 max-w-[90rem] flex-1 px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <Outlet />
+        {/* Pages load on first visit; the header and navigation stay while they do. */}
+        <Suspense fallback={<PageLoader fullScreen={false} />}>
+          <Outlet />
+        </Suspense>
       </main>
+      <GlobalErrorToaster />
     </div>
   );
 }

@@ -172,8 +172,8 @@ test("the team SOP report uses the default rules for everyone in the project", a
   // The run is saved for me and kept after a reload; deleting it removes it.
   await page.reload();
   await page.getByText(/^Your saved reports \(1\)$/).click();
-  page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: /^Delete the report from/ }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete report" }).click();
   await expect(page.getByText(/No saved reports yet/)).toBeVisible();
 });
 
@@ -215,4 +215,50 @@ test("projects are set up from Azure and each developer chooses theirs; new tick
   const response = await request.get(`${BACKEND}/__e2e/requests`);
   const { requests } = (await response.json()) as { requests: Array<{ isWrite: boolean }> };
   expect(requests.filter((entry) => entry.isWrite)).toEqual([]);
+});
+
+test("a project set-up can be changed only by whoever set it up or an SOP owner", async ({ page, browser, request }) => {
+  await request.post(`${BACKEND}/__e2e/rulebook`);
+
+  async function connectAzure(on: Page) {
+    await on.goto("/credentials/new");
+    await on.getByLabel("Organization URL").fill("https://dev.azure.com/fake-org");
+    await on.getByLabel("Personal access token").fill("fake-pat-token-0123456789abcdefghij");
+    await on.getByRole("button", { name: "Save credential" }).click();
+    await expect(on).toHaveURL("/credentials");
+  }
+
+  await register(page, "first@example.com");
+  await connectAzure(page);
+  await page.goto("/sop-rules?tab=projects");
+  const projects = page.getByRole("table", { name: "SOP projects" });
+
+  // Alpha was moved from the old rulebook: only SOP owners can change it. Checking it for myself still works.
+  const alpha = projects.getByRole("row", { name: /Alpha/ });
+  await expect(alpha).toContainText("Set up before owners were recorded; only an SOP owner can change it");
+  await expect(alpha.getByRole("button", { name: "Edit" })).toHaveCount(0);
+  await expect(alpha.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await expect(alpha.getByRole("checkbox", { name: "Check Alpha for me" })).toBeEnabled();
+
+  // Whoever sets a project up may change it.
+  await projects.getByRole("row", { name: /Beta/ }).getByRole("button", { name: "Set up" }).click();
+  const form = page.getByRole("form", { name: "Set up Beta" });
+  await form.getByLabel("Team time zone").fill("Asia/Kolkata");
+  await form.getByRole("button", { name: "Set up project" }).click();
+  const beta = projects.getByRole("row", { name: /Beta/ });
+  await expect(beta.getByRole("button", { name: "Edit" })).toBeVisible();
+  await expect(beta.getByRole("button", { name: "Remove" })).toBeVisible();
+
+  // Another developer sees it read-only, with who set it up.
+  const other = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+  const second = await other.newPage();
+  await register(second, "second@example.com");
+  await connectAzure(second);
+  await second.goto("/sop-rules?tab=projects");
+  const theirBeta = second.getByRole("table", { name: "SOP projects" }).getByRole("row", { name: /Beta/ });
+  await expect(theirBeta).toContainText("Set up by Tester; only they or an SOP owner can change it");
+  await expect(theirBeta.getByRole("button", { name: "Edit" })).toHaveCount(0);
+  await expect(theirBeta.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await expect(theirBeta.getByRole("button", { name: "History" })).toBeVisible();
+  await other.close();
 });

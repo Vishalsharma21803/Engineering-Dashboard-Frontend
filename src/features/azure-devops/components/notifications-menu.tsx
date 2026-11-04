@@ -4,7 +4,14 @@ import { Link } from "react-router-dom";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/utils/cn";
-import { useNotifications, useNotificationStatus, useReadAllNotifications } from "../hooks/use-notifications";
+import {
+  useNotifications,
+  useNotificationStatus,
+  useReadAllNotifications,
+  useSavingNotificationIds,
+  type NotificationSaved,
+  type NotificationSaveFailure,
+} from "../hooks/use-notifications";
 import type { CockpitNotification, NotificationKind, NotificationStatus } from "../types/notification.types";
 import { describeError } from "../utils/error-message";
 import { formatRelative, pluralizeText } from "../utils/format";
@@ -12,7 +19,8 @@ import { formatRelative, pluralizeText } from "../utils/format";
 const TABS: Array<{ status: NotificationStatus; label: string; empty: string }> = [
   { status: "UNREAD", label: "Unread", empty: "You're all caught up." },
   { status: "READ", label: "Read", empty: "Nothing read yet. Read ones stay here until they are fixed." },
-  { status: "ABANDONED", label: "Abandoned", empty: "Nothing abandoned. Abandon one you will not act on; it stays here until it is fixed." },
+  // Shown as "Dismissed"; the stored status keeps its name.
+  { status: "ABANDONED", label: "Dismissed", empty: "Nothing dismissed. Dismiss one you won't act on; it stays here until it's fixed." },
 ];
 
 const KIND_ICONS: Record<NotificationKind, { icon: LucideIcon; tone: string }> = {
@@ -54,36 +62,46 @@ interface NotificationsMenuProps {
 }
 
 /**
- * Everything that needs me outside the ticket list, in one place. Reading or abandoning one only
+ * Everything that needs me outside the ticket list, in one place. Reading or dismissing one only
  * moves it to its tab; it leaves the list only when its cause is fixed.
  */
 export function NotificationsMenu({ credentialId, projectName, dashboardToken, onPipelines }: NotificationsMenuProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<NotificationStatus>("UNREAD");
   const query = useNotifications(credentialId, projectName, dashboardToken);
-  const status = useNotificationStatus(credentialId);
-  const readAll = useReadAllNotifications(credentialId, projectName);
+  // Every failed save is listed with the item it was for, even when another save followed it.
+  // They stay (the button shows them too) until dismissed or the same change is saved after all.
+  const [failures, setFailures] = useState<Array<{ key: number; id: string | null; status: NotificationStatus; what: string; message: string }>>([]);
   const rows = query.data ?? [];
+  const onFailure: NotificationSaveFailure = ({ id, status, error }) => {
+    const title = id === null ? "Mark all as read" : rows.find((row) => row.id === id)?.title ?? "A notification";
+    const message = describeError(error, "the change could not be saved").message;
+    setFailures((current) => [...current, { key: Date.now() + Math.random(), id, status, what: title, message }]);
+  };
+  // A later save of the same row, or Mark all as read reading a row whose "Mark as read" failed, makes that failure moot.
+  const onSaved: NotificationSaved = ({ id, markedRead }) =>
+    setFailures((current) => current.filter((failure) => failure.id !== id && !(failure.status === "READ" && failure.id !== null && markedRead.includes(failure.id))));
+  const status = useNotificationStatus(credentialId, onFailure, onSaved);
+  const readAll = useReadAllNotifications(credentialId, projectName, onFailure, onSaved);
+  const saving = useSavingNotificationIds(credentialId);
   const count = (value: NotificationStatus) => rows.filter((row) => row.status === value).length;
   const unread = count("UNREAD");
   const shown = rows.filter((row) => row.status === tab);
-  const failure = status.error ?? readAll.error;
+  // A failed reload while a list is shown: the list is the last loaded one, not current.
+  const stale = Boolean(query.error && query.data);
 
   return (
     <Popover
       open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) {
-          status.reset();
-          readAll.reset();
-        }
-      }}
+      onOpenChange={setOpen}
     >
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={query.data ? `Notifications, ${unread} unread` : "Notifications"}
+          aria-label={
+            (stale ? `Notifications, could not refresh (${unread} unread when last loaded)` : query.data ? `Notifications, ${unread} unread` : "Notifications") +
+            (failures.length > 0 ? `, ${failures.length} ${failures.length === 1 ? "change" : "changes"} not saved` : "")
+          }
           className={cn(
             "inline-flex h-8 items-center gap-2 rounded-lg border px-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500",
             unread > 0 ? "border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100" : "border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -91,10 +109,21 @@ export function NotificationsMenu({ credentialId, projectName, dashboardToken, o
         >
           <Bell aria-hidden="true" className="size-4" />
           Notifications
-          {query.data ? (
-            <span className={cn("min-w-5 rounded-full px-1.5 text-center text-xs tabular-nums", unread > 0 ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500")}>{unread}</span>
+          {stale ? (
+            // The count may be out of date: not shown as if it were current.
+            <span aria-hidden="true" className="min-w-5 rounded-full bg-rose-100 px-1.5 text-center text-xs font-semibold text-rose-700">
+              !
+            </span>
+          ) : query.data ? (
+            <span className={cn("min-w-5 rounded-full px-1.5 text-center text-xs tabular-nums", unread > 0 ? "bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-200" : "bg-slate-100 text-slate-500")}>{unread}</span>
           ) : query.error ? (
             <span className="text-xs font-normal text-rose-700">could not load</span>
+          ) : null}
+          {failures.length > 0 && !stale ? (
+            // A change that was not saved: seen even after the popover closed.
+            <span aria-hidden="true" className="min-w-5 rounded-full bg-rose-100 px-1.5 text-center text-xs font-semibold text-rose-700">
+              !
+            </span>
           ) : null}
         </button>
       </PopoverTrigger>
@@ -144,10 +173,28 @@ export function NotificationsMenu({ credentialId, projectName, dashboardToken, o
           ) : null}
         </div>
 
-        {failure ? (
-          <p role="alert" className="border-b border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-800">
-            Not saved: {describeError(failure, "the change could not be saved").message}
-          </p>
+        {failures.length > 0 ? (
+          <div className="flex items-start justify-between gap-2 border-b border-rose-100 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+            <div role="alert" className="min-w-0 space-y-0.5">
+              {failures.map((failure) => (
+                <p key={failure.key}>
+                  Not saved: {failure.what}: {failure.message}
+                </p>
+              ))}
+            </div>
+            <button type="button" onClick={() => setFailures([])} aria-label="Dismiss: changes not saved" className="shrink-0 rounded px-1 font-medium text-rose-800 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-indigo-500">
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
+        {stale ? (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <span>Could not refresh: {describeError(query.error).message} Showing the last loaded list.</span>
+            <button type="button" onClick={() => void query.refetch()} disabled={query.isFetching} className="font-medium text-indigo-700 hover:underline disabled:opacity-60">
+              {query.isFetching ? "Retrying…" : "Try again"}
+            </button>
+          </div>
         ) : null}
 
         <div id="notifications-panel" role="tabpanel" aria-labelledby={`notifications-tab-${tab}`} className="max-h-96 overflow-y-auto">
@@ -156,12 +203,12 @@ export function NotificationsMenu({ credentialId, projectName, dashboardToken, o
           ) : query.error && !query.data ? (
             <div className="px-3 py-6 text-center text-sm text-slate-600">
               <p>Notifications could not be loaded: {describeError(query.error).message}</p>
-              <button type="button" onClick={() => void query.refetch()} className="mt-2 text-xs font-medium text-indigo-700 hover:underline">
-                Try again
+              <button type="button" onClick={() => void query.refetch()} disabled={query.isFetching} className="mt-2 text-xs font-medium text-indigo-700 hover:underline disabled:opacity-60">
+                {query.isFetching ? "Retrying…" : "Try again"}
               </button>
             </div>
           ) : shown.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-slate-500">{TABS.find((option) => option.status === tab)!.empty}</p>
+            <p className="px-3 py-6 text-center text-sm text-slate-500">{stale ? "None in the last loaded list." : TABS.find((option) => option.status === tab)!.empty}</p>
           ) : (
             <ul className="divide-y divide-slate-100">
               {shown.map((notification) => (
@@ -169,7 +216,7 @@ export function NotificationsMenu({ credentialId, projectName, dashboardToken, o
                   key={notification.id}
                   notification={notification}
                   credentialId={credentialId}
-                  busy={status.isPending && status.variables?.id === notification.id}
+                  busy={saving.includes(notification.id)}
                   onStatus={(next) => status.mutate({ id: notification.id, status: next })}
                   onOpen={() => {
                     setOpen(false);
@@ -180,7 +227,7 @@ export function NotificationsMenu({ credentialId, projectName, dashboardToken, o
             </ul>
           )}
         </div>
-        <p className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">Each one stays until its cause is fixed. Nothing here changes Azure DevOps.</p>
+        <p className="border-t border-slate-100 px-3 py-2 text-xs text-slate-500">Each one stays until its cause is fixed. Nothing here changes Azure DevOps.</p>
       </PopoverContent>
     </Popover>
   );
@@ -197,7 +244,7 @@ function NotificationRow({ notification, credentialId, busy, onStatus, onOpen }:
       <div className="min-w-0 flex-1">
         <p className={cn("line-clamp-2 text-sm", notification.status === "UNREAD" ? "font-medium text-slate-950" : "text-slate-700")}>{notification.title}</p>
         {notification.reasons.length > 0 ? <p className="mt-0.5 text-xs text-slate-600">{notification.reasons.map(pluralizeText).join(" · ")}</p> : null}
-        <p className="mt-0.5 text-[11px] text-slate-500">
+        <p className="mt-0.5 text-xs text-slate-500">
           {[notification.projectName, `since ${formatRelative(notification.firstSeenAt)}`].filter(Boolean).join(" · ")}
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -221,8 +268,8 @@ function NotificationRow({ notification, credentialId, busy, onStatus, onOpen }:
             </button>
           )}
           {notification.status !== "ABANDONED" ? (
-            <button type="button" disabled={busy} onClick={() => onStatus("ABANDONED")} aria-label={`Abandon: ${notification.title}`} className={cn(action, "text-slate-500 hover:text-rose-700")}>
-              Abandon
+            <button type="button" disabled={busy} onClick={() => onStatus("ABANDONED")} aria-label={`Dismiss: ${notification.title}`} className={cn(action, "text-slate-500 hover:text-rose-700")}>
+              Dismiss
             </button>
           ) : null}
         </div>

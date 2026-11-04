@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { cn } from "@/utils/cn";
 import { useConnectPlatform, type ConnectResult, type PlatformDefinition } from "../api/platform.api";
 import { CredentialAlert } from "./credential-alert";
@@ -66,7 +67,7 @@ export function PlatformForm({ platform, submitLabel, busyLabel = null, onSaved,
             return;
           }
 
-          setFormError(error instanceof ApiError ? error.message : `Could not add ${platform.label}. Please try again.`);
+          setFormError(errorMessage(error, `Could not add ${platform.label}. Please try again.`));
         },
       }
     );

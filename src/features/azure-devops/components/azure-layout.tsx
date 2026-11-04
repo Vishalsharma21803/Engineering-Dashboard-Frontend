@@ -1,13 +1,15 @@
 import { Search } from "lucide-react";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { NavLink, Outlet, useLocation, useMatch, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { Hint } from "@/components/ui/hint";
+import { PageLoader } from "@/components/ui/page-loader";
 import { SelectField } from "@/components/ui/select-field";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
 import { getCredentialDisplayName } from "@/features/credentials/utils/credential-display";
 import { cn } from "@/utils/cn";
+import { modKey } from "@/utils/platform";
 import { CommandPalette } from "./command-palette";
 import { useActions } from "../hooks/use-actions";
 import { useProjects } from "../hooks/use-projects";
@@ -156,7 +158,7 @@ export function AzureLayout() {
                 Approvals<span className="sr-only sm:not-sr-only"> & audit</span>
               </span>
               {pendingCount > 0 ? (
-                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-900 ring-1 ring-inset ring-amber-200">
                   {pendingCount}
                 </span>
               ) : pending.error && !pending.data ? (
@@ -177,7 +179,7 @@ export function AzureLayout() {
             >
               <Search aria-hidden="true" className="size-4" />
               Search
-              <kbd className="rounded border border-slate-200 px-1 text-[11px] text-slate-500">⌘K</kbd>
+              <kbd className="hidden rounded border border-slate-200 px-1 text-[11px] text-slate-500 sm:inline">{modKey}K</kbd>
             </button>
             <label htmlFor="credential-select" className="sr-only">
               Organization
@@ -231,16 +233,20 @@ export function AzureLayout() {
             Could not load your {credentials.error && !credentials.data ? "organizations" : "projects"} from {credentials.error && !credentials.data ? "Cockpit" : "Azure DevOps"}.
             <button
               type="button"
-              className="font-medium underline"
+              className="font-medium underline disabled:opacity-60"
+              disabled={credentials.isFetching || projects.isFetching}
               onClick={() => void (credentials.error ? credentials.refetch() : projects.refetch())}
             >
-              Try again
+              {credentials.isFetching || projects.isFetching ? "Retrying…" : "Try again"}
             </button>
           </div>
         ) : null}
       </div>
 
-      <Outlet />
+      {/* The cockpit header stays while a page loads. */}
+      <Suspense fallback={<PageLoader fullScreen={false} />}>
+        <Outlet />
+      </Suspense>
     </section>
   );
 }

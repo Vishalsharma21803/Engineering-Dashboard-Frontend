@@ -4,8 +4,23 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api-client";
-import { ErrorCard, SectionView, StaleDataBanner } from "../components/feedback";
+import { ErrorCard, ErrorToast, PartialReadNotice, SectionView, StaleDataBanner } from "../components/feedback";
 import { describeError } from "../utils/error-message";
+
+describe("PartialReadNotice", () => {
+  it("shows each non-empty message, in order, as a status note", () => {
+    render(<PartialReadNotice messages={["First part was cut.", null, undefined, "", "  ", "Second part failed."]} />);
+    const notice = screen.getByRole("status");
+    expect(notice.querySelectorAll("p")).toHaveLength(2);
+    expect(notice).toHaveTextContent("First part was cut.Second part failed.");
+  });
+
+  it("renders nothing when no message remains", () => {
+    const { container } = render(<PartialReadNotice messages={[null, undefined, ""]} />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
 
 describe("SectionView", () => {
   it("explains a missing scope", () => {
@@ -61,5 +76,16 @@ describe("StaleDataBanner", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Showing the last loaded data.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalled();
+  });
+});
+
+describe("ErrorToast", () => {
+  it("says what failed: a proposal by default, or the title it is given", () => {
+    const { rerender } = render(<ErrorToast message="Azure DevOps could not be reached." onDismiss={() => undefined} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not prepare the change");
+
+    rerender(<ErrorToast title="Could not save your mark" message="The server did not answer." onDismiss={() => undefined} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not save your mark");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Could not prepare the change");
   });
 });

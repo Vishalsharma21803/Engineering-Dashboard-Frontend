@@ -1,5 +1,6 @@
+import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Updating } from "@/components/ui/updating";
@@ -13,7 +14,7 @@ import { useProjects } from "../hooks/use-projects";
 import type { ActionListFilter, AuditEvent, ProposedAction } from "../types/action.types";
 import type { Page } from "../types/azure.types";
 import { formatDateTime, formatRelative } from "../utils/format";
-import { ACTION_STATUS_TONES, actionKindLabel, type Tone } from "../utils/labels";
+import { ACTION_STATUS_LABELS, ACTION_STATUS_TONES, actionKindLabel, type Tone } from "../utils/labels";
 
 const AUDIT_TONES: Record<AuditEvent, Tone> = {
   PROPOSED: "info",
@@ -38,7 +39,7 @@ function ActionRows({ actions, onReview }: { actions: ProposedAction[]; onReview
         <li key={action.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={ACTION_STATUS_TONES[action.status]}>{action.status}</StatusBadge>
+              <StatusBadge tone={ACTION_STATUS_TONES[action.status]}>{ACTION_STATUS_LABELS[action.status] ?? action.status}</StatusBadge>
               <span className="font-medium text-slate-950">{action.summary}</span>
             </div>
             <p className="mt-0.5 text-xs text-slate-500">
@@ -95,6 +96,8 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
   const pendingActions = pending.data?.items ?? [];
   const history = all.data?.items ?? [];
   const auditEntries = audit.data?.items ?? [];
+  // The standalone page has no tab of its own in the navigation: a way back to where it was opened from.
+  const fromTime = searchParams.get("from") === "time";
 
   return (
     <section className="flex w-full flex-col gap-6">
@@ -105,13 +108,20 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
               Showing changes for <span className="font-medium text-slate-900">{project.name}</span>. Choose “All projects” in the header to see every project.{" "}
             </>
           ) : null}
-          Every change to Azure DevOps is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
+          Every change Cockpit makes to Azure DevOps is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
         </p>
       ) : (
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Approvals & audit</h1>
+          <Link
+            to={fromTime ? "/time" : "/"}
+            className="inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-slate-500 outline-none transition hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          >
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            {fromTime ? "Back to Time" : "Back to Overview"}
+          </Link>
+          <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950">Approvals & audit</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Every change to Azure DevOps is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
+            Every change Cockpit makes to Azure DevOps or Solidtime is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
           </p>
         </div>
       )}
@@ -121,7 +131,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
           {pending.isLoading ? (
             <SkeletonRows rows={2} />
           ) : pending.error ? (
-            <ErrorCard error={pending.error} onRetry={() => void pending.refetch()} />
+            <ErrorCard error={pending.error} onRetry={() => void pending.refetch()} isRetrying={pending.isFetching} />
           ) : pendingActions.length === 0 ? (
             <EmptyState>No pending changes.</EmptyState>
           ) : (
@@ -136,7 +146,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
           {all.isLoading ? (
             <SkeletonRows rows={2} />
           ) : all.error ? (
-            <ErrorCard error={all.error} onRetry={() => void all.refetch()} />
+            <ErrorCard error={all.error} onRetry={() => void all.refetch()} isRetrying={all.isFetching} />
           ) : history.length === 0 ? (
             <EmptyState>No decided actions yet.</EmptyState>
           ) : (
@@ -151,7 +161,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
           {audit.isLoading ? (
             <SkeletonRows rows={3} />
           ) : audit.error ? (
-            <ErrorCard error={audit.error} onRetry={() => void audit.refetch()} />
+            <ErrorCard error={audit.error} onRetry={() => void audit.refetch()} isRetrying={audit.isFetching} />
           ) : auditEntries.length === 0 ? (
             <EmptyState>No audit entries yet.</EmptyState>
           ) : (

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { EmptyState } from "@/features/azure-devops/components/feedback";
 import { FilterBar } from "@/features/azure-devops/components/filter-bar";
 import type { CheckInfo, RuleListItem, RuleWhen } from "../types/rules-list.types";
@@ -71,9 +72,9 @@ export function RulesList({ scope, rules, checks, editable, baseVersion, onSaved
               {scope === "default" ? "Add rule" : "Add my rule"}
             </Button>
             {added ? (
-              <span role="status" className="text-sm text-emerald-700">
+              <StatusNotice as="span" className="text-sm text-emerald-700">
                 {added}
-              </span>
+              </StatusNotice>
             ) : null}
           </div>
         )

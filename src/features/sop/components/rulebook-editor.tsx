@@ -1,11 +1,15 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
 import { Spinner } from "@/components/ui/spinner";
 import { SelectField } from "@/components/ui/select-field";
+import { StatusNotice } from "@/components/ui/status-notice";
+import { useKeptUnsaved, useUnsavedStash } from "@/hooks/use-unsaved-stash";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { cn } from "@/utils/cn";
 import { getRulebookVersion, validateRulebook } from "../api/sop.api";
 import { useRulebookVersions, useSaveRulebook } from "../hooks/use-sop";
@@ -31,7 +35,11 @@ function lineOf(problem: RuleProblem): number | null {
 
 /** Markdown rule-card editor: live validation with line numbers, versions, import/export. */
 export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeholder }: RulebookEditorProps) {
-  const [content, setContent] = useState(initial.content);
+  // Text not saved when the session ended comes back; if the rules changed since, only when asked.
+  const kept = useKeptUnsaved<{ content: string; baseVersion: number }>(`rulebook:${scope}`);
+  const restorable = canSave && kept && kept.content !== initial.content ? kept : null;
+  const restoresNow = restorable !== null && restorable.baseVersion === initial.version;
+  const [content, setContent] = useState(restoresNow ? restorable.content : initial.content);
   const [note, setNote] = useState("");
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [validating, setValidating] = useState(false);
@@ -46,6 +54,13 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
   const fileRef = useRef<HTMLInputElement>(null);
   const versions = useRulebookVersions(scope);
   const save = useSaveRulebook(scope);
+  const dirty = content !== initial.content;
+  // Unsaved text survives a session expiry; it remembers the version it was based on.
+  const unsavedText = useMemo(() => (canSave && dirty ? { content, baseVersion: initial.version } : null), [canSave, dirty, content, initial.version]);
+  const unsaved = useUnsavedStash<{ content: string; baseVersion: number }>(`rulebook:${scope}`, unsavedText);
+  /** Text kept from before a sign-out, based on an older version: restored only if the user says so. */
+  const [staleStash, setStaleStash] = useState(restoresNow ? null : restorable);
+  const [restoredNotice, setRestoredNotice] = useState(restoresNow);
 
   useEffect(() => {
     // An older response must not overwrite the result for newer text (it could enable Save wrongly).
@@ -76,7 +91,6 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
 
   const problems = saveErrors.length > 0 ? saveErrors : (validation?.errors ?? []);
   const lineCount = Math.max(content.split("\n").length, 1);
-  const dirty = content !== initial.content;
 
   function jumpToLine(line: number) {
     const textarea = textareaRef.current;
@@ -98,6 +112,8 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
       { content, ...(note.trim() ? { note: note.trim() } : {}) },
       {
         onSuccess: (saved) => {
+          unsaved.drop();
+          setRestoredNotice(false);
           setNote("");
           setMessage({ tone: "success", text: `Saved as version ${saved.version}.` });
         },
@@ -105,7 +121,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
           if (error instanceof ApiError && error.errors.length > 0) {
             setSaveErrors(error.errors);
           }
-          setMessage({ tone: "error", text: error instanceof ApiError ? error.message : "Could not save." });
+          setMessage({ tone: "error", text: errorMessage(error, "Could not save.") });
         },
       }
     );
@@ -118,7 +134,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
       setSaveErrors([]);
       setMessage({ tone: "success", text: `Loaded version ${version} into the editor. Save to restore it as a new version.` });
     } catch (error) {
-      setMessage({ tone: "error", text: `Could not load that version${error instanceof ApiError ? `: ${error.message}` : "."}` });
+      setMessage({ tone: "error", text: `Could not load that version: ${errorMessage(error, "please try again.")}` });
     }
   }
 
@@ -195,7 +211,7 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
               </>
             ) : null}
             {dirty && canSave ? (
-              <Button size="sm" variant="ghost" onClick={() => { setContent(initial.content); setSaveErrors([]); }}>
+              <Button size="sm" variant="ghost" onClick={() => { setContent(initial.content); setSaveErrors([]); setRestoredNotice(false); unsaved.drop(); }}>
                 Discard changes
               </Button>
             ) : null}
@@ -207,22 +223,36 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
             <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{readOnlyReason}</p>
           ) : null}
 
-          <div role="group" aria-label="View" className="inline-flex w-fit rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            {(["rules", "markdown"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={view === value}
-                onClick={() => setView(value)}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition",
-                  view === value ? "bg-inverse text-on-inverse shadow-sm" : "text-slate-600 hover:text-slate-950"
-                )}
-              >
-                {value === "rules" ? `Rules (${cardCount})` : canSave ? "Edit Markdown" : "Markdown"}
-              </button>
-            ))}
-          </div>
+          {restoredNotice ? (
+            <StatusNotice className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Restored your unsaved edits from before you were signed out. Save them, or use Discard changes.
+            </StatusNotice>
+          ) : null}
+          {staleStash ? (
+            <StatusNotice className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              <span>
+                You have unsaved text from before you were signed out. It was based on version {staleStash.baseVersion}; the rules are now version {initial.version}, so restoring it would replace those changes when you save.
+              </span>
+              <span className="flex gap-2">
+                <Button size="sm" variant="secondary" onClick={() => { setContent(staleStash.content); setSaveErrors([]); setStaleStash(null); }}>
+                  Restore anyway
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { unsaved.drop(); setStaleStash(null); }}>
+                  Discard
+                </Button>
+              </span>
+            </StatusNotice>
+          ) : null}
+
+          <Segmented
+            label="View"
+            value={view}
+            options={[
+              { value: "rules", label: `Rules (${cardCount})` },
+              { value: "markdown", label: canSave ? "Edit Markdown" : "Markdown" },
+            ]}
+            onChange={setView}
+          />
 
           {view === "rules" ? (
             validation && cardCount > 0 ? (
@@ -315,9 +345,9 @@ export function RulebookEditor({ scope, initial, canSave, readOnlyReason, placeh
               </span>
             ) : null}
             {message ? (
-              <span role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-rose-600" : "text-emerald-700"}>
+              <StatusNotice as="span" alert={message.tone === "error"} className={message.tone === "error" ? "text-rose-600" : "text-emerald-700"}>
                 {message.text}
-              </span>
+              </StatusNotice>
             ) : null}
           </div>
 

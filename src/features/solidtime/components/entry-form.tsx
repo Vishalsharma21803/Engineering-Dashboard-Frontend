@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
   const catalog = useCatalog(connection.credentialId);
   const toInput = (iso: string) => (timeZone ? toZonedInput(iso, timeZone) : toLocalInput(iso));
   const fromInput = (value: string) => (timeZone ? fromZonedInput(value, timeZone) : fromLocalInput(value));
+  const descriptionHintId = useId();
   const [description, setDescription] = useState(entry?.description ?? "");
   const [projectId, setProjectId] = useState(entry?.projectId ?? "");
   const [taskId, setTaskId] = useState(entry?.taskId ?? "");
@@ -71,10 +72,15 @@ export function EntryForm({ connection, entry, onPropose, isProposing, onCancel,
 
   return (
     <form onSubmit={submit} aria-label={entry ? "Edit time entry" : "Add time entry"} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-2">
-      <label className="flex flex-col gap-1 text-sm text-slate-700 sm:col-span-2">
-        Description (include the ticket number, e.g. #21786)
-        <Input value={description} onChange={(event) => setDescription(event.target.value)} />
-      </label>
+      <div className="flex flex-col gap-1 sm:col-span-2">
+        <label className="flex flex-col gap-1 text-sm text-slate-700">
+          Description
+          <Input value={description} onChange={(event) => setDescription(event.target.value)} aria-describedby={descriptionHintId} />
+        </label>
+        <p id={descriptionHintId} className="text-xs text-slate-500">
+          Name the ticket as #12345 (or any 4+ digit ticket number).
+        </p>
+      </div>
       <label className="flex flex-col gap-1 text-sm text-slate-700">
         Project
         <SelectField

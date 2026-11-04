@@ -19,6 +19,7 @@ const REASONS: Record<string, string> = {
     "OpenCode allows its free models only inside the OpenCode app (from other apps it always answers \"free usage limit reached\"). Choose a paid OpenCode model (needs credit or OpenCode Go), Claude, or OpenRouter on the Credentials page.",
   PROJECT_NOT_CONFIGURED: "This project is not set up for SOP checks, or you switched it off (SOP rules → Projects).",
   CREDENTIAL_NOT_FOUND: "The Azure DevOps connection was removed.",
+  AI_REQUEST_REJECTED: "The AI provider rejected this check. Change the model or settings; it will not be retried automatically.",
 };
 
 export function describeAiCheckReason(reason: string | null): string {

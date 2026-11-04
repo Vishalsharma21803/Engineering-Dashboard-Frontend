@@ -2,9 +2,9 @@ import { apiRequest } from "@/lib/api-client";
 import type { CockpitNotification, NotificationStatus } from "../types/notification.types";
 
 /** Stored in Cockpit only; none of these calls change Azure DevOps or Solidtime. */
-export async function listNotifications(credentialId: string, projectName: string | undefined) {
+export async function listNotifications(credentialId: string, projectName: string | undefined, signal?: AbortSignal) {
   const query = new URLSearchParams({ credentialId, ...(projectName ? { projectName } : {}) });
-  const response = await apiRequest<{ notifications: CockpitNotification[] }>(`/api/notifications?${query.toString()}`);
+  const response = await apiRequest<{ notifications: CockpitNotification[] }>(`/api/notifications?${query.toString()}`, { signal });
   return response.notifications;
 }
 

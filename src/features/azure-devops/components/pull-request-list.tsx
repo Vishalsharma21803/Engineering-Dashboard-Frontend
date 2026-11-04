@@ -15,7 +15,7 @@ import { formatRelative } from "../utils/format";
 import { voteFromValue } from "../utils/labels";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { UNTRIAGED, movedByPendingMark, pullRequestKey } from "../utils/triage";
-import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "./feedback";
+import { EmptyState, ErrorCard, PartialReadNotice, SkeletonRows, StaleDataBanner } from "./feedback";
 import { FilterBar } from "./filter-bar";
 import { StatusBadge } from "./status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
@@ -87,17 +87,19 @@ export function PullRequestList(props: PullRequestListProps) {
   }
 
   if (!query.data) {
-    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
   }
 
   const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   const data = query.data;
   const hiddenCount = data.hiddenCount ?? 0;
+  const partial = <PartialReadNotice className="mb-3" messages={[data.completeness?.note]} />;
 
   if (data.poolTotal === 0 && hiddenCount === 0) {
     return (
       <>
         {stale}
+        {partial}
         <EmptyState>{team ? "No active pull requests in this project." : "No active pull requests authored by you or awaiting your review."}</EmptyState>
       </>
     );
@@ -112,6 +114,7 @@ export function PullRequestList(props: PullRequestListProps) {
   return (
     <>
       {stale}
+      {partial}
       <div className="space-y-3">
         {/* Filters only help once there is more than one page to look through. */}
         {data.poolTotal > data.pageSize || searchInput || Object.values(filters).some(Boolean) ? (

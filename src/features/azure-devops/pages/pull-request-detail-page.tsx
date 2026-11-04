@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 
-import { EmptyState, ErrorCard, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
+import { ApiError } from "@/lib/api-client";
+import { EmptyState, ErrorCard, NotFoundCard, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
 import { StatusBadge } from "../components/status-badge";
 import { usePullRequest } from "../hooks/use-pull-requests";
 import { formatRelative } from "../utils/format";
@@ -17,7 +18,18 @@ export function PullRequestDetailPage() {
 
   if (isLoading) return <SkeletonRows rows={5} />;
   if (!pr) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    // Only Azure's own "not found": a 404 for any other reason (e.g. an unknown API route) keeps the general error.
+    if (error instanceof ApiError && error.reason === "AZURE_NOT_FOUND") {
+      return (
+        <NotFoundCard
+          title={`Pull request ${id} doesn't exist or you can't see it`}
+          text="It may have been deleted or moved, or your token can't see it."
+          backTo={`/azure/${encodeURIComponent(credentialId)}`}
+          backLabel="Back to My work"
+        />
+      );
+    }
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   const base = `/azure/${encodeURIComponent(credentialId)}`;
@@ -95,17 +107,27 @@ export function PullRequestDetailPage() {
               ids.length === 0 ? (
                 <EmptyState>No work items linked.</EmptyState>
               ) : (
-                <ul className="flex flex-wrap gap-2">
-                  {ids.map((id) => (
-                    <li key={id}>
-                      <Link
-                        to={`${base}/projects/${encodeURIComponent(pr.projectName)}/work-items/${id}`}
-                        className="text-sm font-medium text-indigo-600 hover:text-indigo-500"
-                      >
-                        #{id}
-                      </Link>
-                    </li>
-                  ))}
+                <ul className="space-y-2">
+                  {ids.map((id) => {
+                    // Deleted, not visible to the token, or the titles could not be read: the id alone.
+                    const linked = pr.linkedWorkItems?.find((item) => item.id === id);
+                    return (
+                      <li key={id} className="min-w-0 text-sm">
+                        <Link
+                          to={`${base}/projects/${encodeURIComponent(pr.projectName)}/work-items/${id}`}
+                          className="break-words font-medium text-indigo-600 hover:text-indigo-500"
+                        >
+                          #{id}
+                          {linked ? ` ${linked.title}` : ""}
+                        </Link>
+                        {linked ? (
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {linked.type} · {linked.state}
+                          </p>
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
               )
             }

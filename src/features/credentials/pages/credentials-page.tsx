@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/page-loader";
 import { StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { CredentialAlert } from "../components/credential-alert";
 import { CredentialCard } from "../components/credential-card";
 import type { CardNotice } from "../components/credential-card-frame";
@@ -171,10 +172,7 @@ export function CredentialsPage() {
 
         setCardNotice({ id: credential.id,
           tone: "error",
-          message:
-            mutationError instanceof ApiError
-              ? mutationError.message
-              : "Unable to validate the credential.",
+          message: errorMessage(mutationError, "Unable to validate the credential."),
         });
       },
     });
@@ -226,10 +224,7 @@ export function CredentialsPage() {
 
         setNotice({
           tone: "error",
-          message:
-            mutationError instanceof ApiError
-              ? mutationError.message
-              : "Unable to delete the credential.",
+          message: errorMessage(mutationError, "Unable to delete the credential."),
         });
       },
     });
@@ -293,9 +288,7 @@ export function CredentialsPage() {
               Unable to load credentials
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              {error instanceof ApiError
-                ? error.message
-                : "Something went wrong while loading your credentials."}
+              {errorMessage(error, "Something went wrong while loading your credentials.")}
             </p>
             <Button
               variant="secondary"

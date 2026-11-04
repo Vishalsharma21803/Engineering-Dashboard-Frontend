@@ -2,14 +2,16 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { mockBackend, renderWithProviders } from "@/test/render";
+import { mockBackend, renderWithProviders, type MockRoute } from "@/test/render";
 import { DashboardPage } from "../pages/dashboard-page";
 import { CREDENTIAL_ID, attentionFor, dashboard, dashboardListBody, pageOf, pendingAction } from "./fixtures";
 
 const base = `/api/azure/${CREDENTIAL_ID}`;
 
-function setup(served = dashboard) {
+/** `myWorkPatch` changes the My work page; `routes` replace the canned ones (matched first). */
+function setup(served = dashboard, { myWorkPatch = {}, routes = [] }: { myWorkPatch?: Record<string, unknown>; routes?: MockRoute[] } = {}) {
   const calls = mockBackend([
+    ...routes,
     { path: `${base}/dashboard`, body: { dashboard: served } },
     {
       path: `${base}/my-work`,
@@ -35,6 +37,7 @@ function setup(served = dashboard) {
           closed: { included: false, count: 0 },
           attention: { only: false, count: 1 },
           facets: { types: [], states: [], priorities: [], sop: [] },
+          ...myWorkPatch,
         },
       },
     },
@@ -134,5 +137,45 @@ describe("DashboardPage", () => {
       },
     ]);
     expect(calls.some((call) => call.url.includes("/approve"))).toBe(false);
+  });
+
+  it("says once, in My work, that the ticket list was cut and states were guessed", async () => {
+    const partial = { workItemsTruncated: { cap: 200 }, stateLookupFailed: ["Bug in Alpha"] };
+    setup({ ...dashboard, ...partial }, { myWorkPatch: partial });
+
+    const myWork = await screen.findByRole("list", { name: "My work items" });
+    expect(myWork).toBeInTheDocument();
+    expect(screen.getAllByText("Showing the 200 most recently changed tickets; older ones are not listed or checked.")).toHaveLength(1);
+    expect(screen.getAllByText("Ticket states for Bug in Alpha could not be read from Azure DevOps; open/closed is guessed from the state name.")).toHaveLength(1);
+  });
+
+  it("shows the dashboard's notices when My work itself could not be loaded", async () => {
+    setup(
+      { ...dashboard, workItemsTruncated: { cap: 200 }, stateLookupFailed: ["Bug in Alpha"] },
+      { routes: [{ path: `${base}/my-work`, status: 400, body: { message: "Bad request" } }] }
+    );
+
+    expect(await screen.findByText("Showing the 200 most recently changed tickets; older ones are not listed or checked.")).toBeInTheDocument();
+    expect(screen.getByText("Ticket states for Bug in Alpha could not be read from Azure DevOps; open/closed is guessed from the state name.")).toBeInTheDocument();
+  });
+
+  it("shows what the pull request and pipeline lists left out", async () => {
+    const completeness = (note: string) => ({ truncated: false, cap: 100, failedProjects: ["Beta"], note });
+    // The fixture's PAT cannot read pipelines; here it can.
+    setup({ ...dashboard, sections: { ...dashboard.sections, pipelines: { status: "ok", reason: null, data: [] } } }, {
+      routes: [
+        {
+          path: `${base}/dashboard/pull-requests`,
+          body: { pullRequests: { ...pageOf([]), poolTotal: 0, hiddenCount: 0, showingHidden: false, facets: { person: [], review: [], repositories: [] }, completeness: completeness("Pull requests of Beta could not be read.") } },
+        },
+        {
+          path: `${base}/dashboard/pipeline-runs`,
+          body: { runs: { ...pageOf([]), poolTotal: 0, hiddenCount: 0, showingHidden: false, facets: { results: [] }, completeness: completeness("Pipeline runs of Beta could not be read.") } },
+        },
+      ],
+    });
+
+    expect(await screen.findByText("Pull requests of Beta could not be read.")).toBeInTheDocument();
+    expect(await screen.findByText("Pipeline runs of Beta could not be read.")).toBeInTheDocument();
   });
 });

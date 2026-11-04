@@ -134,8 +134,10 @@ export interface SopReportRunSummary {
   itemsChecked: number;
   itemsWithGaps: number;
   createdAt: string;
-  /** Whose Solidtime hours the run includes: "team", "mine", or null (no Solidtime linked). */
-  timeScope: "team" | "mine" | null;
+  /** Whose Solidtime hours the run includes: "team", "mine", "unavailable" (Solidtime could not be read), or null (no Solidtime linked). */
+  timeScope: "team" | "mine" | "unavailable" | null;
+  /** Only the 200 most recently changed tickets were checked (more existed). */
+  truncated?: boolean;
 }
 
 export type SopReportRole = "tl" | "qa" | "po" | "developer";
@@ -197,12 +199,15 @@ export interface ProjectSettings {
 export interface ProjectSetUp {
   projectName: string;
   settings: ProjectSettings;
+  /** Who set it up (display name); null for set-ups moved from the old rulebook. */
   createdBy: string | null;
   updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
   /** Whether SOP checks run on this project for the signed-in user. */
   checkedForMe: boolean;
+  /** Whether the signed-in user may change or remove it (its creator or an SOP owner). Missing from older servers. */
+  canEdit?: boolean;
 }
 
 export interface AzureSopProject {

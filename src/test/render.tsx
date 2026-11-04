@@ -36,6 +36,11 @@ export function mockBackend(routes: MockRoute[]) {
     const method = init?.method ?? "GET";
     calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : null });
 
+    // Like real fetch: an aborted request (timeout or cancelled query) rejects.
+    if (init?.signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+
     const route = routes.find(
       (candidate) =>
         (candidate.method ?? "GET") === method &&

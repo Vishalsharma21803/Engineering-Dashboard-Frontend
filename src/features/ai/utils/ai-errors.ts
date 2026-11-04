@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 
 const VALIDATION_REASONS: Record<string, string> = {
   AI_KEY_INVALID: "The provider rejected this key. Check it was copied correctly and hasn't been revoked.",
@@ -12,7 +13,7 @@ export function describeValidationFailure(reason: string): string {
 export function describeAiError(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     const field = error.errors[0]?.message;
-    return field ?? error.message ?? fallback;
+    return field ?? errorMessage(error, fallback);
   }
 
   return error instanceof Error && error.message ? `${fallback} (${error.message})` : fallback;

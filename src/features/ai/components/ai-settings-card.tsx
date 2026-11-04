@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { SelectField } from "@/components/ui/select-field";
 import { Checkbox } from "@/components/ui/checkbox";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { ErrorCard, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { cn } from "@/utils/cn";
 import { useAiCredentials, useAiModels, useAiPreference, useAiUsage, useUpdateAiPreference } from "../hooks/use-ai";
@@ -283,9 +284,9 @@ function AiSettingsForm({ initial }: { initial: AiPreference }) {
         <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-h-5 text-xs">
             {message ? (
-              <span role={message.tone === "error" ? "alert" : "status"} className={message.tone === "error" ? "text-sm text-rose-600" : "text-sm text-emerald-700"}>
+              <StatusNotice as="span" alert={message.tone === "error"} className={message.tone === "error" ? "text-sm text-rose-600" : "text-sm text-emerald-700"}>
                 {message.text}
-              </span>
+              </StatusNotice>
             ) : changed && !save.isPending ? (
               <span className="text-amber-700">{valid ? "Unsaved changes" : "Unsaved changes: choose a model, accept the data notice if shown, and use a limit from 0 to 100"}</span>
             ) : !changed && initial.updatedAt ? (

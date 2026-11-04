@@ -3,10 +3,11 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
-import { EmptyState, ErrorCard, SectionCard, StaleDataBanner, StatTile } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, PartialReadNotice, SectionCard, StaleDataBanner, StatTile } from "@/features/azure-devops/components/feedback";
 import { FilterBar } from "@/features/azure-devops/components/filter-bar";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { formatDateTime, formatRelative } from "@/features/azure-devops/utils/format";
@@ -65,6 +66,8 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
       // The new run is the newest: show it, with the saved list back on its first page.
       selectRun(created.id, { extra: { runsPage: null } });
     },
+    // A run that timed out may still have been saved: the list shows it before anyone runs it again.
+    onError: () => void queryClient.invalidateQueries({ queryKey: sopKeys.reportRuns(credentialId, projectId) }),
   });
 
   const remove = useMutation({
@@ -79,6 +82,8 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
     },
   });
   const [runsOpen, setRunsOpen] = useState(runsPageParam.page > 1);
+  // The saved report waiting for "Delete report" in the confirm dialog.
+  const [confirmingDelete, setConfirmingDelete] = useState<{ id: string; createdAt: string } | null>(null);
 
   const notSetUp = run.error instanceof ApiError && run.error.reason === "SOP_PROJECT_NOT_SET_UP";
 
@@ -102,7 +107,7 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
             </Link>
           </p>
         ) : run.error ? (
-          <ErrorCard error={run.error} credentialId={credentialId} onRetry={() => run.mutate()} />
+          <ErrorCard error={run.error} credentialId={credentialId} onRetry={() => run.mutate()} isRetrying={run.isPending} />
         ) : null}
         {run.isPending ? <p className="text-sm text-slate-500">Checking every ticket in the project; this can take a minute.</p> : null}
 
@@ -110,7 +115,7 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
           <StaleDataBanner credentialId={credentialId} error={runs.error} onRetry={() => void runs.refetch()} isRetrying={runs.isFetching} />
         ) : null}
         {runs.error && !runs.data ? (
-          <ErrorCard error={runs.error} credentialId={credentialId} onRetry={() => void runs.refetch()} />
+          <ErrorCard error={runs.error} credentialId={credentialId} onRetry={() => void runs.refetch()} isRetrying={runs.isFetching} />
         ) : !runs.data ? (
           <p className="flex items-center gap-2 text-sm text-slate-500">
             <Spinner className="size-4" /> Loading your saved reports…
@@ -139,9 +144,8 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
                           disabled={remove.isPending}
                           aria-label={`Delete the report from ${formatDateTime(item.createdAt)}`}
                           onClick={() => {
-                            if (window.confirm(`Delete the report from ${formatDateTime(item.createdAt)}? This cannot be undone.`)) {
-                              remove.mutate(item.id);
-                            }
+                            remove.reset();
+                            setConfirmingDelete({ id: item.id, createdAt: item.createdAt });
                           }}
                         >
                           Delete
@@ -161,7 +165,23 @@ export function SopReportCard({ credentialId, projectId }: CardProps) {
                 />
               </Updating>
             </details>
-            {remove.error ? <p role="alert" className="text-sm text-rose-600">Could not delete that report: {remove.error.message}</p> : null}
+            {remove.error && !confirmingDelete ? <p role="alert" className="text-sm text-rose-600">Could not delete that report: {remove.error.message}</p> : null}
+            <ConfirmDialog
+              open={confirmingDelete !== null}
+              title={confirmingDelete ? `Delete the report from ${formatDateTime(confirmingDelete.createdAt)}?` : "Delete the report?"}
+              description="This cannot be undone."
+              confirmLabel="Delete report"
+              pendingLabel="Deleting…"
+              destructive
+              isPending={remove.isPending}
+              error={remove.error ? `Could not delete that report: ${remove.error.message}` : null}
+              onConfirm={() => {
+                if (confirmingDelete) remove.mutate(confirmingDelete.id, { onSuccess: () => setConfirmingDelete(null) });
+              }}
+              onOpenChange={(open) => {
+                if (!open) setConfirmingDelete(null);
+              }}
+            />
 
             {runId ? (
               <ReportRun key={runId} credentialId={credentialId} projectId={projectId} runId={runId} onMissing={() => selectRun(null, { replace: true })} />
@@ -204,7 +224,7 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
 
   if (report.error || !report.data) {
     return report.error ? (
-      <ErrorCard error={report.error} credentialId={credentialId} onRetry={() => void report.refetch()} />
+      <ErrorCard error={report.error} credentialId={credentialId} onRetry={() => void report.refetch()} isRetrying={report.isFetching} />
     ) : (
       <p className="flex items-center gap-2 text-sm text-slate-500">
         <Spinner className="size-4" /> Loading the report…
@@ -220,6 +240,8 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
     toFirstPages();
   };
   const base = `/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(projectId)}/work-items`;
+  // "unavailable": Solidtime could not be read for this run, so hours are unknown (never shown as 0 h).
+  const hasTime = data.run.timeScope === "team" || data.run.timeScope === "mine";
 
   return (
     <div className="flex flex-col gap-5">
@@ -238,6 +260,7 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
           toFirstPages();
         }}
       />
+      <PartialReadNotice messages={[data.run.truncated ? "Only the 200 most recently changed tickets were checked." : null]} />
       <Updating active={report.isPlaceholderData}>
         {data.facets.roles.every((role) => role.value === "developer") ? (
           <p className="text-xs text-slate-500">
@@ -250,7 +273,9 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
           <StatTile label="With SOP gaps" value={data.itemsWithGaps} />
           <StatTile label="Compliant" value={percent(data.compliantShare)} />
           <StatTile label="Run" value={<span className="text-base">{formatRelative(data.run.createdAt)}</span>} hint={formatDateTime(data.run.createdAt)} />
-          {data.trackedHours !== null ? (
+          {data.run.timeScope === "unavailable" ? (
+            <StatTile label="Tracked (Solidtime)" value="Unknown" hint="Solidtime could not be read when this run was made" />
+          ) : hasTime && data.trackedHours !== null ? (
             <StatTile label="Tracked (Solidtime)" value={`${data.trackedHours} h`} hint={data.run.timeScope === "team" ? "whole team" : "your own time only"} />
           ) : null}
         </div>
@@ -300,7 +325,7 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
                     <th className="px-3 py-2 text-right font-medium">Tickets</th>
                     <th className="px-3 py-2 text-right font-medium">With gaps</th>
                     <th className="px-3 py-2 text-right font-medium">Gaps</th>
-                    {data.run.timeScope ? <th className="px-3 py-2 text-right font-medium">Tracked</th> : null}
+                    {hasTime ? <th className="px-3 py-2 text-right font-medium">Tracked</th> : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -313,7 +338,7 @@ function ReportRun({ credentialId, projectId, runId, onMissing }: CardProps & { 
                       <td className="px-3 py-2 text-right text-slate-600">{person.items}</td>
                       <td className="px-3 py-2 text-right text-slate-600">{person.itemsWithGaps}</td>
                       <td className="px-3 py-2 text-right font-medium text-slate-900">{person.gaps}</td>
-                      {data.run.timeScope ? <td className="px-3 py-2 text-right text-slate-600">{person.trackedHours ?? 0} h</td> : null}
+                      {hasTime ? <td className="px-3 py-2 text-right text-slate-600">{person.trackedHours ?? 0} h</td> : null}
                     </tr>
                   ))}
                 </tbody>

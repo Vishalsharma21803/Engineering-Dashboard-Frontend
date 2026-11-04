@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Card } from "@/components/ui/card";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { cn } from "@/utils/cn";
 import type { Section } from "../types/azure.types";
 import { describeError } from "../utils/error-message";
@@ -42,6 +43,21 @@ export function ErrorCard({ error, credentialId, onRetry, isRetrying }: ErrorCar
   );
 }
 
+/** Azure DevOps has no such ticket or pull request (or the token cannot see it): retrying would not help, so no Try again. */
+export function NotFoundCard({ title, text, backTo, backLabel }: { title: string; text: string; backTo: string; backLabel: string }) {
+  return (
+    <Card role="alert" className="p-5">
+      <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+      <p className="mt-1.5 text-sm leading-6 text-slate-600">{text}</p>
+      <div className="mt-4">
+        <Link to={backTo} className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-indigo-600 hover:bg-indigo-50">
+          {backLabel}
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 /**
  * A refetch failed but earlier data is still on screen: say so above it,
  * instead of replacing the page (and anything typed into it) with an error.
@@ -68,6 +84,28 @@ export function StaleDataBanner({ error, onRetry, isRetrying, credentialId }: { 
         </Button>
       </span>
     </div>
+  );
+}
+
+export interface PartialReadNoticeProps {
+  /** Sentences to show, in order; null/undefined/"" entries are skipped. Renders nothing when none remain. */
+  messages: Array<string | null | undefined>;
+  className?: string;
+}
+
+/** Part of a list could not be read or was cut at a cap: say so calmly above it. */
+export function PartialReadNotice({ messages, className }: PartialReadNoticeProps) {
+  const shown = messages.filter((message): message is string => typeof message === "string" && message.trim() !== "");
+  if (shown.length === 0) {
+    return null;
+  }
+
+  return (
+    <StatusNotice className={cn("flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm break-words text-amber-800", className)}>
+      {shown.map((message, index) => (
+        <p key={index}>{message}</p>
+      ))}
+    </StatusNotice>
   );
 }
 
@@ -190,7 +228,7 @@ export function StatTile({ label, value, hint }: { label: string; value: ReactNo
 }
 
 /** Proposal errors float above the page so they are seen wherever the button was clicked. */
-export function ErrorToast({ message, onDismiss }: { message: string | null; onDismiss: () => void }) {
+export function ErrorToast({ message, onDismiss, title = "Could not prepare the change" }: { message: string | null; onDismiss: () => void; title?: string }) {
   if (!message) {
     return null;
   }
@@ -202,7 +240,7 @@ export function ErrorToast({ message, onDismiss }: { message: string | null; onD
     >
       <span aria-hidden="true" className="mt-0.5 size-2.5 shrink-0 rounded-full bg-rose-500" />
       <div className="flex-1">
-        <p className="font-semibold text-slate-950">Could not prepare the change</p>
+        <p className="font-semibold text-slate-950">{title}</p>
         <p className="mt-0.5 text-slate-600">{message}</p>
       </div>
       <button

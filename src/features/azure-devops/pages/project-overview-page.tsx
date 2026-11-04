@@ -1,16 +1,16 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SopReportCard } from "@/features/sop/components/sop-report-card";
 import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
+import { Segmented } from "@/components/ui/segmented";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Updating } from "@/components/ui/updating";
-import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
+import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
 import { useUrlTab } from "@/hooks/use-url-tab";
-import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { DeploymentsPanel } from "../components/deployments-panel";
@@ -26,8 +26,8 @@ import type { Page, Section } from "../types/azure.types";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { formatDateTime } from "../utils/format";
 
-/** One figure of the summary line; "no access" or "—" when the PAT or Azure did not allow it. */
-function Count({ section, one, many }: { section: Section<number>; one: string; many: string }) {
+/** One figure of the summary line; "no access" or "—" when the PAT or Azure did not allow it; "n+" when the read hit its cap. */
+function Count({ section, one, many, truncated = false }: { section: Section<number>; one: string; many: string; truncated?: boolean | undefined }) {
   const value = section.status === "forbidden" ? null : section.status === "error" ? null : section.data;
   return (
     <span className="whitespace-nowrap">
@@ -35,7 +35,8 @@ function Count({ section, one, many }: { section: Section<number>; one: string; 
         <span className="text-amber-700">No access to {many}</span>
       ) : (
         <>
-          <span className="font-semibold text-slate-950 tabular-nums">{value ?? "—"}</span> <span className="text-slate-600">{value === 1 ? one : many}</span>
+          <span className="font-semibold text-slate-950 tabular-nums">{value === null ? "—" : truncated ? `${value}+` : value}</span>{" "}
+          <span className="text-slate-600">{value === 1 && !truncated ? one : many}</span>
         </>
       )}
     </span>
@@ -79,7 +80,7 @@ function PagedList<T>({
   useSyncServedPage(pageParam, query.isPlaceholderData ? undefined : query.data?.page);
 
   if (query.isLoading) return <SkeletonRows rows={2} />;
-  if (!query.data) return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+  if (!query.data) return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
   const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   if (query.data.total === 0) {
     return (
@@ -150,40 +151,33 @@ function TeamsList({ credentialId, projectId }: { credentialId: string; projectI
 }
 
 function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; projectId: string }) {
-  const [state, setState] = useState<"open" | "all">("open");
-  const { setPage } = usePageParam("page");
+  const [searchParams] = useSearchParams();
+  const updateParams = useSearchParamsUpdate();
+  // Kept in the URL (?show=recent), so a reload or a shared link keeps the choice.
+  const show = searchParams.get("show") === "recent" ? "recent" : "open";
   const identity = useCapabilities(credentialId).data?.identity ?? null;
 
   return (
     <SectionCard
       title="Team work items"
-      help="Everyone's work items in this project, grouped under their user story, most recently changed first (up to 200)."
+      help="Everyone's work items in this project under their user story, most recently changed first. Open: not done. Recently changed: anything changed in the last 90 days. Up to 1000 items."
       actions={
         <div className="flex shrink-0 items-center gap-2">
           <span aria-hidden="true" className="text-xs font-medium text-slate-500">Show:</span>
-          <div role="group" aria-label="State" className="inline-flex rounded-lg border border-slate-200 p-0.5">
-            {(["open", "all"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={state === value}
-                onClick={() => {
-                  setState(value);
-                  setPage(1, { replace: true });
-                }}
-                className={cn(
-                  "rounded-md px-3 py-1 text-xs font-medium transition",
-                  state === value ? "bg-inverse text-on-inverse" : "text-slate-600 hover:text-slate-950"
-                )}
-              >
-                {value === "open" ? "Open" : "Changed in last 90 days"}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="State"
+            size="sm"
+            value={show}
+            options={[
+              { value: "open", label: "Open" },
+              { value: "recent", label: "Recently changed" },
+            ]}
+            onChange={(value) => updateParams({ show: value === "open" ? null : value, page: null }, { replace: true })}
+          />
         </div>
       }
     >
-      <TeamWorkTable credentialId={credentialId} projectId={projectId} scope={state} myId={identity?.id ?? null} />
+      <TeamWorkTable credentialId={credentialId} projectId={projectId} scope={show === "recent" ? "all" : "open"} myId={identity?.id ?? null} />
     </SectionCard>
   );
 }
@@ -208,7 +202,7 @@ export function ProjectOverviewPage() {
 
   if (isLoading) return <SkeletonRows rows={5} />;
   if (!project) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   return (
@@ -233,9 +227,9 @@ export function ProjectOverviewPage() {
       </div>
 
       <div role="group" aria-label="Summary" className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-slate-200 bg-surface px-4 py-2.5 text-sm shadow-sm">
-        <Count section={project.counts.myOpenWorkItems} one="open item of yours" many="open items of yours" />
-        <Count section={project.counts.activePullRequests} one="active pull request" many="active pull requests" />
-        <Count section={project.counts.failingPipelines} one="failing pipeline" many="failing pipelines" />
+        <Count section={project.counts.myOpenWorkItems} one="open item of yours" many="open items of yours" truncated={project.myOpenWorkItemsTruncated} />
+        <Count section={project.counts.activePullRequests} one="active pull request" many="active pull requests" truncated={project.activePullRequestsTruncated} />
+        <Count section={project.counts.failingPipelines} one="failing pipeline" many="failing pipelines" truncated={project.failingPipelinesTruncated} />
         <Count section={project.counts.repositories} one="repository" many="repositories" />
         {project.currentIteration.status === "ok" && project.currentIteration.data ? (
           <span className="whitespace-nowrap text-slate-600">

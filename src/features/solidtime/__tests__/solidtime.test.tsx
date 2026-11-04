@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import { AuthContext } from "@/features/auth/context/auth-context";
 import { mockBackend, renderWithProviders } from "@/test/render";
 import { SolidtimeConnectionsSection } from "../components/solidtime-connections-section";
 import { TicketTimerButton } from "../components/ticket-timer-button";
@@ -205,12 +206,65 @@ describe("DraftTab", () => {
     expect(button).toHaveAccessibleDescription(/Nothing to check/);
   });
 
+  it("keeps unsaved edits through a sign-out and brings them back on the same day", async () => {
+    window.sessionStorage.clear();
+    const signedIn = { user: { id: "u1", name: "Ada", email: "ada@example.com" }, isAuthenticated: true, isLoading: false };
+    const withUser = () => (
+      <AuthContext.Provider value={signedIn}>
+        <DraftTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />
+      </AuthContext.Provider>
+    );
+    mockBackend([{ path: `${base}/catalog`, body: catalog }, { path: `${base}/draft`, body: { draft } }]);
+    const first = renderWithProviders(withUser());
+    const list = await screen.findByRole("list", { name: "Drafted entries" });
+    await userEvent.clear(within(list).getByLabelText("Description for #102"));
+    await userEvent.type(within(list).getByLabelText("Description for #102"), "Pairing on the flaky test");
+    // The session expires: the redirect unmounts the tab right after typing.
+    first.unmount();
+
+    renderWithProviders(withUser());
+    const restored = await screen.findByRole("list", { name: "Drafted entries" });
+    expect(within(restored).getByLabelText("Description for #102")).toHaveValue("Pairing on the flaky test");
+    expect(screen.getByText("Restored your unsaved edits from before you were signed out.")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Discard" }));
+    expect(within(restored).getByLabelText("Description for #102")).toHaveValue("#102 Fix flaky test");
+    window.sessionStorage.clear();
+  });
+
   it("points to the AI settings when no model is set up", async () => {
     render([{ method: "POST", path: `${base}/draft/estimate`, status: 422, body: { message: "Choose an AI provider and model on the Credentials page first", reason: "AI_NOT_CONFIGURED" } }]);
     await screen.findByRole("list", { name: "Drafted entries" });
     await userEvent.click(screen.getByRole("button", { name: "Check hours with AI" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Choose an AI provider");
     expect(screen.getByRole("link", { name: "Open AI settings" })).toHaveAttribute("href", "/credentials");
+  });
+
+  const renderDraft = (served: Record<string, unknown>) => {
+    mockBackend([{ path: `${base}/catalog`, body: catalog }, { path: `${base}/draft`, body: { draft: { ...draft, ...served } } }]);
+    renderWithProviders(<DraftTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+  };
+
+  it("says when more tickets were changed since the day than were checked", async () => {
+    renderDraft({ truncated: true, truncatedReason: "scan" });
+    expect(await screen.findByText("More than 200 tickets you changed since this day were found; only the 200 most recent were checked.")).toBeInTheDocument();
+  });
+
+  it("says when only the 50 most recently changed tickets are shown", async () => {
+    renderDraft({ truncated: true, truncatedReason: "rows" });
+    expect(await screen.findByText("Only the 50 most recently changed tickets are shown.")).toBeInTheDocument();
+  });
+
+  it("shows every warning about reads that failed or were cut", async () => {
+    renderDraft({ warnings: ["Solidtime projects could not be read; choose projects yourself.", "Comments on #103 could not be read; its activity may be incomplete."] });
+    expect(await screen.findByText("Solidtime projects could not be read; choose projects yourself.")).toBeInTheDocument();
+    expect(screen.getByText("Comments on #103 could not be read; its activity may be incomplete.")).toBeInTheDocument();
+  });
+
+  it("shows no notice for a complete draft", async () => {
+    renderDraft({ truncatedReason: null, warnings: [] });
+    await screen.findByRole("list", { name: "Drafted entries" });
+    expect(screen.queryByText(/only the 200 most recent|Only the 50 tickets/)).not.toBeInTheDocument();
   });
 });
 
@@ -270,6 +324,17 @@ describe("timer errors", () => {
     ]);
     renderWithProviders(<TicketTimerButton connection={connection} ticket={{ id: 101, title: "Implement login", projectName: "Alpha" }} onPropose={vi.fn()} />);
     const button = await screen.findByRole("button", { name: "Timer unavailable: Solidtime rejected the API token" });
+    expect(button).toBeDisabled();
+  });
+
+  it("does not offer Start while the Solidtime projects cannot be loaded (the mapped project would be lost)", async () => {
+    mockBackend([
+      { path: `${base}/timer`, body: { timer: null } },
+      { path: `${base}/catalog`, status: 502, body: { message: "Solidtime could not be reached", reason: "SOLIDTIME_UPSTREAM_ERROR" } },
+    ]);
+    renderWithProviders(<TicketTimerButton connection={connection} ticket={{ id: 101, title: "Implement login", projectName: "Alpha" }} onPropose={vi.fn()} />);
+    // A 5xx is retried once (about a second) before it counts.
+    const button = await screen.findByRole("button", { name: "Timer unavailable: Solidtime projects could not be loaded: Solidtime could not be reached" }, { timeout: 4_000 });
     expect(button).toBeDisabled();
   });
 

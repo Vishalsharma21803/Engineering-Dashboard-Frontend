@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithProviders } from "@/test/render";
+import { mockBackend, renderWithProviders } from "@/test/render";
 import { azureKeys } from "../api/azure.keys";
 import { CommandPalette } from "../components/command-palette";
 import { GettingStarted } from "../components/getting-started";
@@ -134,6 +134,33 @@ describe("CommandPalette", () => {
     await userEvent.keyboard("{Enter}");
     expect(screen.getByLabelText("location")).toHaveTextContent(`/azure/${CREDENTIAL_ID}/projects/Alpha/work-items/103`);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("loads the tickets itself when no dashboard was loaded yet", async () => {
+    mockBackend([{ path: `/api/azure/${CREDENTIAL_ID}/dashboard`, body: { dashboard } }]);
+    renderWithProviders(<CommandPalette credentialId={CREDENTIAL_ID} pages={pages} />, { path: "*" });
+
+    await userEvent.keyboard("{Control>}k{/Control}");
+    const input = await screen.findByRole("combobox", { name: "Search tickets, pull requests and pages" });
+    await userEvent.type(input, "crash");
+
+    expect(await screen.findByRole("option", { name: /#103 Crash on save/ })).toBeInTheDocument();
+    expect(screen.queryByText("Loading your tickets…")).not.toBeInTheDocument();
+  });
+
+  it("says when the tickets could not be loaded, and still finds pages", async () => {
+    mockBackend([{ path: `/api/azure/${CREDENTIAL_ID}/dashboard`, status: 502, body: { message: "Azure DevOps could not be reached", reason: "AZURE_UNAVAILABLE" } }]);
+    renderWithProviders(<CommandPalette credentialId={CREDENTIAL_ID} pages={pages} />, { path: "*" });
+
+    await userEvent.keyboard("{Control>}k{/Control}");
+    const input = await screen.findByRole("combobox", { name: "Search tickets, pull requests and pages" });
+    // A 5xx is retried once (about 1 s later) before the failure shows.
+    expect(await screen.findByText("Your tickets could not be loaded; only pages are searchable.", undefined, { timeout: 5_000 })).toBeInTheDocument();
+    await userEvent.type(input, "overview");
+    expect(screen.getByRole("option", { name: /Project overview/ })).toBeInTheDocument();
+    await userEvent.clear(input);
+    await userEvent.type(input, "nothing like this");
+    expect(screen.getByText("No tickets or pull requests match.")).toBeInTheDocument();
   });
 
   it("jumps to a page with G then its key", async () => {

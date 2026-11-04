@@ -168,7 +168,7 @@ export function PipelinesPanel(props: PipelinesPanelProps) {
 
   if (query.isLoading) return <SkeletonRows />;
   if (!query.data) {
-    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
   }
   const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   if (query.data.total === 0) {

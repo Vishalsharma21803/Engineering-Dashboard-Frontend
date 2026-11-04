@@ -39,7 +39,7 @@ export function useSopAiReview(credentialId: string, workItem: { id: number; rev
 
   const results = useQuery({
     queryKey: sopKeys.aiResults(credentialId, String(id ?? "")),
-    queryFn: () => listAiChecks(credentialId, [id as number]),
+    queryFn: ({ signal }) => listAiChecks(credentialId, [id as number], signal),
     enabled: configured && id !== null,
     refetchInterval: (query) => {
       const checks = query.state.data ?? [];

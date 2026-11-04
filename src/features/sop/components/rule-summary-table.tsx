@@ -113,9 +113,9 @@ export function RuleSummaryTable({ cards }: { cards: CardSummary[] }) {
               {shown.map((card) => (
                 <tr key={card.id} className="align-top">
                   <td className="px-4 py-3">
-                    <span className="mr-1.5 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">{card.id}</span>
+                    <span className="mr-1.5 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-slate-600">{card.id}</span>
                     <span className="font-medium text-slate-900">{card.title}</span>
-                    {card.origin === "personal" ? <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700">yours</span> : null}
+                    {card.origin === "personal" ? <span className="ml-2 rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-semibold text-indigo-700">yours</span> : null}
                     {/* On phones the "Checked by" column is folded under the title. */}
                     <span className="mt-1 block text-xs text-slate-500 sm:hidden">{checkedBy(card)}</span>
                   </td>

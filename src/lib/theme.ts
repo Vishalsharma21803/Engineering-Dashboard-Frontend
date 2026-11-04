@@ -21,7 +21,7 @@ export function currentTheme(): Theme {
 /** Applies the theme to the page (and the browser UI colour) and remembers it. */
 export function setTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0b1120" : "#020617");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0b1120" : "#f8fafc");
 
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);

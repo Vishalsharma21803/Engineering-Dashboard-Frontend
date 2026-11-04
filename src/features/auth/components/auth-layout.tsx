@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { Link, Outlet } from "react-router-dom";
 
 import { BrandLogo } from "@/components/brand/brand-logo";
+import { PageLoader } from "@/components/ui/page-loader";
 import { CockpitPreview } from "./cockpit-preview";
 
 const highlights = [
@@ -59,7 +61,9 @@ export function AuthLayout() {
             </Link>
           </div>
 
-          <Outlet />
+          <Suspense fallback={<PageLoader fullScreen={false} />}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

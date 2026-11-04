@@ -11,7 +11,7 @@ import { useProjects } from "@/features/azure-devops/hooks/use-projects";
 import { getLastCredential, resolveDefaultProject } from "@/features/azure-devops/utils/last-project";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
 import { getCredentialDisplayName } from "@/features/credentials/utils/credential-display";
-import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { testRulesOnTicket } from "../api/sop.api";
 import type { RulebookScope } from "../types/sop.types";
 import { SopResultPanel } from "./sop-result-panel";
@@ -39,7 +39,7 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
   });
 
   if (credentials.error && !credentials.data) {
-    return <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} />;
+    return <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} isRetrying={credentials.isFetching} />;
   }
 
   if (!credentials.isLoading && azure.length === 0) {
@@ -115,7 +115,7 @@ export function TestOnTicket({ scope, content, allowDraft }: { scope: RulebookSc
 
       {run.error ? (
         <p role="alert" className="text-sm text-rose-600">
-          {run.error instanceof ApiError ? run.error.message : "Could not test the rules."}
+          {errorMessage(run.error, "Could not test the rules.")}
         </p>
       ) : null}
       {run.data && run.data.errors.length > 0 ? (

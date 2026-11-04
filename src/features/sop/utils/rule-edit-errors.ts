@@ -1,4 +1,5 @@
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import type { RuleProblem } from "../types/sop.types";
 
 export const RULES_CHANGED_MESSAGE =
@@ -24,5 +25,5 @@ export function ruleEditErrorText(error: unknown): string {
     return RULES_CHANGED_MESSAGE;
   }
 
-  return error.errors.length > 0 ? error.errors.map(problemText).join(" · ") : error.message;
+  return error.errors.length > 0 ? error.errors.map(problemText).join(" · ") : errorMessage(error, "Could not save the change.");
 }

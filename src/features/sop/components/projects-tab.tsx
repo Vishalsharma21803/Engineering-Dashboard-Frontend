@@ -1,7 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Updating } from "@/components/ui/updating";
 import { Pagination } from "@/components/ui/pagination";
 import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
@@ -16,6 +17,7 @@ import { formatRelative } from "@/features/azure-devops/utils/format";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
 import { getCredentialDisplayName } from "@/features/credentials/utils/credential-display";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import {
   getProjectSuggestion,
   listAzureProjectsForSop,
@@ -26,7 +28,7 @@ import {
   setProjectChecked,
 } from "../api/sop.api";
 import { sopKeys } from "../api/sop.keys";
-import { SOP_STAGE_OPTIONS, type AzureSopProject, type ProjectSettings, type SopStageName } from "../types/sop.types";
+import { SOP_STAGE_OPTIONS, type AzureSopProject, type ProjectSettings, type ProjectSetUp, type SopStageName } from "../types/sop.types";
 
 const STAGE_LABELS: Record<SopStageName, string> = {
   ready: "Ready (new, not started)",
@@ -55,11 +57,19 @@ function browserTimeZone(): string {
 }
 
 function errorText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    return error.errors.length ? error.errors.map((item) => `${item.field}: ${item.message}`).join(" · ") : error.message;
+  if (error instanceof ApiError && error.errors.length) {
+    return error.errors.map((item) => `${item.field}: ${item.message}`).join(" · ");
   }
 
-  return fallback;
+  return errorMessage(error, fallback);
+}
+
+/** Why the signed-in user cannot change a set-up (only its creator or an SOP owner can). */
+function notYoursText(setUp: ProjectSetUp | undefined): string {
+  if (!setUp) return "Only the person who set it up or an SOP owner can change it";
+  return setUp.createdBy
+    ? `Set up by ${setUp.createdBy}; only they or an SOP owner can change it`
+    : "Set up before owners were recorded; only an SOP owner can change it";
 }
 
 /** stage → states, from a state → stage choice per row. */
@@ -89,38 +99,49 @@ function SetUpForm({ credentialId, project, onDone }: SetUpFormProps) {
     queryFn: () => getProjectSuggestion(credentialId, project.id),
     staleTime: 0,
   });
+  const anchor = useRef<HTMLDivElement>(null);
+  const loaded = Boolean(suggestion.data);
 
-  if (suggestion.isLoading) {
-    return (
-      <p className="flex items-center gap-2 text-sm text-slate-500">
-        <Spinner className="size-4" /> Reading {project.name} from Azure DevOps…
-      </p>
-    );
-  }
-
-  if (!suggestion.data) {
-    return <ErrorCard error={suggestion.error} credentialId={credentialId} onRetry={() => void suggestion.refetch()} />;
-  }
+  // The form opens below the list: bring it (or its loading line) into view, then put the cursor in its first field.
+  useEffect(() => {
+    const node = anchor.current;
+    if (!node) return;
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    node.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+    if (loaded) {
+      node.querySelector<HTMLElement>("input, select, textarea, button[role=combobox]")?.focus({ preventScroll: true });
+    }
+  }, [loaded, project.id]);
 
   return (
-    <>
-      {suggestion.error ? <StaleDataBanner credentialId={credentialId} error={suggestion.error} onRetry={() => void suggestion.refetch()} isRetrying={suggestion.isFetching} /> : null}
-      <SetUpFields
-      key={project.id}
-      projectName={suggestion.data.projectName}
-      initial={suggestion.data.settings}
-      isNew={!suggestion.data.setUp}
-      states={suggestion.data.states}
-      fieldCandidates={suggestion.data.fieldCandidates}
-      onSaved={() => {
-        void queryClient.invalidateQueries({ queryKey: sopKeys.all });
-        // SOP results everywhere depend on the project set-up.
-        void queryClient.invalidateQueries({ queryKey: ["azure"] });
-        onDone();
-      }}
-      onCancel={onDone}
-    />
-    </>
+    <div ref={anchor} className="scroll-mt-24">
+      {suggestion.isLoading ? (
+        <p className="flex items-center gap-2 text-sm text-slate-500">
+          <Spinner className="size-4" /> Reading {project.name} from Azure DevOps…
+        </p>
+      ) : !suggestion.data ? (
+        <ErrorCard error={suggestion.error} credentialId={credentialId} onRetry={() => void suggestion.refetch()} isRetrying={suggestion.isFetching} />
+      ) : (
+        <>
+          {suggestion.error ? <StaleDataBanner credentialId={credentialId} error={suggestion.error} onRetry={() => void suggestion.refetch()} isRetrying={suggestion.isFetching} /> : null}
+          <SetUpFields
+            key={project.id}
+            projectName={suggestion.data.projectName}
+            initial={suggestion.data.settings}
+            isNew={!suggestion.data.setUp}
+            states={suggestion.data.states}
+            fieldCandidates={suggestion.data.fieldCandidates}
+            onSaved={() => {
+              void queryClient.invalidateQueries({ queryKey: sopKeys.all });
+              // SOP results everywhere depend on the project set-up.
+              void queryClient.invalidateQueries({ queryKey: ["azure"] });
+              onDone();
+            }}
+            onCancel={onDone}
+          />
+        </>
+      )}
+    </div>
   );
 }
 
@@ -358,18 +379,20 @@ function SetUpFields({ projectName, initial, isNew, states, fieldCandidates, onS
 
 function History({ projectName }: { projectName: string }) {
   const history = useQuery({ queryKey: sopKeys.projectHistory(projectName), queryFn: () => listProjectChanges(projectName) });
+  // Trying again after a failure starts over without data, which clears the error: keep the line, saying so.
+  const retrying = history.isPending && history.isFetching && history.errorUpdateCount > 0;
 
-  if (history.isLoading) return <Spinner className="size-4" />;
-  if (history.error) {
+  if (history.error || retrying) {
     return (
       <p role="alert" className="text-xs text-rose-600">
         Could not load the history.{" "}
-        <button type="button" className="font-medium underline" onClick={() => void history.refetch()}>
-          Try again
+        <button type="button" className="font-medium underline disabled:opacity-60" onClick={() => void history.refetch()} disabled={retrying}>
+          {retrying ? "Retrying…" : "Try again"}
         </button>
       </p>
     );
   }
+  if (history.isLoading) return <Spinner className="size-4" />;
   if (!history.data?.length) return <p className="text-xs text-slate-500">No changes recorded.</p>;
 
   return (
@@ -392,6 +415,12 @@ export function ProjectsTab() {
   const credentialId = chosen ?? azure[0]?.id ?? "";
   const [editing, setEditing] = useState<AzureSopProject | null>(null);
   const [showHistory, setShowHistory] = useState<string | null>(null);
+  // The project whose "Remove" waits in the confirm dialog.
+  const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null);
+  // Each row's Set up / Edit button, so closing the form puts the focus back where it was opened.
+  const setUpButtons = useRef(new Map<string, HTMLButtonElement>());
+  const { user } = useAuth();
+  const isOwner = user?.isSopAdmin ?? false;
 
   const projectsPage = usePageParam("projectsPage");
   const elsewherePage = usePageParam("elsewherePage");
@@ -425,8 +454,19 @@ export function ProjectsTab() {
   const [pendingChoice, setPendingChoice] = useState<Record<string, boolean>>({});
   const remove = useMutation({ mutationFn: (name: string) => removeProjectSetUp(name), onSettled: invalidate });
 
+  function closeForm() {
+    const id = editing?.id;
+    setEditing(null);
+    if (id) setUpButtons.current.get(id)?.focus();
+  }
+
+  function askRemove(name: string) {
+    remove.reset();
+    setConfirmingRemove(name);
+  }
+
   if (credentials.error && !credentials.data) {
-    return <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} />;
+    return <ErrorCard error={credentials.error} onRetry={() => void credentials.refetch()} isRetrying={credentials.isFetching} />;
   }
 
   if (!credentials.isLoading && azure.length === 0) {
@@ -434,14 +474,16 @@ export function ProjectsTab() {
   }
 
   const setUpByName = new Map((setUps.data ?? []).map((setUp) => [setUp.projectName.toLowerCase(), setUp]));
+  // Only a set-up's creator or an SOP owner may change or remove it (an older server sends no canEdit: owners only).
+  const mayChange = (setUp: ProjectSetUp | undefined) => setUp?.canEdit ?? isOwner;
   const elsewhere = projects.data?.elsewhere;
-  const error = toggle.error ?? remove.error;
 
   return (
     <div className="flex flex-col gap-4">
       <p className="max-w-3xl text-sm text-slate-600">
-        A project is checked once it is set up (anyone can do this; every change is recorded). Untick “Check for me” to stop SOP
-        checks on a project for yourself only; team reports always cover every set-up project.
+        A project is checked once it is set up. Anyone can set up a project; after that only the person who set it up or an SOP owner
+        can change it. Every change is recorded. Untick “Check for me” to stop SOP checks on a project for yourself only; team
+        reports always cover every set-up project.
       </p>
 
       {azure.length > 1 ? (
@@ -464,9 +506,15 @@ export function ProjectsTab() {
         </label>
       ) : null}
 
-      {error ? (
+      {/* Each failure names its project; a later failure of the other kind does not hide it. */}
+      {toggle.error ? (
         <p role="alert" className="text-sm text-rose-600">
-          {errorText(error, "That change could not be saved.")}
+          “Check for me” on {toggle.variables?.name ?? "that project"} was not saved: {errorText(toggle.error, "That change could not be saved.")}
+        </p>
+      ) : null}
+      {remove.error ? (
+        <p role="alert" className="text-sm text-rose-600">
+          {remove.variables ?? "That project"} was not removed: {errorText(remove.error, "That change could not be saved.")}
         </p>
       ) : null}
 
@@ -479,10 +527,10 @@ export function ProjectsTab() {
           <Spinner className="size-4" /> Loading projects…
         </p>
       ) : !projects.data ? (
-        <ErrorCard error={projects.error} credentialId={credentialId} onRetry={() => void projects.refetch()} />
+        <ErrorCard error={projects.error} credentialId={credentialId} onRetry={() => void projects.refetch()} isRetrying={projects.isFetching} />
       ) : setUps.error && !setUps.data ? (
         // Without the set-ups every project would look "Not set up".
-        <ErrorCard error={setUps.error} onRetry={() => void setUps.refetch()} />
+        <ErrorCard error={setUps.error} onRetry={() => void setUps.refetch()} isRetrying={setUps.isFetching} />
       ) : (
         <Updating active={projects.isPlaceholderData}>
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-surface shadow-sm">
@@ -500,71 +548,99 @@ export function ProjectsTab() {
               <tbody className="divide-y divide-slate-100">
                 {projects.data.projects.items.map((project) => {
                   const setUp = setUpByName.get(project.name.toLowerCase());
+                  const canChange = !project.setUp || mayChange(setUp);
+                  const noteId = `sop-check-note-${project.id}`;
+                  // Who may change it: beside the buttons on wider screens, on its own line below the row on phones.
+                  const ownerNote = canChange ? null : notYoursText(setUp);
                   return (
-                    <tr key={project.id} className="align-middle">
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        {project.name}
-                        {showHistory === project.name ? (
-                          <div className="mt-1">
-                            <History projectName={project.name} />
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        {setUp ? (
-                          <span className="text-xs text-slate-600">
-                            <StatusBadge tone="success">Set up</StatusBadge>{" "}
-                            <span className="hidden sm:inline">
-                              {setUp.updatedBy ? `by ${setUp.updatedBy} · ` : ""}
-                              {formatRelative(setUp.updatedAt)}
-                            </span>
-                          </span>
-                        ) : (
-                          <StatusBadge tone="neutral">Not set up</StatusBadge>
-                        )}
-                      </td>
-                      <td
-                        className="px-4 py-3"
-                        title={project.setUp ? undefined : "Set this project up first; only set-up projects can be checked."}
-                      >
-                        <Checkbox
-                          className="align-middle"
-                          aria-label={`Check ${project.name} for me`}
-                          checked={project.setUp && (pendingChoice[project.name] ?? project.checkedForMe)}
-                          disabled={!project.setUp || toggle.isPending}
-                          onCheckedChange={(state) => {
-                            const checked = state === true;
-                            setPendingChoice((current) => ({ ...current, [project.name]: checked }));
-                            toggle.mutate({ name: project.name, checked });
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <Button size="sm" variant="secondary" onClick={() => setEditing(project)}>
-                            {project.setUp ? "Edit" : "Set up"}
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => setShowHistory(showHistory === project.name ? null : project.name)}>
-                            History
-                          </Button>
-                          {project.setUp ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
-                              disabled={remove.isPending}
-                              onClick={() => {
-                                if (window.confirm(`Stop SOP checks on ${project.name} for everyone? The set-up history is kept.`)) {
-                                  remove.mutate(project.name);
-                                }
-                              }}
-                            >
-                              Remove
-                            </Button>
+                    <Fragment key={project.id}>
+                      <tr className={ownerNote ? "align-middle max-sm:border-b-0" : "align-middle"}>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {project.name}
+                          {showHistory === project.name ? (
+                            <div className="mt-1">
+                              <History projectName={project.name} />
+                            </div>
                           ) : null}
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-4 py-3">
+                          {setUp ? (
+                            <span className="text-xs text-slate-600">
+                              <span className="whitespace-nowrap">
+                                <StatusBadge tone="success">Set up</StatusBadge>
+                              </span>{" "}
+                              <span className="hidden sm:inline">
+                                {setUp.updatedBy ? `by ${setUp.updatedBy} · ` : ""}
+                                {formatRelative(setUp.updatedAt)}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="whitespace-nowrap">
+                              <StatusBadge tone="neutral">Not set up</StatusBadge>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Checkbox
+                            className="align-middle"
+                            aria-label={`Check ${project.name} for me`}
+                            aria-describedby={project.setUp ? undefined : noteId}
+                            checked={project.setUp && (pendingChoice[project.name] ?? project.checkedForMe)}
+                            disabled={!project.setUp || toggle.isPending}
+                            onCheckedChange={(state) => {
+                              const checked = state === true;
+                              setPendingChoice((current) => ({ ...current, [project.name]: checked }));
+                              toggle.mutate({ name: project.name, checked });
+                            }}
+                          />
+                          {project.setUp ? null : (
+                            <p id={noteId} className="mt-0.5 text-xs text-slate-500">
+                              Set up first
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {canChange ? (
+                              <Button
+                                ref={(node) => {
+                                  if (node) setUpButtons.current.set(project.id, node);
+                                  else setUpButtons.current.delete(project.id);
+                                }}
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => setEditing(project)}
+                              >
+                                {project.setUp ? "Edit" : "Set up"}
+                              </Button>
+                            ) : (
+                              <p className="hidden max-w-56 text-right text-xs text-slate-500 sm:block">{ownerNote}</p>
+                            )}
+                            <Button size="sm" variant="secondary" onClick={() => setShowHistory(showHistory === project.name ? null : project.name)}>
+                              History
+                            </Button>
+                            {project.setUp && canChange ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
+                                disabled={remove.isPending}
+                                onClick={() => askRemove(project.name)}
+                              >
+                                Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                      {ownerNote ? (
+                        <tr className="sm:hidden">
+                          <td colSpan={4} className="px-4 pb-3 text-xs text-slate-500">
+                            {ownerNote}
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -592,7 +668,9 @@ export function ProjectsTab() {
             From another organization, renamed, or moved from the old rulebook. Edit them from an organization that has the project.
           </p>
           <ul className="mt-2 divide-y divide-slate-100 text-sm">
-            {elsewhere.items.map((setUp) => (
+            {elsewhere.items.map((setUp) => {
+              const row = setUpByName.get(setUp.projectName.toLowerCase());
+              return (
               <li key={setUp.projectName} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <span className="font-medium text-slate-900">{setUp.projectName}</span>
                 <span className="flex items-center gap-3">
@@ -609,22 +687,23 @@ export function ProjectsTab() {
                     />
                     Check for me
                   </label>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
-                    disabled={remove.isPending}
-                    onClick={() => {
-                      if (window.confirm(`Stop SOP checks on ${setUp.projectName} for everyone? The set-up history is kept.`)) {
-                        remove.mutate(setUp.projectName);
-                      }
-                    }}
-                  >
-                    Remove
-                  </Button>
+                  {mayChange(row) ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
+                      disabled={remove.isPending}
+                      onClick={() => askRemove(setUp.projectName)}
+                    >
+                      Remove
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-slate-500">{notYoursText(row)}</span>
+                  )}
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ul>
           <Pagination
             label="Set-ups elsewhere pages"
@@ -638,7 +717,24 @@ export function ProjectsTab() {
         </div>
       ) : null}
 
-      {editing ? <SetUpForm credentialId={credentialId} project={editing} onDone={() => setEditing(null)} /> : null}
+      {editing ? <SetUpForm credentialId={credentialId} project={editing} onDone={closeForm} /> : null}
+
+      <ConfirmDialog
+        open={confirmingRemove !== null}
+        title={`Stop SOP checks on ${confirmingRemove ?? "this project"} for everyone?`}
+        description="The set-up history is kept."
+        confirmLabel="Stop checks"
+        pendingLabel="Stopping…"
+        destructive
+        isPending={remove.isPending}
+        error={remove.error ? errorText(remove.error, "That change could not be saved.") : null}
+        onConfirm={() => {
+          if (confirmingRemove) remove.mutate(confirmingRemove, { onSuccess: () => setConfirmingRemove(null) });
+        }}
+        onOpenChange={(open) => {
+          if (!open) setConfirmingRemove(null);
+        }}
+      />
     </div>
   );
 }

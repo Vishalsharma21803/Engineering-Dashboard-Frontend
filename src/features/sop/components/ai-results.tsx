@@ -4,11 +4,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { providerShortName } from "@/features/ai/utils/ai-display";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { formatRelative } from "@/features/azure-devops/utils/format";
 import { SEVERITY_TONES } from "@/features/azure-devops/utils/labels";
-import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { isAiCheckBusy, isAiCheckPaused } from "../hooks/use-sop-ai";
 import type { AiCheck, AiRuleResult } from "../types/sop.types";
 import { FIX_TARGET_LABELS, describeAiCheckReason, describeAiPause } from "../utils/ai-check";
@@ -80,6 +81,11 @@ function FixDraft({ result, fix, onUseFix, isProposing }: { result: AiRuleResult
 
 /** How the AI's verdict reads for a rule (see AiRuleResult.review). */
 function verdictLabel(result: AiRuleResult): { label: string; tone: "danger" | "warning" | "info" | "success" | "neutral" } {
+  // The AI only words a fix for these; it never decides them, so "unsure" here is not doubt.
+  if (result.review === "draft") {
+    return result.verdict === "fail" ? { label: "AI draft", tone: "info" } : { label: "Code decides", tone: "neutral" };
+  }
+
   if (result.verdict === "unsure") {
     return { label: "AI unsure", tone: "neutral" };
   }
@@ -89,8 +95,6 @@ function verdictLabel(result: AiRuleResult): { label: string; tone: "danger" | "
       return result.verdict === "pass" ? { label: "AI: met", tone: "success" } : { label: "AI confirms", tone: "warning" };
     case "quality":
       return result.verdict === "pass" ? { label: "AI: good", tone: "success" } : { label: "AI suggestion", tone: "info" };
-    case "draft":
-      return { label: "AI draft", tone: "info" };
     default:
       return result.verdict === "pass" ? { label: "Passed", tone: "success" } : { label: result.severity === "low" ? "Notice" : "Failed", tone: SEVERITY_TONES[result.severity] };
   }
@@ -112,6 +116,7 @@ export function AiRuleReview({ result, onUseFix, isProposing = false, showRule =
         ) : null}
       </div>
       <p className="text-sm text-slate-700">{result.reason}</p>
+      {result.review === "draft" ? <p className="text-xs text-slate-500">The AI can only suggest wording for this rule; whether it is met is checked by code.</p> : null}
       {result.quotes.length > 0 ? (
         <ul className="space-y-1">
           {result.quotes.map((quote, index) => (
@@ -136,10 +141,26 @@ export function AiRuleReview({ result, onUseFix, isProposing = false, showRule =
  * The AI review's status for one ticket: who reviewed it and when, whether it
  * is running, paused or failed, and a button to review again.
  */
-export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking, currentProvider = null, enqueueError = null, loadError = null, settingsLoading = false, reviewable }: AiReviewProps & { reviewable: boolean }) {
+export function AiReviewHeader({
+  configured,
+  check,
+  rev,
+  onRecheck,
+  isRechecking,
+  currentProvider = null,
+  enqueueError = null,
+  loadError = null,
+  settingsLoading = false,
+  reviewable,
+  reviewOutdated = false,
+}: AiReviewProps & {
+  reviewable: boolean;
+  /** The server no longer applies (all of) this review although the ticket's revision is the same (ComplianceResult.aiReview.outdated). */
+  reviewOutdated?: boolean;
+}) {
   const loadAlert = loadError ? (
     <p role="alert" className="text-sm text-rose-600">
-      Could not load the AI review: {loadError instanceof ApiError ? loadError.message : "the server could not be reached"}.
+      Could not load the AI review: {errorMessage(loadError, "the server could not be reached")}.
     </p>
   ) : null;
 
@@ -196,7 +217,7 @@ export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking
       {loadAlert}
       {enqueueError ? (
         <p role="alert" className="text-sm text-rose-600">
-          Could not start the AI review: {enqueueError instanceof ApiError ? enqueueError.message : "the server could not be reached"}.
+          Could not start the AI review: {errorMessage(enqueueError, "the server could not be reached")}.
         </p>
       ) : null}
       {check && (check.status === "FAILED" || check.status === "SKIPPED") ? (
@@ -205,15 +226,15 @@ export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking
         </p>
       ) : null}
       {pausedByOther && check ? (
-        <p role="status" className="text-sm text-slate-600">
+        <StatusNotice as="p" className="text-sm text-slate-600">
           The last review was paused by {providerShortName(check.provider, "another provider")}. You now use {providerName}; it is
           reviewed again automatically, or click “Review with {providerName}”.
-        </p>
+        </StatusNotice>
       ) : null}
       {paused && check ? (
-        <p role="status" className="text-sm text-amber-700">
+        <StatusNotice as="p" className="text-sm text-amber-700">
           {describeAiPause(check)}
-        </p>
+        </StatusNotice>
       ) : null}
       {check?.errorDetail && (paused || check.status === "FAILED" || check.status === "SKIPPED") ? (
         <p className="text-xs text-slate-500">
@@ -221,7 +242,14 @@ export function AiReviewHeader({ configured, check, rev, onRecheck, isRechecking
         </p>
       ) : null}
       {outdated ? (
-        <p className="text-xs text-slate-500">The ticket changed since the last review, so its results are hidden{busy ? " until this review finishes" : "; it may be outdated"}.</p>
+        <p className="text-xs text-slate-500">
+          The ticket changed since the last review, so its results are hidden{busy ? " until this review finishes" : ". Review again to see current results"}.
+        </p>
+      ) : reviewOutdated && !busy && check?.status === "DONE" ? (
+        <p className="text-xs text-slate-500">
+          Part of this review is out of date (pull requests, links or the review rules changed since it ran), so gaps it marked as met may still count. Review
+          again to update it.
+        </p>
       ) : null}
     </div>
   );

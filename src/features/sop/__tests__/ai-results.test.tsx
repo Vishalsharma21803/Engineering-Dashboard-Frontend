@@ -137,6 +137,17 @@ describe("AiRuleReview drafts", () => {
     render(<AiRuleReview result={{ ...failing("As a manager…"), review: "draft" }} />);
     expect(screen.getByText("AI draft")).toBeInTheDocument();
   });
+
+  it("says the AI only words a fix for a rule code decides (e.g. TL approval), even when it is unsure", () => {
+    render(
+      <AiRuleReview
+        result={{ ...draft, ruleId: "PR-02", ruleTitle: "TL approval", review: "draft", verdict: "unsure", fix: null, advice: null, note: "This gap is a plain fact the AI cannot overrule." }}
+      />
+    );
+    expect(screen.getByText("Code decides")).toBeInTheDocument();
+    expect(screen.queryByText("AI unsure")).not.toBeInTheDocument();
+    expect(screen.getByText("The AI can only suggest wording for this rule; whether it is met is checked by code.")).toBeInTheDocument();
+  });
 });
 
 describe("fixToAction", () => {

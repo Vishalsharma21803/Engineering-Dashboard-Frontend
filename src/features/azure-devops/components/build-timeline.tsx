@@ -14,14 +14,14 @@ interface BuildTimelineProps {
 }
 
 export function BuildTimeline({ credentialId, projectId, build, isProposing, onRetryStage }: BuildTimelineProps) {
-  const { data: timeline, isLoading, error, refetch } = useBuildTimeline(credentialId, projectId, build.id);
+  const { data: timeline, isLoading, isFetching, error, refetch } = useBuildTimeline(credentialId, projectId, build.id);
 
   if (isLoading) {
     return <SkeletonRows rows={2} />;
   }
 
   if (error || !timeline) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   if (timeline.stages.length === 0) {

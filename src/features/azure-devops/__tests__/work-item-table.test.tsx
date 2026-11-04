@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { pageWindow } from "@/utils/pagination";
 import { mockBackend, renderWithProviders } from "@/test/render";
@@ -286,6 +286,71 @@ describe("TeamWorkTable", () => {
     await userEvent.click(screen.getByRole("button", { name: "Filter" }));
     await chooseOption(screen.getByLabelText("Assignee"), "unassigned");
     await waitFor(() => expect(calls.some((call) => call.url.includes("assignee=unassigned") && call.url.includes("scope=open"))).toBe(true));
+  });
+});
+
+describe("tracked time on the rows", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("keeps saying the time could not be loaded while it is tried again", async () => {
+    mockBackend([
+      { path: "/api/azure/c/my-work", body: { myWork: myWorkPage(1) } },
+      { path: /\/ticket-times/, status: 400, body: { message: "Solidtime rejected the request" } },
+    ]);
+    const time = { connection: { credentialId: "st" } as never, onPropose: () => undefined, isProposing: false };
+    renderWithProviders(<MyWorkTable credentialId="c" projectId={undefined} dashboardToken="t" triage={triage} time={time} myId="me" fix={{ onPropose: () => undefined, isProposing: false }} pullRequests={[]} />);
+    expect(await screen.findByText(/Tracked time could not be loaded from Solidtime/)).toBeInTheDocument();
+
+    // The retry is still on its way.
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("button", { name: "Retrying…" })).toBeDisabled();
+    expect(screen.getByText(/Tracked time could not be loaded from Solidtime/)).toBeInTheDocument();
+  });
+});
+
+describe("read-completeness notices", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("says when My work was cut at its cap", async () => {
+    renderMyWork("/", myWorkPage(1, { workItemsTruncated: { cap: 200 } }));
+    expect(await screen.findByText("Showing the 200 most recently changed tickets; older ones are not listed or checked.")).toBeInTheDocument();
+  });
+
+  it("says which ticket states were guessed", async () => {
+    renderMyWork("/", myWorkPage(1, { stateLookupFailed: ["Bug in Alpha", "Task in Beta"] }));
+    expect(
+      await screen.findByText("Ticket states for Bug in Alpha, Task in Beta could not be read from Azure DevOps; open/closed is guessed from the state name.")
+    ).toBeInTheDocument();
+  });
+
+  it("says which projects' sprint could not be read", async () => {
+    renderMyWork("/", myWorkPage(1, { sprint: { mode: "all", inSprint: 0, names: [], unreadable: ["Alpha"] } }));
+    expect(await screen.findByText("The current sprint of Alpha could not be read; its tickets are shown in every view.")).toBeInTheDocument();
+  });
+
+  it("shows no notice when the read was complete", async () => {
+    renderMyWork("/", myWorkPage(1, { workItemsTruncated: null, stateLookupFailed: [], sprint: { mode: "all", inSprint: 0, names: [], unreadable: [] } }));
+    expect(await screen.findByText("Page 1 of 3")).toBeInTheDocument();
+    expect(screen.queryByText(/most recently changed tickets|could not be read/)).not.toBeInTheDocument();
+  });
+
+  it("says when the team list was cut at its cap", async () => {
+    const page: TeamWorkPage = {
+      items: [{ heading: null, latest: null, headingRow: null, rows: [ticket(1)] }],
+      page: 1,
+      pageSize: 10,
+      total: 1,
+      totalPages: 1,
+      ticketCount: 1,
+      poolTotal: 1,
+      facets: { types: [], states: [], priorities: [], assignees: [] },
+      workItemsTruncated: { cap: 1000 },
+    };
+    mockBackend([{ path: "/api/azure/c/projects/Alpha/team-work-items", body: { teamWork: page } }]);
+    renderWithProviders(<TeamWorkTable credentialId="c" projectId="Alpha" scope="open" myId="me" />);
+    expect(await screen.findByText("Showing the 1000 most recently changed tickets; older ones are not listed.")).toBeInTheDocument();
   });
 });
 

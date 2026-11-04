@@ -29,7 +29,7 @@ function List({ connection, kind, onPropose, isProposing }: { connection: Solidt
   const [projectId, setProjectId] = useState("");
   const list = useQuery({
     queryKey: [...solidtimeKeys.list(connection.credentialId, kind), pageParam.page],
-    queryFn: () => listCatalogPage(connection.credentialId, kind, pageParam.page),
+    queryFn: ({ signal }) => listCatalogPage(connection.credentialId, kind, pageParam.page, signal),
     placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
   });

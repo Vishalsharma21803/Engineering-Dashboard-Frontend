@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
-import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { useCatalog, useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
@@ -40,8 +40,16 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
   const onThisTicket = running !== null && running.organization_id === connection.organizationId && mentionsTicket(running.description, ticket.id);
 
   // The timer could not be read (bad token, Solidtime down or rate limiting): say so instead of offering Start.
-  if (timer.error && !timer.data) {
-    const reason = timer.error instanceof ApiError ? timer.error.message : "Solidtime could not be reached.";
+  // Without the project list a mapped project cannot be chosen, so a timer would start without its project.
+  const unavailable =
+    timer.error && !timer.data
+      ? errorMessage(timer.error, "Solidtime could not be reached.")
+      : catalog.isError && !catalog.data && !running
+        ? `Solidtime projects could not be loaded: ${errorMessage(catalog.error, "Solidtime could not be reached.")}`
+        : null;
+
+  if (unavailable) {
+    const reason = unavailable;
     // A disabled button shows no tooltip: the reason sits on a focusable wrapper.
     return (
       <Hint label={`Timer unavailable: ${reason}`}>
@@ -82,7 +90,8 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
     <Button
       size="sm"
       variant="secondary"
-      disabled={disabled || running !== null || timer.isLoading}
+      // The project comes from the catalog: wait for it.
+      disabled={disabled || running !== null || timer.isLoading || catalog.isLoading}
       className={compactClass}
       title={running ? undefined : `Track time on #${ticket.id}`}
       onClick={() =>

@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { useLinkedSolidtime } from "@/features/solidtime/hooks/use-solidtime";
+import { modKey } from "@/utils/platform";
 import { ActionReviewDialog } from "../components/action-review-dialog";
-import { ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
+import { ErrorCard, ErrorToast, PartialReadNotice, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
 import { GettingStarted } from "../components/getting-started";
 import { SprintOverview } from "../components/sprint-overview";
 import { PipelineRunList } from "../components/pipeline-run-list";
@@ -17,6 +19,7 @@ import { useDashboard } from "../hooks/use-dashboard";
 import { useDashboardTriage } from "../hooks/use-triage";
 import type { Dashboard, MyWorkOverview } from "../types/azure.types";
 import { formatDateTime } from "../utils/format";
+import { checkedTicketsTruncatedNotice, stateLookupNotice } from "../utils/read-notices";
 
 /** Original-case project names, since project triage keys are lower-cased. */
 function projectNames(dashboard: Dashboard): Map<string, string> {
@@ -43,7 +46,7 @@ export function DashboardPage() {
 function OrganizationDashboard({ credentialId }: { credentialId: string }) {
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get("project") ?? undefined;
-  const { data: dashboard, isLoading, error, refetch, refresh, isRefreshing } = useDashboard(credentialId, projectId);
+  const { data: dashboard, isLoading, error, refetch, isFetching, refresh, isRefreshing } = useDashboard(credentialId, projectId);
   const review = useActionReview();
   const triage = useDashboardTriage(credentialId, dashboard);
   const linkedTime = useLinkedSolidtime(credentialId);
@@ -56,7 +59,7 @@ function OrganizationDashboard({ credentialId }: { credentialId: string }) {
   }
 
   if (!dashboard) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   // Sections that could not be read: the lists and counts below would otherwise look complete.
@@ -75,12 +78,12 @@ function OrganizationDashboard({ credentialId }: { credentialId: string }) {
   return (
     <div className="flex flex-col gap-6">
       {triage.loadError ? (
-        <p role="status" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        <StatusNotice as="p" className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           Your snoozed, acknowledged and abandoned marks could not be loaded ({triage.loadError instanceof Error ? triage.loadError.message : "unknown error"}), so everything is shown.
           <Button size="sm" variant="ghost" disabled={triage.isRetryingLoad} onClick={triage.retryLoad}>
             {triage.isRetryingLoad ? "Retrying…" : "Retry"}
           </Button>
-        </p>
+        </StatusNotice>
       ) : null}
 
       {triage.projectMarks.length > 0 ? (
@@ -120,10 +123,10 @@ function OrganizationDashboard({ credentialId }: { credentialId: string }) {
       {error ? <StaleDataBanner credentialId={credentialId} error={error} onRetry={() => void refresh()} isRetrying={isRefreshing} /> : null}
 
       {failedSections.length > 0 ? (
-        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        <StatusNotice as="p" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
           Could not read {failedSections.map(([label]) => label).join(", ")} from Azure DevOps, so the counts and prioritized actions below are incomplete.
-          Use “Refresh from Azure” to try again.
-        </p>
+          Use Refresh (↻) in the sprint header to try again.
+        </StatusNotice>
       ) : null}
 
       {dashboard.projectsTruncated ? (
@@ -158,8 +161,15 @@ function OrganizationDashboard({ credentialId }: { credentialId: string }) {
       <SectionCard
         id="my-work"
         title="My work"
-        help="Your tickets by status (in progress, to do, resolved), each under its user story, the most recent change first. A story assigned to someone else shows their name. A warning on a row says what is missing; Fix… proposes the change for your approval. Press J or K to move between tickets, ⌘K to find one."
+        help={`Your tickets by status (in progress, to do, resolved), each under its user story, the most recent change first. A story assigned to someone else shows their name. A warning on a row says what is missing; Fix… proposes the change for your approval. Press J or K to move between tickets, ${modKey}K to find one.`}
       >
+        {/* My work shows these itself once loaded; this covers a list that could not be loaded, so they are said once. */}
+        {listOverview === null ? (
+          <PartialReadNotice
+            className="mb-3"
+            messages={[checkedTicketsTruncatedNotice(dashboard.workItemsTruncated), stateLookupNotice(dashboard.stateLookupFailed)]}
+          />
+        ) : null}
         <SectionView section={dashboard.sections.workItems} label="work items">
           {() => (
             <MyWorkTable
@@ -199,6 +209,7 @@ function OrganizationDashboard({ credentialId }: { credentialId: string }) {
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />
       <ErrorToast
+        title={review.proposeError ? "Could not prepare the change" : "Could not save your mark"}
         message={review.proposeError ?? triage.saveError}
         onDismiss={() => {
           review.clearProposeError();

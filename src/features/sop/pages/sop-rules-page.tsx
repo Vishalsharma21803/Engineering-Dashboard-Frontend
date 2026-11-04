@@ -60,7 +60,7 @@ function EditorTab({ scope, canSave, readOnlyReason }: { scope: RulebookScope; c
   }
 
   if (rulebook.error || !rulebook.data) {
-    return <ErrorCard error={rulebook.error} onRetry={() => void rulebook.refetch()} />;
+    return <ErrorCard error={rulebook.error} onRetry={() => void rulebook.refetch()} isRetrying={rulebook.isFetching} />;
   }
 
   return (
@@ -97,7 +97,7 @@ function RulesTab({ scope, isOwner }: { scope: RulebookScope; isOwner: boolean }
   }
 
   if (list.error || !list.data) {
-    return <ErrorCard error={list.error} onRetry={() => void list.refetch()} />;
+    return <ErrorCard error={list.error} onRetry={() => void list.refetch()} isRetrying={list.isFetching} />;
   }
 
   const editable = scope === "personal" || list.data.canEditDefaults;
@@ -162,7 +162,7 @@ function EffectiveTab() {
   }
 
   if (effective.error || !effective.data) {
-    return <ErrorCard error={effective.error} onRetry={() => void effective.refetch()} />;
+    return <ErrorCard error={effective.error} onRetry={() => void effective.refetch()} isRetrying={effective.isFetching} />;
   }
 
   const cards = effective.data.cards;
@@ -207,9 +207,9 @@ export function SopRulesPage() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950">SOP rules</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-          Code checks every rule: an item is a to-do while the ticket is in its stage and a gap once the ticket moves on without it.
-          When you open a ticket, your AI model reviews what code found, can clear a finding written another way, and drafts fixes.
-          The default rules are set by SOP owners; your own changes only affect your checks.
+          Rules say what each ticket needs at each stage. Something missing while the ticket is still in that stage is a to-do; once
+          the ticket moves on it becomes a gap. When you open a ticket, your AI model double-checks the findings and can draft fixes
+          for you to approve. SOP owners set the default rules; your own changes affect only your checks.
         </p>
       </div>
 

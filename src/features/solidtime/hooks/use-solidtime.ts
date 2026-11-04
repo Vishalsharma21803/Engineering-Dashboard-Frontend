@@ -5,7 +5,7 @@ import { getCatalog, getProfile, getTimer, listConnections } from "../api/solidt
 import { solidtimeKeys } from "../api/solidtime.keys";
 
 export function useSolidtimeConnections() {
-  return useQuery({ queryKey: solidtimeKeys.connections, queryFn: listConnections, retry: retryUnlessClientError, staleTime: 60_000 });
+  return useQuery({ queryKey: solidtimeKeys.connections, queryFn: ({ signal }) => listConnections(signal), retry: retryUnlessClientError, staleTime: 60_000 });
 }
 
 /**
@@ -22,7 +22,7 @@ export function useLinkedSolidtime(azureCredentialId: string) {
 export function useTimer(credentialId: string | null) {
   return useQuery({
     queryKey: solidtimeKeys.timer(credentialId ?? ""),
-    queryFn: () => getTimer(credentialId ?? ""),
+    queryFn: ({ signal }) => getTimer(credentialId ?? "", signal),
     enabled: Boolean(credentialId),
     retry: retryUnlessClientError,
     // A running timer's duration is shown live; the server state is re-read now and then.
@@ -32,7 +32,7 @@ export function useTimer(credentialId: string | null) {
 
 /** My Solidtime profile (name and time zone). */
 export function useSolidtimeProfile(credentialId: string) {
-  return useQuery({ queryKey: solidtimeKeys.profile(credentialId), queryFn: () => getProfile(credentialId), retry: retryUnlessClientError, staleTime: 10 * 60_000 });
+  return useQuery({ queryKey: solidtimeKeys.profile(credentialId), queryFn: ({ signal }) => getProfile(credentialId, signal), retry: retryUnlessClientError, staleTime: 10 * 60_000 });
 }
 
 /** My Solidtime time zone; days in the time views follow it (not the browser's). Null until (or unless) the profile loads. */
@@ -43,7 +43,7 @@ export function useSolidtimeTimeZone(credentialId: string) {
 export function useCatalog(credentialId: string | null) {
   return useQuery({
     queryKey: solidtimeKeys.catalog(credentialId ?? ""),
-    queryFn: () => getCatalog(credentialId ?? ""),
+    queryFn: ({ signal }) => getCatalog(credentialId ?? "", signal),
     enabled: Boolean(credentialId),
     retry: retryUnlessClientError,
     staleTime: 5 * 60_000,

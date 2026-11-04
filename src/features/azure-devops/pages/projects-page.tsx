@@ -10,11 +10,11 @@ import { resolveDefaultProject } from "../utils/last-project";
  */
 export function ProjectsPage() {
   const { credentialId = "" } = useParams();
-  const { data, isLoading, error, refetch } = useProjects(credentialId);
+  const { data, isLoading, isFetching, error, refetch } = useProjects(credentialId);
 
   if (isLoading) return <SkeletonRows rows={4} />;
   if (error || !data) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   const projectId = resolveDefaultProject(credentialId, "", data.projects);

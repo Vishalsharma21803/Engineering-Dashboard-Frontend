@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ApiError } from "@/lib/api-client";
 import { ActionReviewDialog } from "../components/action-review-dialog";
-import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, NotFoundCard, PartialReadNotice, SectionCard, SectionView, SkeletonRows, StaleDataBanner } from "../components/feedback";
 import { StatusBadge } from "../components/status-badge";
 import {
   PriorityBadge,
@@ -115,7 +116,18 @@ export function WorkItemDetailPage() {
 
   if (isLoading) return <SkeletonRows rows={5} />;
   if (!workItem) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    // Only Azure's own "not found": a 404 for any other reason (e.g. an unknown API route) keeps the general error.
+    if (error instanceof ApiError && error.reason === "AZURE_NOT_FOUND") {
+      return (
+        <NotFoundCard
+          title={`Ticket #${id} doesn't exist or you can't see it`}
+          text="It may have been deleted or moved to another project, or your token can't see it."
+          backTo={`/azure/${encodeURIComponent(credentialId)}`}
+          backLabel="Back to My work"
+        />
+      );
+    }
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   const base = `/azure/${encodeURIComponent(credentialId)}`;
@@ -374,6 +386,10 @@ export function WorkItemDetailPage() {
           </TabsContent>
 
           <TabsContent value="history">
+            <PartialReadNotice
+              className="mb-3"
+              messages={[workItem.historyTruncated ? "This ticket has a very long history; part of the middle of it is not shown." : null]}
+            />
             <SectionView section={workItem.history} label="history">
               {(history) =>
                 history.length === 0 ? (

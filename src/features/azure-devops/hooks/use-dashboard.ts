@@ -5,13 +5,15 @@ import { getDashboard } from "../api/azure.api";
 import { azureKeys } from "../api/azure.keys";
 import { retryUnlessClientError } from "../utils/query-retry";
 
-export function useDashboard(credentialId: string, projectId: string | undefined) {
+/** `enabled: false` only reads what is cached (the command palette loads it only when nothing is). */
+export function useDashboard(credentialId: string, projectId: string | undefined, { enabled = true }: { enabled?: boolean } = {}) {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const query = useQuery({
     queryKey: azureKeys.dashboard(credentialId, projectId),
     queryFn: () => getDashboard(credentialId, projectId),
     retry: retryUnlessClientError,
+    enabled,
   });
 
   /** Bypasses the backend's short-lived Azure cache. */
@@ -19,8 +21,12 @@ export function useDashboard(credentialId: string, projectId: string | undefined
     setIsRefreshing(true);
 
     try {
+      const queryKey = azureKeys.dashboard(credentialId, projectId);
+      // A load already running would be handed back as is (without refresh=true): cancel it first.
+      // The cancelled request still finishes on the server; only its answer is ignored.
+      await queryClient.cancelQueries({ queryKey, exact: true });
       await queryClient.fetchQuery({
-        queryKey: azureKeys.dashboard(credentialId, projectId),
+        queryKey,
         queryFn: () => getDashboard(credentialId, projectId, { refresh: true }),
         staleTime: 0,
       });

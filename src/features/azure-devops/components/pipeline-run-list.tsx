@@ -14,7 +14,7 @@ import { formatRelative, stripRef } from "../utils/format";
 import { buildLabel, buildTone } from "../utils/labels";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { movedByPendingMark, pipelineKey } from "../utils/triage";
-import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "./feedback";
+import { EmptyState, ErrorCard, PartialReadNotice, SkeletonRows, StaleDataBanner } from "./feedback";
 import { FilterBar } from "./filter-bar";
 import { StatusBadge } from "./status-badge";
 import { HiddenToggle, TriageBadge, TriageMenu } from "./triage-menu";
@@ -46,16 +46,18 @@ export function PipelineRunList({ credentialId, projectId, dashboardToken, triag
   }
 
   if (!query.data) {
-    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} />;
+    return <ErrorCard error={query.error} credentialId={credentialId} onRetry={() => void query.refetch()} isRetrying={query.isFetching} />;
   }
 
   const stale = query.error ? <StaleDataBanner credentialId={credentialId} error={query.error} onRetry={() => void query.refetch()} isRetrying={query.isFetching} /> : null;
   const data = query.data;
+  const partial = <PartialReadNotice className="mb-3" messages={[data.completeness?.note]} />;
 
   if (data.poolTotal === 0 && data.hiddenCount === 0) {
     return (
       <>
         {stale}
+        {partial}
         <EmptyState>No pipeline runs requested by you in the last week.</EmptyState>
       </>
     );
@@ -66,6 +68,7 @@ export function PipelineRunList({ credentialId, projectId, dashboardToken, triag
   return (
     <>
       {stale}
+      {partial}
       <div className="space-y-3">
         {/* Filters only help once there is more than one page to look through. */}
         {(data.facets.results.length > 1 && data.poolTotal > data.pageSize) || result ? (
@@ -110,10 +113,10 @@ export function PipelineRunList({ credentialId, projectId, dashboardToken, triag
           ) : null}
           <ul className="divide-y divide-slate-100">
             {data.items.filter((build) => !movedByPendingMark(triageOf(build), data.showingHidden)).map((build) => (
-              <li key={build.id} className={cn("flex items-center justify-between gap-2 py-2.5", triageOf(build).state !== "active" && "opacity-75")}>
+              <li key={build.id} className={cn("flex flex-col gap-1.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2", triageOf(build).state !== "active" && "opacity-75")}>
                 <Link
                   to={`/azure/${encodeURIComponent(credentialId)}/projects/${encodeURIComponent(build.projectName ?? "")}?build=${build.id}`}
-                  className="min-w-0 truncate text-sm text-slate-800 hover:text-indigo-600"
+                  className="min-w-0 break-words text-sm text-slate-800 hover:text-indigo-600 sm:truncate"
                 >
                   <span className="font-medium">{build.definitionName}</span> #{build.buildNumber} · {stripRef(build.sourceBranch)} · {formatRelative(build.queueTime)}
                 </Link>

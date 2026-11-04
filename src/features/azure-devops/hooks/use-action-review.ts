@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import type { ProposeActionInput, ProposedAction } from "../types/action.types";
 import { useProposeAction } from "./use-actions";
 
@@ -21,7 +21,7 @@ export function useActionReview() {
         onProposed?.();
       },
       onError: (error) =>
-        setProposeError(error instanceof ApiError ? error.message : "The action could not be prepared."),
+        setProposeError(errorMessage(error, "The action could not be prepared.")),
     });
   }
 

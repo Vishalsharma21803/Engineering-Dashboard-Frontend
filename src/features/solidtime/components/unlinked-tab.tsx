@@ -62,7 +62,7 @@ export function UnlinkedTab({ connection, onPropose, isProposing, today }: { con
     <div className="flex flex-col gap-3">
       {list.error ? <StaleDataBanner error={list.error} onRetry={() => void list.refetch()} isRetrying={list.isFetching} /> : null}
       <p className="text-sm text-slate-600">
-        Your entries from {formatDayLabel(from, { day: "numeric", month: "short" })} to {formatDayLabel(to, { day: "numeric", month: "short" })} that name no ticket. Add the ticket number (e.g. #21786) so the time counts for it.
+        Your entries from {formatDayLabel(from, { day: "numeric", month: "short" })} to {formatDayLabel(to, { day: "numeric", month: "short" })} that name no ticket. Name the ticket as #12345 (or any 4+ digit ticket number) so the time counts for it.
       </p>
       {!list.data.ticketsChecked ? <p className="text-xs text-amber-700">Ticket numbers could not be checked against Azure DevOps; only entries with no number at all are listed.</p> : null}
       <Updating active={list.isPlaceholderData}>

@@ -1,8 +1,10 @@
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { SelectField } from "@/components/ui/select-field";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import { cn } from "@/utils/cn";
 import { useEditRules } from "../hooks/use-sop";
@@ -38,12 +40,14 @@ interface RuleRowProps {
 export function RuleRow({ rule, check, scope, editable, baseVersion, onSaved }: RuleRowProps) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const edit = useEditRules(scope);
   const titleId = useId();
   const panelId = useId();
   const busy = edit.isPending;
 
-  async function send(change: RuleEdit, success: string, note: string) {
+  /** True when the change was saved. */
+  async function send(change: RuleEdit, success: string, note: string): Promise<boolean> {
     setMessage(null);
 
     try {
@@ -51,8 +55,10 @@ export function RuleRow({ rule, check, scope, editable, baseVersion, onSaved }: 
       await edit.mutateAsync({ baseVersion, edits: [change], note: `${rule.id}: ${note}` });
       setMessage({ tone: "success", text: success });
       onSaved();
+      return true;
     } catch (error) {
       setMessage({ tone: "error", text: ruleEditErrorText(error) });
+      return false;
     }
   }
 
@@ -68,11 +74,11 @@ export function RuleRow({ rule, check, scope, editable, baseVersion, onSaved }: 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-slate-600">{rule.id}</span>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-slate-600">{rule.id}</span>
             <span id={titleId} className="break-words font-medium text-slate-900">
               {rule.title}
             </span>
-            {rule.origin === "personal" ? <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700">yours</span> : null}
+            {rule.origin === "personal" ? <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-semibold text-indigo-700">yours</span> : null}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {rule.checker === "ai" ? "AI review only" : rule.uses ? `Code · ${checkerLabel(rule.uses)}` : "Code"}
@@ -132,23 +138,38 @@ export function RuleRow({ rule, check, scope, editable, baseVersion, onSaved }: 
               disabled={busy}
               className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
               onClick={() => {
-                const question =
-                  scope === "default" ? `Remove ${rule.id} from the default rules for everyone?` : `Remove your rule ${rule.id}?`;
-                if (window.confirm(`${question} Earlier versions stay in the history.`)) {
-                  void send({ op: "remove", id: rule.id }, "Removed.", "removed");
-                }
+                setMessage(null);
+                setConfirmingRemove(true);
               }}
             >
               Remove
             </Button>
           ) : null}
+          {canRemove ? (
+            <ConfirmDialog
+              open={confirmingRemove}
+              title={scope === "default" ? `Remove ${rule.id} from the default rules for everyone?` : `Remove your rule ${rule.id}?`}
+              description="Earlier versions stay in the history."
+              confirmLabel="Remove"
+              pendingLabel="Removing…"
+              destructive
+              isPending={busy}
+              error={message?.tone === "error" ? message.text : null}
+              onConfirm={() => {
+                void send({ op: "remove", id: rule.id }, "Removed.", "removed").then((saved) => {
+                  if (saved) setConfirmingRemove(false);
+                });
+              }}
+              onOpenChange={setConfirmingRemove}
+            />
+          ) : null}
         </div>
       </div>
 
       {message ? (
-        <p role={message.tone === "error" ? "alert" : "status"} className={cn("mt-2 text-sm", message.tone === "error" ? "text-rose-600" : "text-emerald-700")}>
+        <StatusNotice as="p" alert={message.tone === "error"} className={cn("mt-2 text-sm", message.tone === "error" ? "text-rose-600" : "text-emerald-700")}>
           {message.text}
-        </p>
+        </StatusNotice>
       ) : null}
 
       {open ? (

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Spinner } from "@/components/ui/spinner";
@@ -25,6 +26,7 @@ export function AiProviderCard({ credential, initialNotice = null }: AiProviderC
   const [editing, setEditing] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [notice, setNotice] = useState<AiNotice | null>(initialNotice);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const replace = useReplaceAiKey();
   const validate = useValidateAiCredential();
   const remove = useDeleteAiCredential();
@@ -79,16 +81,25 @@ export function AiProviderCard({ credential, initialNotice = null }: AiProviderC
             className="text-rose-700 hover:bg-rose-50 hover:text-rose-700"
             disabled={busy}
             onClick={() => {
-              if (window.confirm(`Delete your ${info.name} key? AI checks using it will stop.`)) {
-                remove.mutate(credential.id, {
-                  onError: (error) => setNotice({ tone: "error", text: describeAiError(error, "Could not delete the key.") }),
-                });
-              }
+              remove.reset();
+              setConfirmingDelete(true);
             }}
           >
             {remove.isPending ? <Spinner className="size-3.5" /> : <TrashIcon />}
             Delete
           </Button>
+          <ConfirmDialog
+            open={confirmingDelete}
+            title={`Delete your ${info.name} key?`}
+            description="AI checks using it will stop."
+            confirmLabel="Delete key"
+            pendingLabel="Deleting…"
+            destructive
+            isPending={remove.isPending}
+            error={remove.error ? describeAiError(remove.error, "Could not delete the key.") : null}
+            onConfirm={() => remove.mutate(credential.id, { onSuccess: () => setConfirmingDelete(false) })}
+            onOpenChange={setConfirmingDelete}
+          />
         </>
       }
     >

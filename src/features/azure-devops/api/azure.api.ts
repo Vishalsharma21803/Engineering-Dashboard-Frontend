@@ -39,13 +39,23 @@ function azurePath(credentialId: string, path: string, query: Query = {}): strin
 
 const segment = encodeURIComponent;
 
+/*
+ * Timeouts (contract 3): GETs default to 30 s; the heavy aggregations below get 120 s.
+ * Only short reads take TanStack's `signal`: cancelling a heavy one on unmount would throw
+ * away a costly backend answer and re-run it when the user comes back.
+ */
+const SLOW_READ = { timeoutMs: 120_000 };
+
 export interface ReadOptions {
   refresh?: boolean;
 }
 
-export async function getCapabilities(credentialId: string) {
+type Signal = AbortSignal | undefined;
+
+export async function getCapabilities(credentialId: string, signal?: Signal) {
   const response = await apiRequest<{ capabilities: Capabilities }>(
-    azurePath(credentialId, "/capabilities")
+    azurePath(credentialId, "/capabilities"),
+    { signal }
   );
   return response.capabilities;
 }
@@ -56,20 +66,23 @@ export async function getDashboard(
   options: ReadOptions = {}
 ) {
   const response = await apiRequest<{ dashboard: Dashboard }>(
-    azurePath(credentialId, "/dashboard", { projectId, refresh: options.refresh })
+    azurePath(credentialId, "/dashboard", { projectId, refresh: options.refresh }),
+    SLOW_READ
   );
   return response.dashboard;
 }
 
-export async function listProjects(credentialId: string) {
+export async function listProjects(credentialId: string, signal?: Signal) {
   return apiRequest<{ projects: ProjectSummary[]; truncated: boolean }>(
-    azurePath(credentialId, "/projects")
+    azurePath(credentialId, "/projects"),
+    { signal }
   );
 }
 
 export async function getProjectOverview(credentialId: string, projectId: string) {
   const response = await apiRequest<{ project: ProjectOverview }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}`)
+    azurePath(credentialId, `/projects/${segment(projectId)}`),
+    SLOW_READ
   );
   return response.project;
 }
@@ -77,7 +90,8 @@ export async function getProjectOverview(credentialId: string, projectId: string
 /** Every active pull request in one project (project overview), filtered and paged by the server. */
 export async function listProjectPullRequests(credentialId: string, projectId: string, input: { page: number; filters: PullRequestListFilters }) {
   const response = await apiRequest<{ pullRequests: PullRequestPage }>(
-    azurePath(credentialId, "/pull-requests", { projectId, role: "everyone", page: input.page, ...nonEmpty({ ...input.filters }) })
+    azurePath(credentialId, "/pull-requests", { projectId, role: "everyone", page: input.page, ...nonEmpty({ ...input.filters }) }),
+    SLOW_READ
   );
   return response.pullRequests;
 }
@@ -90,21 +104,24 @@ export async function listDashboardPullRequests(
   input: { page: number; hidden: boolean; filters: PullRequestListFilters }
 ) {
   const response = await apiRequest<{ pullRequests: PullRequestPage }>(
-    azurePath(credentialId, "/dashboard/pull-requests", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ ...input.filters }) })
+    azurePath(credentialId, "/dashboard/pull-requests", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ ...input.filters }) }),
+    SLOW_READ
   );
   return response.pullRequests;
 }
 
 export async function listDashboardPipelineRuns(credentialId: string, projectId: string | undefined, input: { page: number; hidden: boolean; result: string }) {
   const response = await apiRequest<{ runs: PipelineRunPage }>(
-    azurePath(credentialId, "/dashboard/pipeline-runs", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ result: input.result }) })
+    azurePath(credentialId, "/dashboard/pipeline-runs", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ result: input.result }) }),
+    SLOW_READ
   );
   return response.runs;
 }
 
 export async function getWorkItem(credentialId: string, projectId: string, workItemId: number) {
   const response = await apiRequest<{ workItem: WorkItemDetail }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/work-items/${workItemId}`)
+    azurePath(credentialId, `/projects/${segment(projectId)}/work-items/${workItemId}`),
+    SLOW_READ
   );
   return response.workItem;
 }
@@ -119,44 +136,50 @@ export async function getPullRequest(
     azurePath(
       credentialId,
       `/projects/${segment(projectId)}/repos/${segment(repositoryId)}/pull-requests/${pullRequestId}`
-    )
+    ),
+    SLOW_READ
   );
   return response.pullRequest;
 }
 
 /** 10 per page; without a page, `build` asks for the page holding that run's pipeline. */
-export async function listPipelines(credentialId: string, projectId: string, input: { page: number | undefined; build: number | undefined }) {
+export async function listPipelines(credentialId: string, projectId: string, input: { page: number | undefined; build: number | undefined }, signal?: Signal) {
   const response = await apiRequest<{ pipelines: Page<PipelineSummary> }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/pipelines`, { page: input.page, build: input.build })
+    azurePath(credentialId, `/projects/${segment(projectId)}/pipelines`, { page: input.page, build: input.build }),
+    { signal }
   );
   return response.pipelines;
 }
 
-export async function listPipelineRuns(credentialId: string, projectId: string, pipelineId: number) {
+export async function listPipelineRuns(credentialId: string, projectId: string, pipelineId: number, signal?: Signal) {
   const response = await apiRequest<{ runs: BuildSummary[] }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/pipelines/${pipelineId}/runs`, { top: 10 })
+    azurePath(credentialId, `/projects/${segment(projectId)}/pipelines/${pipelineId}/runs`, { top: 10 }),
+    { signal }
   );
   return response.runs;
 }
 
-export async function getBuildTimeline(credentialId: string, projectId: string, buildId: number) {
+export async function getBuildTimeline(credentialId: string, projectId: string, buildId: number, signal?: Signal) {
   const response = await apiRequest<{ timeline: BuildTimeline }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/builds/${buildId}/timeline`)
+    azurePath(credentialId, `/projects/${segment(projectId)}/builds/${buildId}/timeline`),
+    { signal }
   );
   return response.timeline;
 }
 
-export async function getDeployments(credentialId: string, projectId: string) {
+export async function getDeployments(credentialId: string, projectId: string, signal?: Signal) {
   const response = await apiRequest<{ deployments: Deployments }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/deployments`)
+    azurePath(credentialId, `/projects/${segment(projectId)}/deployments`),
+    { signal }
   );
   return response.deployments;
 }
 
 /** Every repository, for pickers. */
-export async function listRepositories(credentialId: string, projectId: string) {
+export async function listRepositories(credentialId: string, projectId: string, signal?: Signal) {
   const response = await apiRequest<{ repositories: RepositorySummary[] }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/repos`)
+    azurePath(credentialId, `/projects/${segment(projectId)}/repos`),
+    { signal }
   );
   return response.repositories;
 }
@@ -193,7 +216,8 @@ export async function getMyWorkPage(
       attention: input.attention || undefined,
       groupBy: input.groupBy === "story" ? "story" : undefined,
       ...nonEmpty(filters),
-    })
+    }),
+    SLOW_READ
   );
   return response.myWork;
 }
@@ -206,7 +230,8 @@ export async function getTeamWorkPage(
 ) {
   const { sop: _sop, ...filters } = input.filters;
   const response = await apiRequest<{ teamWork: TeamWorkPage }>(
-    azurePath(credentialId, `/projects/${segment(projectId)}/team-work-items`, { scope: input.scope, page: input.page, ...nonEmpty(filters) })
+    azurePath(credentialId, `/projects/${segment(projectId)}/team-work-items`, { scope: input.scope, page: input.page, ...nonEmpty(filters) }),
+    SLOW_READ
   );
   return response.teamWork;
 }

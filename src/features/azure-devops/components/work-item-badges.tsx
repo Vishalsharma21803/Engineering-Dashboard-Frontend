@@ -70,7 +70,7 @@ export function PriorityBadge({ priority }: { priority: number | null }) {
   }
 
   return (
-    <Hint label={`Priority ${priority}`}>
+    <Hint label={`Priority ${priority}`} focusable>
       <span
         className={cn(
           "inline-flex h-5 min-w-7 shrink-0 cursor-default items-center justify-center rounded px-1 text-[11px] font-bold",

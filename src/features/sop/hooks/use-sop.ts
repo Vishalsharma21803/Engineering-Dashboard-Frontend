@@ -8,15 +8,15 @@ import type { RuleEditsInput } from "../types/rules-list.types";
 import type { RulebookScope } from "../types/sop.types";
 
 export function useRulebook(scope: RulebookScope) {
-  return useQuery({ queryKey: sopKeys.rulebook(scope), queryFn: () => getRulebook(scope) });
+  return useQuery({ queryKey: sopKeys.rulebook(scope), queryFn: ({ signal }) => getRulebook(scope, signal) });
 }
 
 export function useRulebookVersions(scope: RulebookScope) {
-  return useQuery({ queryKey: sopKeys.versions(scope), queryFn: () => listRulebookVersions(scope) });
+  return useQuery({ queryKey: sopKeys.versions(scope), queryFn: ({ signal }) => listRulebookVersions(scope, signal) });
 }
 
 export function useEffectiveRules() {
-  return useQuery({ queryKey: sopKeys.effective, queryFn: getEffectiveRules });
+  return useQuery({ queryKey: sopKeys.effective, queryFn: ({ signal }) => getEffectiveRules(signal) });
 }
 
 export function useSaveRulebook(scope: RulebookScope) {
@@ -30,7 +30,7 @@ export function useSaveRulebook(scope: RulebookScope) {
 }
 
 export function useRulesList() {
-  return useQuery({ queryKey: sopKeys.rulesList, queryFn: getRulesList });
+  return useQuery({ queryKey: sopKeys.rulesList, queryFn: ({ signal }) => getRulesList(signal) });
 }
 
 /**

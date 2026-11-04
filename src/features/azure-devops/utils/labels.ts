@@ -35,6 +35,17 @@ export function actionKindLabel(kind: string): string {
   return ACTION_KIND_LABELS[kind as ActionKind] ?? kind;
 }
 
+/** Status words for people ("Succeeded", not the API's "SUCCEEDED"). */
+export const ACTION_STATUS_LABELS: Record<ActionStatus, string> = {
+  PENDING: "Pending approval",
+  APPROVED: "Approved",
+  EXECUTING: "Running",
+  SUCCEEDED: "Succeeded",
+  FAILED: "Failed",
+  REJECTED: "Rejected",
+  EXPIRED: "Expired",
+};
+
 export const ACTION_STATUS_TONES: Record<ActionStatus, Tone> = {
   PENDING: "warning",
   APPROVED: "info",

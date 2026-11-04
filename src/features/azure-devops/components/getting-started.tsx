@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useState } from "react";
 
+import { modKey } from "@/utils/platform";
 import { readStored, writeStored } from "../utils/stored";
 
 const KEY = "cockpit:tips-dismissed";
@@ -8,7 +9,7 @@ const KEY = "cockpit:tips-dismissed";
 const TIPS = [
   { title: "Your sprint at a glance", text: "The bar shows how much of your work is finished; the tick is today. Hours left are compared with the working hours you have left." },
   { title: "Problems sit on the ticket", text: "A warning on a row says what is missing. Fix… proposes the change, and nothing is written to Azure DevOps until you approve it." },
-  { title: "Find anything fast", text: "Press ⌘K (Ctrl+K) to jump to any of your tickets or pull requests, and J / K to move through the list." },
+  { title: "Find anything fast", text: `Press ${modKey}K to jump to any of your tickets or pull requests, and J / K to move through the list.` },
 ];
 
 /** Three short tips on the first visit; dismissed once, remembered in this browser. */
@@ -17,19 +18,21 @@ export function GettingStarted() {
   if (dismissed) return null;
 
   return (
-    <section aria-label="Getting started" className="relative rounded-xl border border-indigo-100 bg-indigo-50/60 px-5 py-4">
-      <button
-        type="button"
-        onClick={() => {
-          setDismissed(true);
-          writeStored(KEY, true);
-        }}
-        className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-700 outline-none hover:bg-indigo-100 focus-visible:ring-2 focus-visible:ring-indigo-500"
-      >
-        Got it
-        <X aria-hidden="true" className="size-3.5" />
-      </button>
-      <h2 className="text-sm font-semibold text-slate-950">New here? Three things to know</h2>
+    <section aria-label="Getting started" className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-sm font-semibold text-slate-950">New here? Three things to know</h2>
+        <button
+          type="button"
+          onClick={() => {
+            setDismissed(true);
+            writeStored(KEY, true);
+          }}
+          className="-mr-2 -mt-1 inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-indigo-700 outline-none hover:bg-indigo-100 focus-visible:ring-2 focus-visible:ring-indigo-500"
+        >
+          Got it
+          <X aria-hidden="true" className="size-3.5" />
+        </button>
+      </div>
       <ol className="mt-3 grid gap-4 sm:grid-cols-3">
         {TIPS.map((tip, index) => (
           <li key={tip.title} className="flex gap-3">

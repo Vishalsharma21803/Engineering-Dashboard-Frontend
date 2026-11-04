@@ -3,6 +3,7 @@ import type {
   AuthResponse,
   CurrentUserResponse,
   LoginInput,
+  LogoutResponse,
   RegisterInput,
   User,
 } from "../types/auth.types";
@@ -51,8 +52,9 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 }
 
-export async function logoutAccount(): Promise<void> {
-  await apiRequest<{ message: string }>("/api/auth/logout", {
+/** The body says when the server could not end the session (reason SESSION_NOT_REVOKED). */
+export async function logoutAccount(): Promise<LogoutResponse | undefined> {
+  return apiRequest<LogoutResponse | undefined>("/api/auth/logout", {
     method: "POST",
   });
 }

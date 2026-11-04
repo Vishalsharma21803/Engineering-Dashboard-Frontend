@@ -50,7 +50,7 @@ export function RegisterPage() {
         password: values.password,
       },
       {
-        onSuccess: (user) => {
+        onSuccess: ({ user, loginError }) => {
           if (user) {
             navigate("/", { replace: true });
             return;
@@ -61,6 +61,7 @@ export function RegisterPage() {
             state: {
               registered: true,
               email: values.email,
+              loginError,
             },
           });
         },

@@ -187,6 +187,10 @@ export interface DayDraft {
   busy: Array<{ start: string; end: string }>;
   rows: DraftRow[];
   truncated: boolean;
+  /** "scan": more tickets I changed since that day than were read; "rows": more activity rows than one draft holds (50). */
+  truncatedReason?: "scan" | "rows" | null;
+  /** Reads that failed or were cut; the draft is still made, but may be incomplete. */
+  warnings?: string[];
 }
 
 export interface HoursEstimate {

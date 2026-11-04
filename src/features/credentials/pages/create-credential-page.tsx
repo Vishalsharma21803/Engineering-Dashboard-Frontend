@@ -61,7 +61,7 @@ export function CreateCredentialPage() {
             <Spinner className="size-4" /> Loading platforms…
           </p>
         ) : !platforms.data || !platform ? (
-          <ErrorCard error={platforms.error ?? new Error("No platform can be connected right now.")} onRetry={() => void platforms.refetch()} />
+          <ErrorCard error={platforms.error ?? new Error("No platform can be connected right now.")} onRetry={() => void platforms.refetch()} isRetrying={platforms.isFetching} />
         ) : (
           <>
             {/* A failed background refresh keeps the form (and what was typed) on screen. */}

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -19,10 +19,17 @@ import {
   type LoginFormValues,
 } from "../schemas/auth.schema";
 import { getPostLoginRedirect } from "../utils/redirect-path";
+import { clearSessionExpired } from "../utils/session-expiry";
 
 interface LoginLocationState {
   registered?: boolean;
   email?: string;
+  /** The account was created but signing in right after failed: why. */
+  loginError?: string;
+  /** "expired": the session ended on its own (ProtectedRoute). */
+  reason?: string;
+  /** Said by the server on sign-out, e.g. that the session could not be ended there. */
+  notice?: string;
 }
 
 export function LoginPage() {
@@ -32,6 +39,14 @@ export function LoginPage() {
   const location = useLocation();
   const locationState = location.state as LoginLocationState | null;
   const redirectTo = getPostLoginRedirect(location.state);
+  const expired = locationState?.reason === "expired";
+
+  // The notice below has said it; a later sign-out redirect must not repeat it.
+  useEffect(() => {
+    if (expired) {
+      clearSessionExpired();
+    }
+  }, [expired]);
 
   const {
     register,
@@ -84,8 +99,24 @@ export function LoginPage() {
         onSubmit={onSubmit}
         noValidate
       >
-        {locationState?.registered ? (
+        {locationState?.registered && locationState.loginError ? (
+          <FormNotice
+            tone="warning"
+            message={`Account created, but signing you in failed: ${locationState.loginError.replace(/\.+$/, "")}. Sign in below.`}
+          />
+        ) : locationState?.registered ? (
           <FormNotice message="Account created. Sign in with your new password to continue." />
+        ) : null}
+
+        {expired ? (
+          <FormNotice
+            tone="warning"
+            message="Your session expired. Sign in again to continue where you were."
+          />
+        ) : null}
+
+        {locationState?.notice ? (
+          <FormNotice tone="warning" message={locationState.notice} />
         ) : null}
 
         {formError ? <FormError message={formError} /> : null}

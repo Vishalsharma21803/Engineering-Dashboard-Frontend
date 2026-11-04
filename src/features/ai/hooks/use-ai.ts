@@ -17,32 +17,32 @@ import { aiKeys } from "../api/ai.keys";
 import type { AiProvider } from "../types/ai.types";
 
 export function useAiCredentials() {
-  return useQuery({ queryKey: aiKeys.credentials, queryFn: listAiCredentials });
+  return useQuery({ queryKey: aiKeys.credentials, queryFn: ({ signal }) => listAiCredentials(signal) });
 }
 
 export function useAiModels(provider: AiProvider | null, enabled = true) {
   return useQuery({
     queryKey: aiKeys.models(provider ?? "none"),
-    queryFn: () => listAiModels(provider ?? "CLAUDE"),
+    queryFn: ({ signal }) => listAiModels(provider ?? "CLAUDE", signal),
     enabled: provider !== null && enabled,
     staleTime: 10 * 60_000,
   });
 }
 
 export function useAiPreference() {
-  return useQuery({ queryKey: aiKeys.preference, queryFn: getAiPreference });
+  return useQuery({ queryKey: aiKeys.preference, queryFn: ({ signal }) => getAiPreference(signal) });
 }
 
 export function useAiUsage() {
-  return useQuery({ queryKey: aiKeys.usage, queryFn: getAiUsage });
+  return useQuery({ queryKey: aiKeys.usage, queryFn: ({ signal }) => getAiUsage(signal) });
 }
 
 export function useSopCheckTiming() {
-  return useQuery({ queryKey: aiKeys.timing, queryFn: getSopCheckTiming });
+  return useQuery({ queryKey: aiKeys.timing, queryFn: ({ signal }) => getSopCheckTiming(signal) });
 }
 
 export function useOpenRouterAllowlist() {
-  return useQuery({ queryKey: aiKeys.allowlist, queryFn: getOpenRouterAllowlist });
+  return useQuery({ queryKey: aiKeys.allowlist, queryFn: ({ signal }) => getOpenRouterAllowlist(signal) });
 }
 
 /** Any key change can invalidate the saved AI settings, so refresh everything AI-related. */
@@ -55,6 +55,8 @@ export function useReplaceAiKey() {
   const invalidate = useInvalidateAi();
   return useMutation({
     mutationFn: ({ id, apiKey }: { id: string; apiKey: string }) => replaceAiKey(id, apiKey),
+    // The variables hold the key: do not keep them once the call is done.
+    gcTime: 0,
     onSettled: invalidate,
   });
 }

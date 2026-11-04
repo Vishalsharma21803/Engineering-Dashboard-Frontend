@@ -10,12 +10,15 @@ import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { SelectField } from "@/components/ui/select-field";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { Checkbox } from "@/components/ui/checkbox";
-import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
+import { EmptyState, ErrorCard, PartialReadNotice, SkeletonRows, StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
+import { useUnsavedStash } from "@/hooks/use-unsaved-stash";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { cn } from "@/utils/cn";
 import { estimateDraft, getDraft } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
@@ -25,6 +28,14 @@ import { formatDayLabel, formatHours, shiftDay, zonedClock, zonedInstant } from 
 import { LoadErrorNotice } from "./load-error-notice";
 
 const HOUR = 3_600_000;
+/** Unsaved edits older than this are not brought back after a sign-out. */
+const STASH_MAX_AGE_MS = 12 * HOUR;
+/** Why a draft may be missing tickets (DayDraft.truncatedReason). */
+const TRUNCATED_TEXT: Record<NonNullable<DayDraft["truncatedReason"]> | "none", string | null> = {
+  scan: "More than 200 tickets you changed since this day were found; only the 200 most recent were checked.",
+  rows: "Only the 50 most recently changed tickets are shown.",
+  none: null,
+};
 /** AI errors that are fixed on the Credentials page. */
 const AI_SETUP_REASONS = new Set(["AI_NOT_CONFIGURED", "AI_KEY_REQUIRED", "AI_MODEL_UNAVAILABLE", "DATA_COLLECTION_NOT_ACCEPTED", "AI_KEY_INVALID", "DAILY_LIMIT_REACHED"]);
 
@@ -93,7 +104,7 @@ function HoursBadge({ edit, row }: { edit: Editable; row: DraftRow }) {
 
 function aiErrorText(error: unknown): { text: string; setup: boolean } {
   if (error instanceof ApiError) {
-    return { text: error.message, setup: AI_SETUP_REASONS.has(error.reason ?? "") };
+    return { text: errorMessage(error, "The AI could not check the hours. Try again."), setup: AI_SETUP_REASONS.has(error.reason ?? "") };
   }
 
   return { text: `The AI could not check the hours${error instanceof Error && error.message ? `: ${error.message}` : "."} Try again.`, setup: false };
@@ -140,8 +151,11 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
     // Rebuild replaces the edits on purpose: no "reloaded" notice for it.
     setRebuildAsked(true);
     estimate.reset();
+    const queryKey = solidtimeKeys.draft(connection.credentialId, day);
+    // A load already running would be reused as is (without refresh=true): cancel it first.
     void queryClient
-      .fetchQuery({ queryKey: solidtimeKeys.draft(connection.credentialId, day), queryFn: () => getDraft(connection.credentialId, day, { refresh: true }), retry: retryUnlessClientError, staleTime: 0 })
+      .cancelQueries({ queryKey, exact: true })
+      .then(() => queryClient.fetchQuery({ queryKey, queryFn: () => getDraft(connection.credentialId, day, { refresh: true }), retry: retryUnlessClientError, staleTime: 0 }))
       // The failure is shown from the query's own error state.
       .catch(() => undefined);
   };
@@ -154,6 +168,30 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
   const rows = edits.source === data && data !== undefined ? edits.rows : initial;
   // The same day came back as a new draft (e.g. refetched after an approval) without me asking: my edits were replaced.
   const editsReplaced = !rebuildAsked && data !== undefined && edits.source !== undefined && edits.source !== data && edits.source.day === data.day;
+  // Edits made on this draft are kept through a session expiry (restored on the same day, within 12 h).
+  const unsavedRows = useMemo(
+    () => (data !== undefined && edits.source === data && JSON.stringify(edits.rows) !== JSON.stringify(initial) ? { day: data.day, rows: edits.rows } : null),
+    [data, edits, initial]
+  );
+  const unsaved = useUnsavedStash<{ day: string; rows: Record<number, Editable> }>(`draft:${connection.credentialId}:${day}`, unsavedRows, STASH_MAX_AGE_MS);
+  const [restoredFor, setRestoredFor] = useState<DayDraft | null>(null);
+  const [stashCheckedDays, setStashCheckedDays] = useState<string[]>([]);
+
+  // The first time a day's draft shows, bring back edits that were not proposed when the session ended
+  // (adjusted during render, so the restored rows are what is shown first).
+  if (data && !stashCheckedDays.includes(data.day)) {
+    setStashCheckedDays([...stashCheckedDays, data.day]);
+    const kept = unsaved.read()?.value;
+
+    if (kept?.day === data.day && edits.source !== data) {
+      // Only rows still in this draft come back; new rows keep their suggestions.
+      const rowsBack = Object.fromEntries(
+        Object.entries(initial).map(([ticketId, edit]) => [ticketId, kept.rows[Number(ticketId)] ?? edit])
+      ) as Record<number, Editable>;
+      setEdits({ source: data, rows: rowsBack });
+      setRestoredFor(data);
+    }
+  }
   const [aiResult, setAiResult] = useState<{ source: DayDraft; estimate: DraftEstimate; asked: number[] } | null>(null);
 
   const dayStart = data ? zonedInstant(data.day, "00:00", timeZone) : null;
@@ -371,23 +409,38 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
           </p>
         ) : null}
         {shownAi ? (
-          <p role="status" className="text-sm text-slate-600">
+          <StatusNotice as="p" className="text-sm text-slate-600">
             {aiSummary(shownAi.estimate, shownAi.asked)}
-          </p>
+          </StatusNotice>
         ) : null}
       </Card>
 
       {editsReplaced ? (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <StatusNotice className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>This day was loaded again (for example after an approval changed Solidtime), so your unsaved edits and AI hours were replaced. Rows already in Solidtime now say so.</span>
           <Button size="sm" variant="secondary" onClick={() => save(initial)}>
             OK
           </Button>
-        </div>
+        </StatusNotice>
+      ) : null}
+      {restoredFor !== null && restoredFor === data ? (
+        <StatusNotice className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>Restored your unsaved edits from before you were signed out.</span>
+          <span className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setRestoredFor(null)}>
+              OK
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { unsaved.drop(); setRestoredFor(null); save(initial); }}>
+              Discard
+            </Button>
+          </span>
+        </StatusNotice>
       ) : null}
       {/* A failed Rebuild keeps the draft and the edits made on it. */}
       {draft.error && data ? <StaleDataBanner error={draft.error} onRetry={rebuild} isRetrying={draft.isFetching} /> : null}
       {catalog.isError && !catalog.data ? <LoadErrorNotice what="Solidtime projects" error={catalog.error} onRetry={() => void catalog.refetch()} isRetrying={catalog.isFetching} /> : null}
+      {/* What the draft may be missing: tickets past the caps, and reads that failed or were cut. */}
+      {data ? <PartialReadNotice messages={[TRUNCATED_TEXT[data.truncatedReason ?? "none"], ...(data.warnings ?? [])]} /> : null}
 
       {draft.isLoading ? (
         <SkeletonRows rows={4} />
@@ -488,7 +541,7 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
                       {parseHours(edit.hours) !== edit.ai.ruleHours ? ` (the rules said ${edit.ai.ruleHours} h)` : ""}
                     </p>
                   ) : null}
-                  {row.note ? <p className="mt-2 text-xs text-amber-700">{row.note}</p> : null}
+                  {row.note ? <p className="mt-2 text-xs break-words text-amber-700">{row.note}</p> : null}
                   {problem ? <p className="mt-2 text-xs font-medium text-rose-600">{problem}</p> : null}
                   {overlap ? <p className="mt-2 text-xs text-amber-700">{overlap}</p> : null}
 
@@ -508,7 +561,6 @@ export function DraftTab({ connection, onPropose, isProposing, today }: { connec
               );
             })}
           </ul>
-          {data.truncated ? <p className="text-xs text-amber-700">Only the 50 most recently changed tickets are shown.</p> : null}
 
           <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-surface/95 px-4 py-3 shadow-lg backdrop-blur">
             <p className="text-sm text-slate-700">

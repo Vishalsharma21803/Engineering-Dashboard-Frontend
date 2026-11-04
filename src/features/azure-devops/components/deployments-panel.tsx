@@ -13,11 +13,11 @@ function resultTone(result: string | null): Tone {
 }
 
 export function DeploymentsPanel({ credentialId, projectId }: { credentialId: string; projectId: string }) {
-  const { data: deployments, isLoading, error, refetch } = useDeployments(credentialId, projectId);
+  const { data: deployments, isLoading, isFetching, error, refetch } = useDeployments(credentialId, projectId);
 
   if (isLoading) return <SkeletonRows rows={2} />;
   if (error || !deployments) {
-    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} />;
+    return <ErrorCard error={error} credentialId={credentialId} onRetry={() => void refetch()} isRetrying={isFetching} />;
   }
 
   return (

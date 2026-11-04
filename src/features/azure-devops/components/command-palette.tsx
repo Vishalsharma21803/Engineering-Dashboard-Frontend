@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { cn } from "@/utils/cn";
+import { useDashboard } from "../hooks/use-dashboard";
 import type { Dashboard } from "../types/azure.types";
 import { StatusIcon } from "./status-icon";
 
@@ -31,7 +33,8 @@ interface CommandPaletteProps {
 
 /**
  * ⌘K / Ctrl+K: jump to any of my tickets, pull requests or pages. It searches
- * what the dashboard already loaded, so it opens instantly and calls nothing.
+ * what the dashboard already loaded, so it opens instantly; opened before any
+ * dashboard was loaded (e.g. on a project page), it loads My work's dashboard itself.
  * G then a letter jumps to a page (G M My work, G O overview, G A approvals…).
  */
 export function CommandPalette({ credentialId, pages }: CommandPaletteProps) {
@@ -91,10 +94,17 @@ export function CommandPalette({ credentialId, pages }: CommandPaletteProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [navigate]);
 
+  const cachedDashboards = () =>
+    queryClient.getQueriesData<Dashboard>({ queryKey: ["azure", credentialId, "dashboard"] }).map(([, data]) => data).filter((data): data is Dashboard => Boolean(data));
+  // Nothing cached to search: load the dashboard (all projects) while the palette is open.
+  const fallback = useDashboard(credentialId, undefined, { enabled: open && cachedDashboards().length === 0 });
+
   const entries = useMemo<Entry[]>(() => {
     if (!open) return [];
     const base = `/azure/${encodeURIComponent(credentialId)}`;
     const dashboards = queryClient.getQueriesData<Dashboard>({ queryKey: ["azure", credentialId, "dashboard"] }).map(([, data]) => data).filter((data): data is Dashboard => Boolean(data));
+    // The palette's own load, once it arrives.
+    if (fallback.data && !dashboards.includes(fallback.data)) dashboards.push(fallback.data);
     const tickets = new Map<number, Entry>();
     const pullRequests = new Map<number, Entry>();
     for (const dashboard of dashboards) {
@@ -128,7 +138,10 @@ export function CommandPalette({ credentialId, pages }: CommandPaletteProps) {
       haystack: page.label.toLowerCase(),
     }));
     return [...tickets.values(), ...pullRequests.values(), ...pageEntries];
-  }, [open, credentialId, queryClient, pages]);
+  }, [open, credentialId, queryClient, pages, fallback.data]);
+  const hasTickets = entries.some((entry) => !entry.id.startsWith("page:"));
+  const loadingTickets = open && !hasTickets && fallback.isFetching;
+  const ticketsFailed = open && !hasTickets && Boolean(fallback.error) && !fallback.isFetching;
 
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const results = (words.length === 0 ? entries : entries.filter((entry) => words.every((word) => entry.haystack.includes(word)))).slice(0, 12);
@@ -179,9 +192,18 @@ export function CommandPalette({ credentialId, pages }: CommandPaletteProps) {
           />
           <kbd className="hidden shrink-0 rounded border border-slate-200 px-1.5 text-[11px] text-slate-500 sm:inline">Esc</kbd>
         </div>
+        {loadingTickets ? (
+          <StatusNotice as="p" className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
+            Loading your tickets…
+          </StatusNotice>
+        ) : ticketsFailed ? (
+          <StatusNotice as="p" className="border-b border-slate-100 px-4 py-2 text-xs text-amber-700">
+            Your tickets could not be loaded; only pages are searchable.
+          </StatusNotice>
+        ) : null}
         <ul id="command-results" role="listbox" ref={listRef} aria-label="Results" className="max-h-80 overflow-y-auto p-1.5">
           {results.length === 0 ? (
-            <li className="px-3 py-6 text-center text-sm text-slate-500">Nothing matches. Try a ticket number or a word from its title.</li>
+            <li className="px-3 py-6 text-center text-sm text-slate-500">No tickets or pull requests match.</li>
           ) : (
             results.map((entry, index) => (
               <li

@@ -5,6 +5,7 @@ import type {
 } from "react-hook-form";
 
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 
 export function applyApiError<TFieldValues extends FieldValues>(
   error: unknown,
@@ -27,9 +28,6 @@ export function applyApiError<TFieldValues extends FieldValues>(
     }
   }
 
-  if (error.status >= 500) {
-    return fallbackMessage;
-  }
-
-  return error.message || fallbackMessage;
+  // The server's reason, also for 5xx (with the status when the reason is unknown).
+  return errorMessage(error, fallbackMessage);
 }

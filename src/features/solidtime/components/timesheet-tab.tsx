@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Hint } from "@/components/ui/hint";
 import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
+import { Segmented } from "@/components/ui/segmented";
 import { Spinner } from "@/components/ui/spinner";
 import { Updating } from "@/components/ui/updating";
 import { EmptyState, ErrorCard, SkeletonRows, StaleDataBanner, StatTile } from "@/features/azure-devops/components/feedback";
@@ -31,9 +32,6 @@ interface TabProps {
 type Mode = "day" | "week";
 type View = "entries" | "tickets";
 
-const SEGMENT = "rounded-md px-3 py-1.5 text-sm font-medium transition";
-const SEGMENT_ON = "bg-inverse text-on-inverse shadow-sm";
-const SEGMENT_OFF = "text-slate-600 hover:text-slate-950";
 
 function EntryRow({
   entry,
@@ -174,23 +172,19 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-3 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Period" className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            {(["day", "week"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={mode === value}
-                onClick={() => {
-                  setMode(value);
-                  setEditing(null);
-                  resetPages();
-                }}
-                className={cn(SEGMENT, mode === value ? SEGMENT_ON : SEGMENT_OFF)}
-              >
-                {value === "day" ? "Day" : "Week"}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="Period"
+            value={mode}
+            options={[
+              { value: "day", label: "Day" },
+              { value: "week", label: "Week" },
+            ]}
+            onChange={(value) => {
+              setMode(value);
+              setEditing(null);
+              resetPages();
+            }}
+          />
           <div className="inline-flex items-center gap-1">
             <Hint label={`Previous ${unit}`}>
               <Button size="sm" variant="secondary" aria-label={`Previous ${unit}`} onClick={() => goTo(shiftDay(anchor, -step))}>
@@ -259,7 +253,7 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
                             picked ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/20" : "border-slate-200 bg-surface",
                           )}
                         >
-                          <span className={cn("text-[11px] font-semibold uppercase tracking-wide", day.day === today ? "text-indigo-600" : "text-slate-500")}>
+                          <span className={cn("text-xs font-semibold uppercase tracking-wide", day.day === today ? "text-indigo-600" : "text-slate-500")}>
                             {formatDayLabel(day.day, { weekday: "short" })}
                           </span>
                           <span className="text-lg font-semibold leading-none text-slate-950">{Number(day.day.slice(8))}</span>
@@ -282,14 +276,15 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
               <p className="text-xs text-amber-700">Ticket numbers were not checked against Azure DevOps (no organization linked, or it could not be read).</p>
             ) : null}
 
-            <div role="group" aria-label="Show" className="inline-flex w-fit rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-              <button type="button" aria-pressed={view === "entries"} onClick={() => setView("entries")} className={cn(SEGMENT, view === "entries" ? SEGMENT_ON : SEGMENT_OFF)}>
-                Entries ({sheet.data.entries.total})
-              </button>
-              <button type="button" aria-pressed={view === "tickets"} onClick={() => setView("tickets")} className={cn(SEGMENT, view === "tickets" ? SEGMENT_ON : SEGMENT_OFF)}>
-                By ticket ({sheet.data.byTicket.total})
-              </button>
-            </div>
+            <Segmented
+              label="Show"
+              value={view}
+              options={[
+                { value: "entries", label: `Entries (${sheet.data.entries.total})` },
+                { value: "tickets", label: `By ticket (${sheet.data.byTicket.total})` },
+              ]}
+              onChange={setView}
+            />
 
             {view === "entries" ? (
               <section aria-labelledby="entries-title" className="flex flex-col gap-2">

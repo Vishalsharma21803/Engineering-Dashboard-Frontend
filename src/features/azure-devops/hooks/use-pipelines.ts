@@ -13,7 +13,7 @@ import { retryUnlessClientError } from "../utils/query-retry";
 export function usePipelines(credentialId: string, projectId: string, input: { page: number | undefined; build: number | undefined }) {
   return useQuery({
     queryKey: [...azureKeys.pipelines(credentialId, projectId), input],
-    queryFn: () => listPipelines(credentialId, projectId, input),
+    queryFn: ({ signal }) => listPipelines(credentialId, projectId, input, signal),
     placeholderData: keepPreviousData,
     retry: retryUnlessClientError,
   });
@@ -22,7 +22,7 @@ export function usePipelines(credentialId: string, projectId: string, input: { p
 export function usePipelineRuns(credentialId: string, projectId: string, pipelineId: number | null) {
   return useQuery({
     queryKey: azureKeys.pipelineRuns(credentialId, projectId, pipelineId ?? 0),
-    queryFn: () => listPipelineRuns(credentialId, projectId, pipelineId ?? 0),
+    queryFn: ({ signal }) => listPipelineRuns(credentialId, projectId, pipelineId ?? 0, signal),
     retry: retryUnlessClientError,
     enabled: pipelineId !== null,
   });
@@ -31,7 +31,7 @@ export function usePipelineRuns(credentialId: string, projectId: string, pipelin
 export function useBuildTimeline(credentialId: string, projectId: string, buildId: number | null) {
   return useQuery({
     queryKey: azureKeys.timeline(credentialId, projectId, buildId ?? 0),
-    queryFn: () => getBuildTimeline(credentialId, projectId, buildId ?? 0),
+    queryFn: ({ signal }) => getBuildTimeline(credentialId, projectId, buildId ?? 0, signal),
     retry: retryUnlessClientError,
     enabled: buildId !== null,
   });
@@ -40,7 +40,7 @@ export function useBuildTimeline(credentialId: string, projectId: string, buildI
 export function useDeployments(credentialId: string, projectId: string) {
   return useQuery({
     queryKey: azureKeys.deployments(credentialId, projectId),
-    queryFn: () => getDeployments(credentialId, projectId),
+    queryFn: ({ signal }) => getDeployments(credentialId, projectId, signal),
     retry: retryUnlessClientError,
   });
 }

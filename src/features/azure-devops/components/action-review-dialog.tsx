@@ -3,11 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { StatusNotice } from "@/components/ui/status-notice";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { useApproveAction, useRejectAction } from "../hooks/use-actions";
 import type { ActionFailurePayload, ProposedAction, Verification } from "../types/action.types";
 import { formatDateTime, formatValue } from "../utils/format";
-import { ACTION_STATUS_TONES, actionKindLabel } from "../utils/labels";
+import { ACTION_STATUS_LABELS, ACTION_STATUS_TONES, actionKindLabel } from "../utils/labels";
 import { StatusBadge } from "./status-badge";
 
 interface ActionReviewDialogProps {
@@ -63,7 +65,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
           const payload = error instanceof ApiError ? (error.payload as ActionFailurePayload | null) : null;
           setOutcome({
             kind: "failed",
-            message: error instanceof ApiError ? error.message : "The action could not be executed.",
+            message: errorMessage(error, "The action could not be executed."),
             action: payload?.action ?? null,
           });
         },
@@ -83,7 +85,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
         onError: (error) =>
           setOutcome({
             kind: "failed",
-            message: error instanceof ApiError ? error.message : "The action could not be rejected.",
+            message: errorMessage(error, "The action could not be rejected."),
             action: null,
           }),
       }
@@ -117,7 +119,7 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
               <p className="text-sm font-medium text-slate-500">
                 {canDecide ? "Approval required" : "Action"} · {actionKindLabel(shown.kind)}
               </p>
-              <StatusBadge tone={ACTION_STATUS_TONES[shown.status]}>{shown.status}</StatusBadge>
+              <StatusBadge tone={ACTION_STATUS_TONES[shown.status]}>{ACTION_STATUS_LABELS[shown.status] ?? shown.status}</StatusBadge>
             </div>
 
             <DialogTitle className="mt-2 text-lg font-semibold tracking-tight">
@@ -131,29 +133,32 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
               {shown.status === "PENDING" ? ` · expires ${formatDateTime(shown.expiresAt)}` : ""}
             </p>
 
-            <table className="mt-4 w-full overflow-hidden rounded-lg border border-slate-200 text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Field</th>
-                  <th className="px-3 py-2 font-medium">Current</th>
-                  <th className="px-3 py-2 font-medium">Proposed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {shown.preview.map((change) => (
-                  <tr key={change.field}>
-                    <td className="px-3 py-2 font-medium text-slate-700">{change.field}</td>
-                    <td className="whitespace-pre-wrap px-3 py-2 text-slate-500">{formatValue(change.before)}</td>
-                    <td className="whitespace-pre-wrap px-3 py-2 font-medium text-slate-950">
-                      {formatValue(change.after)}
-                    </td>
+            {/* Long values wrap, and a wide table scrolls inside its frame, never past the dialog. */}
+            <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full table-fixed text-left text-sm sm:table-auto">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="w-1/4 px-3 py-2 font-medium sm:w-auto">Field</th>
+                    <th className="px-3 py-2 font-medium">Current</th>
+                    <th className="px-3 py-2 font-medium">Proposed</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {shown.preview.map((change) => (
+                    <tr key={change.field}>
+                      <td className="px-3 py-2 font-medium break-words text-slate-700">{change.field}</td>
+                      <td className="whitespace-pre-wrap px-3 py-2 text-slate-500 [overflow-wrap:anywhere]">{formatValue(change.before)}</td>
+                      <td className="whitespace-pre-wrap px-3 py-2 font-medium text-slate-950 [overflow-wrap:anywhere]">
+                        {formatValue(change.after)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
             {outcome?.kind === "executed" ? (
-              <div role="status" className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <StatusNotice className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
                 <p className="font-medium">Executed in {platform}.</p>
                 <ul className="mt-1 space-y-0.5">
                   {outcome.verification.checks.map((check) => (
@@ -162,13 +167,13 @@ export function ActionReviewDialog({ action, onClose }: ActionReviewDialogProps)
                     </li>
                   ))}
                 </ul>
-              </div>
+              </StatusNotice>
             ) : null}
 
             {outcome?.kind === "rejected" ? (
-              <p role="status" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <StatusNotice as="p" className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                 Rejected. Nothing was changed in {platform}.
-              </p>
+              </StatusNotice>
             ) : null}
 
             {outcome?.kind === "failed" ? (

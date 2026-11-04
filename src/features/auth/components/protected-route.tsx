@@ -6,6 +6,7 @@ import {
 
 import { PageLoader } from "@/components/ui/page-loader";
 import { useAuth } from "../hooks/use-auth";
+import { isSessionExpired } from "../utils/session-expiry";
 import { ServerUnavailable } from "./server-unavailable";
 
 export function ProtectedRoute() {
@@ -37,7 +38,11 @@ export function ProtectedRoute() {
       <Navigate
         to="/login"
         replace
-        state={{ from: location }}
+        state={{
+          from: location,
+          // The session ended on its own (a 401), not by signing out.
+          ...(isSessionExpired() ? { reason: "expired" } : {}),
+        }}
       />
     );
   }

@@ -50,6 +50,17 @@ export interface IterationSummary {
 
 export type SectionStatus = "ok" | "forbidden" | "error";
 
+/** How complete a list read was. `note` is a ready-to-show sentence (null when nothing was cut or failed). */
+export interface ReadCompleteness {
+  /** More existed than was read (a cap was hit). */
+  truncated: boolean;
+  /** The cap that applied (items listed at most). */
+  cap: number | null;
+  /** Projects whose part of the list could not be read (names). */
+  failedProjects: string[];
+  note: string | null;
+}
+
 export interface Section<T> {
   status: SectionStatus;
   data: T | null;
@@ -67,6 +78,12 @@ export interface ProjectOverview extends ProjectSummary {
     activePullRequests: Section<number>;
     failingPipelines: Section<number>;
   };
+  /** `counts.myOpenWorkItems` hit the list cap: show it as "n+". */
+  myOpenWorkItemsTruncated?: boolean;
+  /** `counts.activePullRequests` hit its cap: show it as "n+". */
+  activePullRequestsTruncated?: boolean;
+  /** More pipelines than were read: show `counts.failingPipelines` as "n+". */
+  failingPipelinesTruncated?: boolean;
 }
 
 export type StateCategory =
@@ -85,6 +102,8 @@ export interface WorkItemSummary {
   title: string;
   state: string;
   stateCategory: StateCategory;
+  /** "guessed": the type's states could not be read, so open/closed comes from the state name. */
+  stateCategorySource?: "azure" | "guessed";
   reason: string | null;
   priority: number | null;
   assignedTo: IdentityRef | null;
@@ -153,6 +172,8 @@ export interface WorkItemDetail extends WorkItemSummary {
   reproSteps: string;
   comments: Section<WorkItemComment[]>;
   history: Section<WorkFieldChange[]>;
+  /** Part of the middle of a very long history was not read. */
+  historyTruncated?: boolean;
   linkedPullRequests: Section<LinkedPullRequest[]>;
   allowedStates: Array<{ name: string; category: StateCategory }>;
   supportedFields: SupportedWorkFields;
@@ -241,6 +262,8 @@ export interface PullRequestDetail extends PullRequestSummary {
   threads: Section<PullRequestThread[]>;
   policies: Section<PolicyEvaluation[]>;
   linkedWorkItemIds: Section<number[]>;
+  /** Titles of the linked tickets; absent when they could not be read. Ids missing here show as "#id". */
+  linkedWorkItems?: Array<{ id: number; title: string; state: string; type: string }>;
 }
 
 export interface BuildSummary {
@@ -410,6 +433,8 @@ export interface ComplianceResult {
   cleared: Array<ComplianceRuleRef & { reason: string; quotes: string[] }>;
   /** The user's last AI review of this ticket (saved; the dashboard never calls the AI). */
   aiReview: ComplianceAiReview | null;
+  /** Part of the ticket's very long history (middle revisions or oldest comments) was not read; results are unchanged. */
+  historyTruncated?: boolean;
 }
 
 export interface ComplianceAiReview {
@@ -463,6 +488,12 @@ export interface Dashboard {
     compliance: Section<ComplianceResult[]>;
   };
   recommendations: Recommendation[];
+  /** "Bug in Alpha" pairs whose states could not be read (their tickets' open/closed is guessed). */
+  stateLookupFailed?: string[];
+  /** The ticket list was cut at `cap` (most recently changed kept). */
+  workItemsTruncated?: { cap: number } | null;
+  /** Null when that section could not be read at all. */
+  completeness?: { pullRequests: ReadCompleteness | null; pipelines: ReadCompleteness | null };
 }
 
 /** One page of a server-paged list (10 rows; the server clamps the page). */
@@ -556,10 +587,15 @@ export interface MyWorkPage extends Page<MyWorkGroup> {
   poolTotal: number;
   hiddenCount: number;
   showingHidden: boolean;
-  sprint: { mode: "current" | "all"; inSprint: number; names: string[] };
+  /** `unreadable`: projects whose current sprint could not be read (their tickets show in every view). */
+  sprint: { mode: "current" | "all"; inSprint: number; names: string[]; unreadable?: string[] };
   closed: { included: boolean; count: number };
   attention: { only: boolean; count: number };
   facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; sop: FacetOption[] };
+  /** The ticket list was cut at `cap` (most recently changed kept). */
+  workItemsTruncated?: { cap: number } | null;
+  /** "Bug in Alpha" pairs whose states could not be read (open/closed guessed). */
+  stateLookupFailed?: string[];
 }
 
 /** Filters for pull request lists; the server applies them before paging. */
@@ -577,6 +613,8 @@ export interface PullRequestPage extends Page<PullRequestSummary> {
   hiddenCount?: number;
   showingHidden?: boolean;
   facets: { person: FacetOption[]; review: FacetOption[]; repositories: FacetOption[] };
+  /** What the read left out (pull requests past the cap, projects that could not be read). */
+  completeness?: ReadCompleteness;
 }
 
 export interface PipelineRunPage extends Page<BuildSummary> {
@@ -584,10 +622,14 @@ export interface PipelineRunPage extends Page<BuildSummary> {
   hiddenCount: number;
   showingHidden: boolean;
   facets: { results: FacetOption[] };
+  /** What the read left out (runs past the cap, projects that could not be read). */
+  completeness?: ReadCompleteness;
 }
 
 export interface TeamWorkPage extends Page<WorkItemGroup<WorkItemSummary>> {
   ticketCount: number;
   poolTotal: number;
   facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; assignees: FacetOption[] };
+  /** The ticket list was cut at `cap` (most recently changed kept). */
+  workItemsTruncated?: { cap: number } | null;
 }

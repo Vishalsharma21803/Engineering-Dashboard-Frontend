@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { ApiError } from "@/lib/api-client";
+import { retryUnlessClientError } from "@/lib/query-retry";
 import { listCredentials } from "../api/credential.api";
 import { credentialKeys } from "../api/credential.keys";
 
@@ -8,18 +8,8 @@ import { credentialKeys } from "../api/credential.keys";
 export function useCredentials() {
   return useQuery({
     queryKey: credentialKeys.list,
-    queryFn: listCredentials,
+    queryFn: ({ signal }) => listCredentials(signal),
     select: (credentials) => credentials.filter((credential) => credential.platform === "AZURE"),
-    retry: (failureCount, error) => {
-      if (
-        error instanceof ApiError &&
-        error.status >= 400 &&
-        error.status < 500
-      ) {
-        return false;
-      }
-
-      return failureCount < 1;
-    },
+    retry: retryUnlessClientError,
   });
 }

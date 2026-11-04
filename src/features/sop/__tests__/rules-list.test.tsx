@@ -188,6 +188,7 @@ describe("Rules list", () => {
     expect(edits(calls, "/api/sop/my-rules/edits")).toEqual([{ baseVersion: 3, edits: [{ op: "reset", id: "EST-01" }] }]);
   });
 
+  // Types a whole form key by key: slow under a parallel full run (15 s), not a hang.
   it("adds my rule that uses a built-in check", async () => {
     const calls = renderPage({ routes: [{ method: "POST", path: "/api/sop/my-rules/edits", body: saved }] });
 
@@ -233,8 +234,9 @@ describe("Rules list", () => {
         ],
       },
     ]);
-  });
+  }, 15_000);
 
+  // Types a whole form key by key: slow under a parallel full run (15 s), not a hang.
   it("adds an AI-only rule and shows the server's validation problems", async () => {
     const calls = renderPage({
       routes: [
@@ -282,7 +284,7 @@ describe("Rules list", () => {
         },
       ],
     });
-  });
+  }, 15_000);
 
   it("asks to make the change again when the rules were changed elsewhere", async () => {
     const calls = renderPage({
@@ -322,7 +324,6 @@ describe("Rules list", () => {
   });
 
   it("lets SOP owners reset and remove default rules", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const calls = renderPage({
       owner: true,
       route: "/?tab=default",
@@ -342,8 +343,13 @@ describe("Rules list", () => {
     expect(await within(row("Title length")).findByRole("alert")).toHaveTextContent("STR-01 is not a built-in rule");
 
     await userEvent.click(within(row("Title length")).getByRole("button", { name: "Remove" }));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Remove STR-01 from the default rules for everyone?"));
+    const confirm = await screen.findByRole("alertdialog");
+    expect(confirm).toHaveTextContent("Remove STR-01 from the default rules for everyone?");
+    expect(confirm).toHaveTextContent("Earlier versions stay in the history.");
+    await userEvent.click(within(confirm).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(edits(calls, "/api/sop/rulebook/edits")).toHaveLength(2));
+    // The removal failed too (the server refuses every edit here): the dialog stays open and says why.
+    expect(await within(confirm).findByRole("alert")).toHaveTextContent("STR-01 is not a built-in rule");
     expect(edits(calls, "/api/sop/rulebook/edits")).toEqual([
       { baseVersion: 7, edits: [{ op: "reset", id: "STR-01" }], note: "STR-01: restored the starter version" },
       { baseVersion: 7, edits: [{ op: "remove", id: "STR-01" }], note: "STR-01: removed" },

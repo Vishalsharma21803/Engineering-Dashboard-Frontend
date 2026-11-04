@@ -26,3 +26,9 @@ export interface RegisterInput {
 export interface CurrentUserResponse {
   user: User;
 }
+
+export interface LogoutResponse {
+  message: string;
+  /** SESSION_NOT_REVOKED: signed out here, but copies of the session stay valid until they expire. */
+  reason?: string;
+}

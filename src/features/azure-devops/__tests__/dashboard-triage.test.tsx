@@ -201,7 +201,7 @@ describe("dashboard triage", () => {
     renderWithProviders(<DashboardPage />, { path: "/azure/:credentialId", route: `/azure/${CREDENTIAL_ID}` });
 
     expect(await screen.findByText(/could not be loaded \(.+\), so everything is shown/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Retry" })).toBeEnabled();
     // My work arrives from its own (server-paged) request.
     expect(await screen.findByRole("link", { name: "103 Crash on save" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Triage #103 Crash on save" })).toBeDisabled();

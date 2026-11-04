@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, type ReactNode } from "react";
 
 import { getCurrentUser } from "@/features/auth/api/auth.api";
@@ -7,11 +7,28 @@ import {
   AuthContext,
   type AuthContextValue,
 } from "@/features/auth/context/auth-context";
-import { UNAUTHORIZED_EVENT } from "@/lib/api-client";
+import type { User } from "@/features/auth/types/auth.types";
+import { markSessionExpired } from "@/features/auth/utils/session-expiry";
+import { bumpSessionEpoch, currentSessionEpoch, UNAUTHORIZED_EVENT } from "@/lib/api-client";
+import { clearGlobalNotices } from "@/lib/global-errors";
 import { clearPrivateQueries } from "@/lib/query-client";
 
 interface AuthProviderProps {
   children: ReactNode;
+}
+
+/**
+ * The session ended without a sign-out: remember that (the sign-in page says so),
+ * ignore answers to requests from the old session and drop its private data.
+ */
+function endExpiredSession(queryClient: QueryClient): void {
+  if (queryClient.getQueryData<User | null>(authKeys.me)) {
+    markSessionExpired();
+  }
+
+  bumpSessionEpoch();
+  clearPrivateQueries(queryClient);
+  clearGlobalNotices();
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -26,15 +43,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isFetching,
   } = useQuery({
     queryKey: authKeys.me,
-    queryFn: getCurrentUser,
+    // A 401 when re-checking (reconnect, refetch) while signed in is an expired session too.
+    queryFn: async () => {
+      const startedInEpoch = currentSessionEpoch();
+      const current = await getCurrentUser();
+
+      // Signed in or out while this check ran: its answer is about the old session; keep the new one.
+      if (startedInEpoch !== currentSessionEpoch()) {
+        return queryClient.getQueryData<User | null>(authKeys.me) ?? null;
+      }
+
+      if (current === null && queryClient.getQueryData<User | null>(authKeys.me)) {
+        endExpiredSession(queryClient);
+      }
+
+      return current;
+    },
     retry: false,
     staleTime: 5 * 60_000,
   });
 
   useEffect(() => {
     function handleUnauthorized() {
+      endExpiredSession(queryClient);
       queryClient.setQueryData(authKeys.me, null);
-      clearPrivateQueries(queryClient);
     }
 
     window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized);

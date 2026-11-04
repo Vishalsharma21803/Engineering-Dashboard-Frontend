@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { PartialReadNotice } from "@/features/azure-devops/components/feedback";
 import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { ComplianceResult, ComplianceViolation } from "@/features/azure-devops/types/azure.types";
 import { SEVERITY_TONES } from "@/features/azure-devops/utils/labels";
@@ -91,7 +92,16 @@ export function SopResultPanel({ result, renderAction, ai }: SopResultPanelProps
 
   return (
     <div className="flex flex-col gap-5">
-      {ai ? <AiReviewHeader {...ai} reviewable={now.length + earlier.length + result.notices.length + result.passedRules.length > 0} /> : null}
+      {ai ? (
+        <AiReviewHeader
+          {...ai}
+          reviewable={now.length + earlier.length + result.notices.length + result.passedRules.length > 0}
+          reviewOutdated={result.aiReview?.outdated === true}
+        />
+      ) : null}
+      <PartialReadNotice
+        messages={[result.historyTruncated ? "Part of this ticket's long history was not read, so some SOP checks may be incomplete." : null]}
+      />
 
       <Section title="Needed now" hint="What this stage needs. To-dos are not gaps yet; they become gaps if the ticket moves on without them.">
         {now.length === 0 ? (

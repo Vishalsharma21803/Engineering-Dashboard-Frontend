@@ -8,7 +8,7 @@
       name="description"
       content="Engineer Cockpit — a workspace for Azure DevOps projects, work items, repositories, pull requests, and pipelines."
     />
-    <meta name="theme-color" content="#020617" />
+    <meta name="theme-color" content="#f8fafc" />
     <title>Engineer Cockpit</title>
     <script>
       (function () {
@@ -18,6 +18,9 @@
           theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         }
         document.documentElement.dataset.theme = theme;
+        // The browser bar matches the page background (as setTheme in src/lib/theme.ts does).
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", theme === "dark" ? "#0b1120" : "#f8fafc");
       })();
     </script>
   </head>

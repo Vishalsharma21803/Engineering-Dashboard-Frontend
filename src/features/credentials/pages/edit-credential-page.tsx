@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { PageLoader } from "@/components/ui/page-loader";
 import { StaleDataBanner } from "@/features/azure-devops/components/feedback";
 import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { applyApiError } from "@/lib/form-errors";
 import { CredentialForm } from "../components/credential-form";
 import { useCredentials } from "../hooks/use-credentials";
@@ -62,9 +63,7 @@ export function EditCredentialPage() {
             Unable to load credential
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            {error instanceof ApiError
-              ? error.message
-              : "Something went wrong while loading the credential."}
+            {errorMessage(error, "Something went wrong while loading the credential.")}
           </p>
           <Button
             variant="secondary"

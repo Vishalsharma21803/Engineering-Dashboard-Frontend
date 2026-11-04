@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
+import { StatusNotice } from "@/components/ui/status-notice";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
 import { useCatalog, useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
@@ -50,7 +51,7 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
   }
 
   // The timer could not be read: say why, and hold Start (a timer may be running that this page cannot see).
-  const readError = timer.error && !timer.data ? (timer.error instanceof ApiError ? timer.error.message : "Solidtime could not be reached.") : null;
+  const readError = timer.error && !timer.data ? errorMessage(timer.error, "Solidtime could not be reached.") : null;
 
   // One block, so the notices stay with the form in the Time page's grid.
   return (
@@ -63,9 +64,9 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
           </Button>
         </p>
       ) : timer.error ? (
-        <p role="status" className="text-xs text-amber-700">
-          The timer could not be refreshed ({timer.error instanceof ApiError ? timer.error.message : "Solidtime could not be reached"}); it shows the last state read.
-        </p>
+        <StatusNotice as="p" className="text-xs text-amber-700">
+          The timer could not be refreshed ({errorMessage(timer.error, "Solidtime could not be reached")}); it shows the last state read.
+        </StatusNotice>
       ) : null}
       <form
         aria-label="Start a timer"

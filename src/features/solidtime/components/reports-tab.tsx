@@ -14,9 +14,10 @@ import { StatusBadge } from "@/features/azure-devops/components/status-badge";
 import type { Page } from "@/features/azure-devops/types/azure.types";
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
-import { ApiError, apiDownload } from "@/lib/api-client";
+import { apiDownload } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { cn } from "@/utils/cn";
-import { getAccuracy, timeCsvUrl } from "../api/solidtime.api";
+import { getAccuracy, TIME_CSV_TIMEOUT_MS, timeCsvUrl } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
 import type { AccuracyRow, AccuracyTicket, SolidtimeConnection } from "../types/solidtime.types";
 import { rangePresets } from "../utils/range-presets";
@@ -167,7 +168,7 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
     setDownloading(true);
 
     try {
-      const blob = await apiDownload(timeCsvUrl(connection.credentialId, csvFrom, csvTo));
+      const blob = await apiDownload(timeCsvUrl(connection.credentialId, csvFrom, csvTo), { timeoutMs: TIME_CSV_TIMEOUT_MS });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `time-${csvFrom}-to-${csvTo}.csv`;
@@ -175,7 +176,7 @@ export function ReportsTab({ connection, today }: { connection: SolidtimeConnect
       // Released after the browser has started the download.
       window.setTimeout(() => URL.revokeObjectURL(link.href), 10_000);
     } catch (error) {
-      setDownloadError(error instanceof ApiError ? error.message : "The export could not be downloaded.");
+      setDownloadError(errorMessage(error, "The export could not be downloaded."));
     } finally {
       setDownloading(false);
     }

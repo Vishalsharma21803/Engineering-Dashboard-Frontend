@@ -100,11 +100,11 @@ export function TimePage() {
           <p className="mt-1 text-sm text-slate-600">Every change to Solidtime is proposed first and runs only after you approve it.</p>
         </div>
         {(pending.data?.total ?? 0) > 0 ? (
-          <Link to="/actions" className={buttonClassName({ size: "sm", variant: "secondary" })}>
+          <Link to="/actions?from=time" className={buttonClassName({ size: "sm", variant: "secondary" })}>
             {pending.data?.total} awaiting approval
           </Link>
         ) : pending.error && !pending.data ? (
-          <Link to="/actions" className={buttonClassName({ size: "sm", variant: "secondary" })}>
+          <Link to="/actions?from=time" className={buttonClassName({ size: "sm", variant: "secondary" })}>
             Approvals could not be checked
           </Link>
         ) : null}

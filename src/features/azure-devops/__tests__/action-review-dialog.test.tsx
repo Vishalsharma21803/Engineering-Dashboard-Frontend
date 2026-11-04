@@ -77,7 +77,7 @@ describe("ActionReviewDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Approve & execute" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("changed after this action was proposed");
-    await waitFor(() => expect(screen.getByText("FAILED")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Failed")).toBeInTheDocument());
   });
 
   it("offers no approval for actions that are no longer pending", () => {

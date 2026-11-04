@@ -36,7 +36,7 @@ export function TicketTimePanel({ azureCredentialId, ticket, onPropose, isPropos
     retry: retryUnlessClientError,
   });
 
-  const description = "From Solidtime, matched by the ticket number in each entry's description.";
+  const description = "From Solidtime, matched by the ticket number in each entry's description. Name the ticket as #12345 (or any 4+ digit ticket number).";
 
   if (isLoading) {
     return (

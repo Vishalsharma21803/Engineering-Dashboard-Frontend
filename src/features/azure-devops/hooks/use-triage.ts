@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 
-import { ApiError } from "@/lib/api-client";
+import { errorMessage } from "@/lib/error-text";
 import { triageKeys } from "../api/azure.keys";
 import { clearTriage, listTriage, upsertTriage } from "../api/triage.api";
 import type { Dashboard, Recommendation } from "../types/azure.types";
@@ -39,10 +39,6 @@ export interface DashboardTriage {
   clear: (mark: TriageMark) => void;
 }
 
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof ApiError && error.status < 500 && error.message ? error.message : fallback;
-}
-
 /** Snooze / acknowledge / abandon state for the dashboard, with optimistic updates. */
 export function useDashboardTriage(credentialId: string, dashboard: Dashboard | undefined): DashboardTriage {
   const queryClient = useQueryClient();
@@ -52,7 +48,7 @@ export function useDashboardTriage(credentialId: string, dashboard: Dashboard | 
 
   const query = useQuery({
     queryKey,
-    queryFn: () => listTriage(credentialId),
+    queryFn: ({ signal }) => listTriage(credentialId, signal),
     retry: retryUnlessClientError,
     enabled: credentialId !== "",
   });

@@ -1,4 +1,5 @@
 import { cn } from "@/utils/cn";
+import { StatusNotice } from "@/components/ui/status-notice";
 
 export type CredentialAlertTone = "error" | "success" | "info";
 
@@ -81,8 +82,8 @@ export function CredentialAlert({
   onDismiss,
 }: CredentialAlertProps) {
   return (
-    <div
-      role={tone === "error" ? "alert" : "status"}
+    <StatusNotice
+      alert={tone === "error"}
       className={cn(
         "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
         toneStyles[tone]
@@ -116,6 +117,6 @@ export function CredentialAlert({
           </svg>
         </button>
       ) : null}
-    </div>
+    </StatusNotice>
   );
 }

@@ -201,7 +201,7 @@ test("the sprint header sums up my tickets in the current sprint and jumps to a 
   expect(await azureWrites(request)).toEqual([]);
 });
 
-test("notifications: read and abandoned ones stay listed, survive a reload, and can be restored", async ({ page, request }) => {
+test("notifications: read and dismissed ones stay listed, survive a reload, and can be restored", async ({ page, request }) => {
   await signUpWithCredential(page);
   await page.goto("/azure");
 
@@ -214,7 +214,7 @@ test("notifications: read and abandoned ones stay listed, survive a reload, and 
   await expect(panel).toContainText("alpha-ci #2026.501 failed");
 
   await page.getByRole("button", { name: "Mark as read: PR 1 Login flow" }).click();
-  await page.getByRole("button", { name: "Abandon: alpha-ci #2026.501 failed" }).click();
+  await page.getByRole("button", { name: "Dismiss: alpha-ci #2026.501 failed" }).click();
   await expect(page.getByRole("tab", { name: "Unread 1" })).toBeVisible();
 
   // Stored, not hidden: after a reload they are in their tabs.
@@ -222,7 +222,7 @@ test("notifications: read and abandoned ones stay listed, survive a reload, and 
   await page.getByRole("button", { name: "Notifications, 1 unread" }).click();
   await page.getByRole("tab", { name: /^Read/ }).click();
   await expect(page.getByRole("tabpanel")).toContainText("PR 1 Login flow");
-  await page.getByRole("tab", { name: /^Abandoned/ }).click();
+  await page.getByRole("tab", { name: /^Dismissed/ }).click();
   await page.getByRole("button", { name: "Restore: alpha-ci #2026.501 failed" }).click();
   await expect(page.getByRole("tab", { name: "Unread 2" })).toBeVisible();
 
