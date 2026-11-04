@@ -1,7 +1,9 @@
-import type { ReactNode } from "react";
+import { CircleHelp } from "lucide-react";
+import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/utils/cn";
 import type { Section } from "../types/azure.types";
@@ -123,22 +125,50 @@ export function SectionView<T>({ section, label, children }: SectionViewProps<T>
   return <>{children(section.data as T)}</>;
 }
 
+/** A "?" next to a heading: the explanation is one hover or focus away instead of always on screen. */
+export function HelpHint({ label, topic }: { label: string; topic: string }) {
+  const id = useId();
+  return (
+    <Hint label={<span className="block max-w-72">{label}</span>}>
+      <button
+        type="button"
+        aria-label={`About ${topic}`}
+        aria-describedby={id}
+        className="inline-flex size-5 shrink-0 items-center justify-center rounded-full text-slate-400 outline-none transition-colors hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-indigo-500"
+      >
+        <CircleHelp aria-hidden="true" className="size-4" />
+        <span id={id} hidden>
+          {label}
+        </span>
+      </button>
+    </Hint>
+  );
+}
+
 export function SectionCard({
   title,
   description,
+  help,
   actions,
   children,
+  id,
 }: {
   title: string;
   description?: string;
+  /** Shown behind a "?" next to the title instead of under it. */
+  help?: string;
   actions?: ReactNode;
   children: ReactNode;
+  id?: string;
 }) {
   return (
-    <Card>
+    <Card id={id} className={id ? "scroll-mt-6" : undefined}>
       <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-tight text-slate-950">{title}</h2>
+          <h2 className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-slate-950">
+            {title}
+            {help ? <HelpHint label={help} topic={title} /> : null}
+          </h2>
           {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
         </div>
         {actions}

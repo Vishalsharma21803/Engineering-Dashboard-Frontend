@@ -67,7 +67,8 @@ export function PipelineRunList({ credentialId, projectId, dashboardToken, triag
     <>
       {stale}
       <div className="space-y-3">
-        {data.facets.results.length > 1 || result ? (
+        {/* Filters only help once there is more than one page to look through. */}
+        {(data.facets.results.length > 1 && data.poolTotal > data.pageSize) || result ? (
           <FilterBar
             filters={[
               {

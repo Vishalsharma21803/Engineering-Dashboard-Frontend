@@ -36,10 +36,11 @@ export function useRepositories(credentialId: string, projectId: string) {
   });
 }
 
-export function useCapabilities(credentialId: string) {
+export function useCapabilities(credentialId: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: azureKeys.capabilities(credentialId),
     queryFn: () => getCapabilities(credentialId),
+    enabled: options.enabled ?? true,
     retry: retryUnlessClientError,
     staleTime: 5 * 60_000,
   });

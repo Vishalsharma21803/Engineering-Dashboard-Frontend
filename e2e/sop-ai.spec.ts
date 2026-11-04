@@ -28,7 +28,9 @@ test("opening a ticket reviews it with the developer's own AI model; My work nev
 
   // Before AI is set up, the ticket page points to the setup.
   await page.goto("/azure");
-  await page.getByRole("table").getByRole("link", { name: "#101 Implement login" }).click();
+  await page.getByRole("list", { name: "My work items" }).getByRole("link", { name: "101 Implement login" }).click();
+  // #101 passes its code rules, so the SOP details wait in their tab.
+  await page.getByRole("tab", { name: "SOP checks" }).click();
   await expect(page.getByRole("link", { name: "Set up your AI model" })).toBeVisible();
 
   await page.goto("/credentials");
@@ -41,12 +43,13 @@ test("opening a ticket reviews it with the developer's own AI model; My work nev
 
   // My work never calls the AI: no ticket has an AI result until it is opened.
   await page.goto("/azure");
-  const table = page.getByRole("table");
-  await expect(table.getByRole("link", { name: "#101 Implement login" })).toBeVisible();
-  await expect(table.getByText("T-05 · AI")).toHaveCount(0);
+  const table = page.getByRole("list", { name: "My work items" });
+  await expect(table.getByRole("link", { name: "101 Implement login" })).toBeVisible();
+  // #101 has no code-rule gap and no AI result yet: nothing about SOP on its row.
+  await expect(table.getByRole("listitem").filter({ hasText: "101 Implement login" }).last()).not.toContainText("Fake verdict");
 
   // Opening a ticket reviews it with the AI; its verdict on the AI-only rule shows once it lands.
-  await table.getByRole("link", { name: "#101 Implement login" }).click();
+  await table.getByRole("link", { name: "101 Implement login" }).click();
   await expect(page.getByText("Fake verdict for T-05.")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("AI review", { exact: true }).locator("..")).toContainText("claude-haiku-5-5");
 
@@ -56,8 +59,10 @@ test("opening a ticket reviews it with the developer's own AI model; My work nev
 
   // Back on My work, the saved review counts for that ticket only.
   await page.goto("/azure");
-  await expect(page.getByRole("table").getByText("T-05 · AI")).toHaveCount(1);
-  await expect((await openOptions(page.getByLabel("SOP"))).filter({ hasText: "T-05 · Approach is described (1)" })).toHaveCount(1);
+  // The AI's gap on the AI-only rule now counts on that row.
+  await expect(page.getByRole("list", { name: "My work items" }).getByRole("listitem").filter({ hasText: "101 Implement login" }).last()).toContainText("Fake verdict for T-05");
+  await page.getByRole("button", { name: /^Filter/ }).click();
+  await expect((await openOptions(page.getByLabel("Checks"))).filter({ hasText: "T-05 · Approach is described (1)" })).toHaveCount(1);
   await page.keyboard.press("Escape");
 
   const response = await request.get(`${BACKEND}/__e2e/requests`);
@@ -88,7 +93,7 @@ test("an AI fix is applied only through the approval dialog", async ({ page, req
   await expect(page.getByText(/^Saved /)).toBeVisible();
 
   await page.goto("/azure");
-  await page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" }).click();
+  await page.getByRole("list", { name: "My work items" }).getByRole("link", { name: "102 Fix flaky test" }).click();
   await expect(page.getByText("Suggestion:").first()).toBeVisible({ timeout: 15_000 });
   const draft = page.getByLabel(/Ready to post · Add comment/);
   await expect(draft).toHaveValue("Approach:\n1. Add the form\n2. Call the auth API");

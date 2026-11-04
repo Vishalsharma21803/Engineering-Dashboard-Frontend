@@ -1,6 +1,8 @@
+import { ArrowRightLeft, CheckCircle2, Clock, GitPullRequest, MessageSquare } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -8,12 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRepositories } from "../hooks/use-projects";
 import type { ProposeActionInput } from "../types/action.types";
 import type { SupportedWorkFields, WorkItemDetail } from "../types/azure.types";
+import type { ActionPanel } from "../utils/action-panels";
 
 interface WorkItemActionsProps {
   credentialId: string;
   workItem: WorkItemDetail;
   isProposing: boolean;
   onPropose: (input: ProposeActionInput, onProposed?: () => void) => void;
+  /** The open form (controlled, so SOP fixes on the page can open one). */
+  open: ActionPanel | null;
+  onOpenChange: (panel: ActionPanel | null) => void;
 }
 
 type FieldKey = keyof SupportedWorkFields;
@@ -27,18 +33,22 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   priority: "Priority (1–4)",
 };
 
-function ActionBlock({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+function ActionDialog({ title, hint, open, onClose, children }: { title: string; hint: string; open: boolean; onClose: () => void; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="mt-0.5 text-xs text-slate-500">{hint}</p>
-      <div className="mt-3">{children}</div>
-    </div>
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : onClose())}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{hint} Nothing is written to Azure DevOps until you approve it.</DialogDescription>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
   );
 }
 
-/** Each form only proposes; the review dialog asks for approval. */
-export function WorkItemActions({ credentialId, workItem, isProposing, onPropose }: WorkItemActionsProps) {
+/** Buttons for each change; each opens a form that only proposes (the review dialog asks for approval). */
+export function WorkItemActions({ credentialId, workItem, isProposing, onPropose, open, onOpenChange }: WorkItemActionsProps) {
   const target = { projectId: workItem.projectName, workItemId: workItem.id };
   const supportedFields = (Object.keys(FIELD_LABELS) as FieldKey[]).filter((key) => workItem.supportedFields[key]);
 
@@ -62,9 +72,16 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
   const [pullRequestId, setPullRequestId] = useState("");
   const repositories = useRepositories(credentialId, workItem.projectName);
 
+  const close = () => onOpenChange(null);
+  /** Proposing hands over to the review dialog; the form closes. */
+  const propose = (input: ProposeActionInput, onProposed?: () => void) => {
+    onPropose(input, onProposed);
+    close();
+  };
+
   function submitComment(event: FormEvent) {
     event.preventDefault();
-    onPropose(
+    propose(
       { credentialId, kind: "WORK_ITEM_COMMENT", target, params: { text: comment } },
       () => setComment("")
     );
@@ -84,7 +101,7 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
 
   function submitFields(event: FormEvent) {
     event.preventDefault();
-    onPropose({ credentialId, kind: "WORK_ITEM_UPDATE_FIELDS", target, params: changedFields });
+    propose({ credentialId, kind: "WORK_ITEM_UPDATE_FIELDS", target, params: changedFields });
   }
 
   const transitions = workItem.allowedStates.filter((candidate) => candidate.name !== workItem.state);
@@ -94,16 +111,34 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
     workItem.stateCategory !== "Completed" &&
     workItem.stateCategory !== "Removed";
 
+  const actionButton = (panel: ActionPanel, label: string, icon: ReactNode) => (
+    <Button size="sm" variant="secondary" onClick={() => onOpenChange(panel)} aria-haspopup="dialog">
+      {icon}
+      {label}
+    </Button>
+  );
+
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      <ActionBlock title="Add comment" hint="Progress update, or the reason for a state, estimate or due date change.">
-        <form onSubmit={submitComment} className="space-y-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {actionButton("comment", "Comment", <MessageSquare aria-hidden="true" className="size-4" />)}
+      {transitions.length > 0 ? actionButton("state", "Change state", <ArrowRightLeft aria-hidden="true" className="size-4" />) : null}
+      {supportedFields.length > 0 ? actionButton("fields", "Estimates & work", <Clock aria-hidden="true" className="size-4" />) : null}
+      {actionButton("pr", "Link pull request", <GitPullRequest aria-hidden="true" className="size-4" />)}
+      {canCloseAfterMerge ? (
+        <Button size="sm" variant="secondary" disabled={isProposing} onClick={() => onPropose({ credentialId, kind: "WORK_ITEM_CLOSE_AFTER_MERGE", target, params: {} })}>
+          <CheckCircle2 aria-hidden="true" className="size-4" />
+          Close after merge…
+        </Button>
+      ) : null}
+
+      <ActionDialog title="Add comment" hint="Progress update, or the reason for a state, estimate or due date change." open={open === "comment"} onClose={close}>
+        <form onSubmit={submitComment} className="space-y-3">
           <Label htmlFor="action-comment" className="sr-only">
             Comment
           </Label>
           <Textarea
             id="action-comment"
-            className="min-h-24"
+            className="min-h-32"
             value={comment}
             maxLength={10_000}
             onChange={(event) => setComment(event.target.value)}
@@ -113,12 +148,12 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
             Review comment…
           </Button>
         </form>
-      </ActionBlock>
+      </ActionDialog>
 
       {supportedFields.length > 0 ? (
-        <ActionBlock title="Estimates & work log" hint="Only changed values are proposed.">
-          <form onSubmit={submitFields} className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
+        <ActionDialog title="Estimates & work log" hint="Only changed values are proposed." open={open === "fields"} onClose={close}>
+          <form onSubmit={submitFields} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               {supportedFields.map((key) => (
                 <div key={key} className="space-y-1">
                   <Label htmlFor={`field-${key}`} className="text-xs">
@@ -143,15 +178,15 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
               {changedCount === 0 ? <span className="text-xs text-slate-500">Edit a value to enable.</span> : null}
             </div>
           </form>
-        </ActionBlock>
+        </ActionDialog>
       ) : null}
 
       {transitions.length > 0 ? (
-        <ActionBlock title="Change state" hint={`Currently ${workItem.state}.`}>
+        <ActionDialog title="Change state" hint={`Currently ${workItem.state}.`} open={open === "state"} onClose={close}>
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              onPropose({ credentialId, kind: "WORK_ITEM_TRANSITION_STATE", target, params: { state } });
+              propose({ credentialId, kind: "WORK_ITEM_TRANSITION_STATE", target, params: { state } });
             }}
             className="flex gap-2"
           >
@@ -170,14 +205,14 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
               Review…
             </Button>
           </form>
-        </ActionBlock>
+        </ActionDialog>
       ) : null}
 
-      <ActionBlock title="Link pull request" hint="Adds a PR reference to this ticket.">
+      <ActionDialog title="Link pull request" hint="Adds a pull request reference to this ticket." open={open === "pr"} onClose={close}>
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            onPropose({
+            propose({
               credentialId,
               kind: "WORK_ITEM_LINK_PR",
               target,
@@ -222,19 +257,7 @@ export function WorkItemActions({ credentialId, workItem, isProposing, onPropose
             Review…
           </Button>
         </form>
-      </ActionBlock>
-
-      {canCloseAfterMerge ? (
-        <ActionBlock title="Close after merge" hint="Allowed once every linked pull request has been completed.">
-          <Button
-            size="sm"
-            disabled={isProposing}
-            onClick={() => onPropose({ credentialId, kind: "WORK_ITEM_CLOSE_AFTER_MERGE", target, params: {} })}
-          >
-            Review closing…
-          </Button>
-        </ActionBlock>
-      ) : null}
+      </ActionDialog>
     </div>
   );
 }

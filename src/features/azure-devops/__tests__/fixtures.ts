@@ -1,5 +1,5 @@
 import type { ProposedAction } from "../types/action.types";
-import type { Dashboard } from "../types/azure.types";
+import type { Attention, Dashboard } from "../types/azure.types";
 import type { TriageMark } from "../types/triage.types";
 import { buildSignalIndex, isHidden, pipelineKey, pullRequestKey, recommendationKey, resolveTriage } from "../utils/triage";
 
@@ -71,6 +71,35 @@ export const dashboard: Dashboard = {
           links: { pullRequests: [], commits: [], branches: [], builds: [], parentId: null, childIds: [] },
           webUrl: "https://dev.azure.com/acme/Alpha/_workitems/edit/102",
         },
+        {
+          id: 103,
+          rev: 5,
+          projectName: "Alpha",
+          type: "Bug",
+          title: "Crash on save",
+          state: "Resolved",
+          stateCategory: "Resolved",
+          reason: null,
+          priority: 2,
+          assignedTo: null,
+          iterationPath: null,
+          areaPath: null,
+          tags: [],
+          originalEstimate: null,
+          remainingWork: 1,
+          completedWork: null,
+          storyPoints: 3,
+          effort: null,
+          dueDate: null,
+          blocked: false,
+          createdDate: null,
+          changedDate: null,
+          stateChangeDate: null,
+          closedDate: null,
+          commentCount: 0,
+          links: { pullRequests: [], commits: [], branches: [], builds: [], parentId: null, childIds: [] },
+          webUrl: "https://dev.azure.com/acme/Alpha/_workitems/edit/103",
+        },
       ],
     },
     pullRequests: { status: "ok", reason: null, data: [] },
@@ -132,6 +161,12 @@ export const dashboard: Dashboard = {
 };
 
 /** An empty first page, as the server sends for an empty list. */
+/** What My work shows on a ticket's row: its recommendation's category, reasons and fix (as the server builds it). */
+export function attentionFor(workItemId: number): Attention | null {
+  const recommendation = dashboard.recommendations.find((item) => item.target.type === "workItem" && item.target.id === workItemId);
+  return recommendation ? { category: recommendation.category, reasons: recommendation.reasons, suggestedAction: recommendation.suggestedAction } : null;
+}
+
 export function pageOf<T>(items: T[]) {
   return { items, page: 1, pageSize: 10, total: items.length, totalPages: Math.max(1, Math.ceil(items.length / 10)) };
 }

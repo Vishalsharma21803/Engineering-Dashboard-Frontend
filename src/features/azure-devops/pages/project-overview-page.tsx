@@ -3,15 +3,18 @@ import { useState, type ReactNode } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { SopReportCard } from "@/features/sop/components/sop-report-card";
+import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { ArrowRightIcon } from "@/components/ui/icons";
 import { Pagination } from "@/components/ui/pagination";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Updating } from "@/components/ui/updating";
 import { usePageParam, useSyncServedPage } from "@/hooks/use-page-param";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import { cn } from "@/utils/cn";
 
 import { ActionReviewDialog } from "../components/action-review-dialog";
 import { DeploymentsPanel } from "../components/deployments-panel";
-import { EmptyState, ErrorCard, ErrorToast, SectionCard, SectionView, SkeletonRows, StaleDataBanner, StatTile } from "../components/feedback";
+import { EmptyState, ErrorCard, ErrorToast, SectionCard, SkeletonRows, StaleDataBanner } from "../components/feedback";
 import { PipelinesPanel } from "../components/pipelines-panel";
 import { PullRequestList } from "../components/pull-request-list";
 import { TeamWorkTable } from "../components/work-item-table";
@@ -23,11 +26,30 @@ import type { Page, Section } from "../types/azure.types";
 import { retryUnlessClientError } from "../utils/query-retry";
 import { formatDateTime } from "../utils/format";
 
-function countValue(section: Section<number>) {
-  if (section.status === "forbidden") return <span className="text-base text-amber-600">No access</span>;
-  if (section.status === "error" || section.data === null) return "—";
-  return section.data;
+/** One figure of the summary line; "no access" or "—" when the PAT or Azure did not allow it. */
+function Count({ section, one, many }: { section: Section<number>; one: string; many: string }) {
+  const value = section.status === "forbidden" ? null : section.status === "error" ? null : section.data;
+  return (
+    <span className="whitespace-nowrap">
+      {section.status === "forbidden" ? (
+        <span className="text-amber-700">No access to {many}</span>
+      ) : (
+        <>
+          <span className="font-semibold text-slate-950 tabular-nums">{value ?? "—"}</span> <span className="text-slate-600">{value === 1 ? one : many}</span>
+        </>
+      )}
+    </span>
+  );
 }
+
+const TABS = [
+  { id: "work", label: "Work items" },
+  { id: "delivery", label: "PRs & pipelines" },
+  { id: "sop", label: "SOP report" },
+  { id: "repos", label: "Repos & teams" },
+] as const;
+type TabId = (typeof TABS)[number]["id"];
+const isTab = (value: string | null): value is TabId => TABS.some((tab) => tab.id === value);
 
 /** A small list paged on the server (10 per page), its page kept in the URL as ?{param}=. */
 function PagedList<T>({
@@ -135,7 +157,7 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
   return (
     <SectionCard
       title="Team work items"
-      description="Everyone's work items in this project, most recently changed first (up to 200, 10 per page)."
+      help="Everyone's work items in this project, grouped under their user story, most recently changed first (up to 200)."
       actions={
         <div className="flex shrink-0 items-center gap-2">
           <span aria-hidden="true" className="text-xs font-medium text-slate-500">Show:</span>
@@ -168,7 +190,7 @@ function ProjectWorkItems({ credentialId, projectId }: { credentialId: string; p
 
 function ProjectPullRequests({ credentialId, projectId }: { credentialId: string; projectId: string }) {
   return (
-    <SectionCard title="Active pull requests" description="Every open pull request in this project, 10 per page.">
+    <SectionCard title="Active pull requests" help="Every open pull request in this project.">
       <PullRequestList scope="team" credentialId={credentialId} projectId={projectId} />
     </SectionCard>
   );
@@ -181,6 +203,8 @@ export function ProjectOverviewPage() {
   const focusBuildId = Number.isInteger(buildParam) && buildParam > 0 ? buildParam : null;
   const { data: project, isLoading, isFetching, error, refetch } = useProjectOverview(credentialId, projectId);
   const review = useActionReview();
+  // A link to a pipeline run opens the pipelines tab.
+  const [tab, setTab] = useUrlTab(isTab, focusBuildId !== null ? "delivery" : "work");
 
   if (isLoading) return <SkeletonRows rows={5} />;
   if (!project) {
@@ -208,50 +232,64 @@ export function ProjectOverviewPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatTile label="My open items" value={countValue(project.counts.myOpenWorkItems)} hint="assigned to you" />
-        <StatTile label="Active PRs" value={countValue(project.counts.activePullRequests)} hint="whole project" />
-        <StatTile label="Failing pipelines" value={countValue(project.counts.failingPipelines)} />
-        <StatTile label="Repositories" value={countValue(project.counts.repositories)} />
-        <StatTile
-          label="Current iteration"
-          value={
-            <SectionView section={project.currentIteration} label="iterations">
-              {(iteration) => <span className="text-base">{iteration?.name ?? "None"}</span>}
-            </SectionView>
-          }
-          hint={project.currentIteration.data?.finishDate ? `ends ${formatDateTime(project.currentIteration.data.finishDate)}` : undefined}
-        />
+      <div role="group" aria-label="Summary" className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-slate-200 bg-surface px-4 py-2.5 text-sm shadow-sm">
+        <Count section={project.counts.myOpenWorkItems} one="open item of yours" many="open items of yours" />
+        <Count section={project.counts.activePullRequests} one="active pull request" many="active pull requests" />
+        <Count section={project.counts.failingPipelines} one="failing pipeline" many="failing pipelines" />
+        <Count section={project.counts.repositories} one="repository" many="repositories" />
+        {project.currentIteration.status === "ok" && project.currentIteration.data ? (
+          <span className="whitespace-nowrap text-slate-600">
+            <span className="font-semibold text-slate-950">{project.currentIteration.data.name}</span>
+            {project.currentIteration.data.finishDate ? ` · ends ${formatDateTime(project.currentIteration.data.finishDate)}` : ""}
+          </span>
+        ) : null}
       </div>
 
-      <ProjectWorkItems credentialId={credentialId} projectId={project.id} />
+      <Tabs value={tab} onValueChange={(value) => isTab(value) && setTab(value)} className="gap-6">
+        <TabsList variant="line" aria-label="Sections" className="-mx-4 px-4 sm:mx-0 sm:px-0">
+          <ActiveIndicator variant="underline" />
+          {TABS.map((item) => (
+            <TabsTrigger key={item.id} value={item.id}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <SopReportCard credentialId={credentialId} projectId={project.id} />
+        <TabsContent value="work" className="flex flex-col gap-6">
+          <ProjectWorkItems credentialId={credentialId} projectId={project.id} />
+        </TabsContent>
 
-      <ProjectPullRequests credentialId={credentialId} projectId={project.id} />
+        <TabsContent value="delivery" className="flex flex-col gap-6">
+          <ProjectPullRequests credentialId={credentialId} projectId={project.id} />
+          <SectionCard title="Pipeline health" help="Expand a pipeline for recent runs, failed stages and errors.">
+            <PipelinesPanel
+              credentialId={credentialId}
+              projectId={project.id}
+              focusBuildId={focusBuildId}
+              isProposing={review.isProposing}
+              onPropose={(input) => review.propose(input)}
+            />
+          </SectionCard>
+          <SectionCard title="Deployments" help="YAML environments and classic releases, where the PAT allows.">
+            <DeploymentsPanel credentialId={credentialId} projectId={project.id} />
+          </SectionCard>
+        </TabsContent>
 
-      <SectionCard title="Pipeline health" description="Expand a pipeline for recent runs, failed stages and errors.">
-        <PipelinesPanel
-          credentialId={credentialId}
-          projectId={project.id}
-          focusBuildId={focusBuildId}
-          isProposing={review.isProposing}
-          onPropose={(input) => review.propose(input)}
-        />
-      </SectionCard>
+        <TabsContent value="sop" className="flex flex-col gap-6">
+          <SopReportCard credentialId={credentialId} projectId={project.id} />
+        </TabsContent>
 
-      <SectionCard title="Deployments" description="YAML environments and classic releases, where the PAT allows.">
-        <DeploymentsPanel credentialId={credentialId} projectId={project.id} />
-      </SectionCard>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SectionCard title="Repositories">
-          <RepositoriesList credentialId={credentialId} projectId={project.id} />
-        </SectionCard>
-        <SectionCard title="Teams">
-          <TeamsList credentialId={credentialId} projectId={project.id} />
-        </SectionCard>
-      </div>
+        <TabsContent value="repos">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <SectionCard title="Repositories">
+              <RepositoriesList credentialId={credentialId} projectId={project.id} />
+            </SectionCard>
+            <SectionCard title="Teams">
+              <TeamsList credentialId={credentialId} projectId={project.id} />
+            </SectionCard>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <ActionReviewDialog action={review.reviewing} onClose={review.closeReview} />
       <ErrorToast message={review.proposeError} onDismiss={review.clearProposeError} />

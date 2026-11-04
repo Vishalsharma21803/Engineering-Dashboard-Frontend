@@ -113,30 +113,33 @@ export function PullRequestList(props: PullRequestListProps) {
     <>
       {stale}
       <div className="space-y-3">
-        <FilterBar
-          search={{
-            value: searchInput,
-            onChange: (value) => {
-              setSearchInput(value);
+        {/* Filters only help once there is more than one page to look through. */}
+        {data.poolTotal > data.pageSize || searchInput || Object.values(filters).some(Boolean) ? (
+          <FilterBar
+            search={{
+              value: searchInput,
+              onChange: (value) => {
+                setSearchInput(value);
+                toFirstPage();
+              },
+              placeholder: "Search PR, title or branch",
+            }}
+            filters={[
+              { id: "person", label: team ? "Author" : "Role", value: filters.person, options: data.facets.person, onChange: set("person") },
+              { id: "review", label: "Review", value: filters.review, options: data.facets.review, onChange: set("review") },
+              ...(data.facets.repositories.length > 1
+                ? [{ id: "repository", label: "Repo", value: filters.repository, options: data.facets.repositories, onChange: set("repository") }]
+                : []),
+            ]}
+            shown={data.total}
+            total={data.poolTotal}
+            onClear={() => {
+              setFilters(EMPTY_FILTERS);
+              setSearchInput("");
               toFirstPage();
-            },
-            placeholder: "Search PR, title or branch",
-          }}
-          filters={[
-            { id: "person", label: team ? "Author" : "Role", value: filters.person, options: data.facets.person, onChange: set("person") },
-            { id: "review", label: "Review", value: filters.review, options: data.facets.review, onChange: set("review") },
-            ...(data.facets.repositories.length > 1
-              ? [{ id: "repository", label: "Repo", value: filters.repository, options: data.facets.repositories, onChange: set("repository") }]
-              : []),
-          ]}
-          shown={data.total}
-          total={data.poolTotal}
-          onClear={() => {
-            setFilters(EMPTY_FILTERS);
-            setSearchInput("");
-            toFirstPage();
-          }}
-        />
+            }}
+          />
+        ) : null}
         <Updating active={query.isPlaceholderData}>
           {hiddenCount > 0 ? (
             <div className="flex justify-end">

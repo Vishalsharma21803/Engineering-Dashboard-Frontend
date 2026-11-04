@@ -1,7 +1,6 @@
 import type { ActionKind, ActionStatus } from "../types/action.types";
 import type {
   PullRequestReviewer,
-  RecommendationCategory,
   Severity,
 } from "../types/azure.types";
 
@@ -50,15 +49,6 @@ export const SEVERITY_TONES: Record<Severity, Tone> = {
   high: "danger",
   medium: "warning",
   low: "info",
-};
-
-export const CATEGORY_LABELS: Record<RecommendationCategory, { label: string; tone: Tone }> = {
-  BLOCKER: { label: "Blocker", tone: "danger" },
-  FAILED_PIPELINE: { label: "Failed pipeline", tone: "danger" },
-  REVIEW: { label: "Code review", tone: "info" },
-  SOP: { label: "SOP", tone: "warning" },
-  STALE: { label: "Stale", tone: "neutral" },
-  TIME: { label: "Time", tone: "info" },
 };
 
 export const VOTE_LABELS: Record<PullRequestReviewer["voteLabel"], { label: string; tone: Tone }> = {

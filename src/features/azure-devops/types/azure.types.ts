@@ -159,6 +159,15 @@ export interface WorkItemDetail extends WorkItemSummary {
   compliance: ComplianceResult;
   /** False when the project's SOP has a Testing stage after merge. */
   closeAfterMergeAllowed: boolean;
+  /** Its parent (whoever it belongs to) and children (mine listed, others counted). */
+  family: Section<WorkItemFamily>;
+}
+
+export interface WorkItemFamily {
+  parent: GroupHeading | null;
+  parentIsMine: boolean;
+  myChildren: GroupHeading[];
+  otherChildren: number;
 }
 
 export interface SupportedWorkFields {
@@ -443,6 +452,8 @@ export interface Recommendation {
 export interface Dashboard {
   identity: AzureIdentity;
   generatedAt: string;
+  /** The project the dashboard is narrowed to, by name; null for all projects. */
+  projectName?: string | null;
   projectsScanned: number;
   projectsTruncated: boolean;
   sections: {
@@ -478,10 +489,76 @@ export interface WorkItemListFilters {
   assignee: string;
 }
 
-export interface MyWorkPage extends Page<{ workItem: WorkItemSummary; compliance: ComplianceResult | null }> {
+/** The ticket heading a group: a story (or feature, PBI…), possibly someone else's. */
+export interface GroupHeading {
+  id: number;
+  title: string;
+  type: string;
+  state: string;
+  stateCategory: StateCategory;
+  projectName: string;
+  assignedTo: IdentityRef | null;
+  changedDate: string | null;
+  /** False when Azure could not return it: only its number is known. */
+  readable: boolean;
+}
+
+/** A story with the listed tickets under it (heading null: a ticket under no story). */
+export interface WorkItemGroup<T> {
+  heading: GroupHeading | null;
+  /** The heading's own row when it is one of the listed tickets. */
+  headingRow: T | null;
+  rows: T[];
+  /** The newest change in the group (what the list is sorted by). */
+  latest: string | null;
+}
+
+/** Why a ticket needs me, and the change that fixes it (proposed for approval). */
+export interface Attention {
+  category: RecommendationCategory;
+  reasons: string[];
+  suggestedAction: SuggestedAction | null;
+}
+
+export interface MyWorkRow {
+  workItem: WorkItemSummary;
+  compliance: ComplianceResult | null;
+  attention: Attention | null;
+}
+
+export type WorkSection = "inProgress" | "todo" | "resolved" | "done";
+
+export interface StoryProgress {
+  done: number;
+  total: number;
+  remainingHours: number;
+}
+
+export interface MyWorkGroup extends WorkItemGroup<MyWorkRow> {
+  /** Null when grouped by story only. */
+  section: WorkSection | null;
+  /** My tickets under the heading, every section included. */
+  progress: StoryProgress | null;
+}
+
+export interface MyWorkOverview {
+  sprint: { name: string; startDate: string | null; finishDate: string | null } | null;
+  counts: Record<WorkSection, number>;
+  remainingHours: number;
+}
+
+/** 10 groups per page: status sections, newest change first inside. */
+export interface MyWorkPage extends Page<MyWorkGroup> {
+  groupBy: "status" | "story";
+  sections: Array<{ key: WorkSection; count: number }>;
+  overview: MyWorkOverview;
+  ticketCount: number;
   poolTotal: number;
   hiddenCount: number;
   showingHidden: boolean;
+  sprint: { mode: "current" | "all"; inSprint: number; names: string[] };
+  closed: { included: boolean; count: number };
+  attention: { only: boolean; count: number };
   facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; sop: FacetOption[] };
 }
 
@@ -502,15 +579,6 @@ export interface PullRequestPage extends Page<PullRequestSummary> {
   facets: { person: FacetOption[]; review: FacetOption[]; repositories: FacetOption[] };
 }
 
-export interface RecommendationPage extends Page<{ recommendation: Recommendation; state: "active" | "acknowledged" | "snoozed" | "abandoned"; rank: number | null }> {
-  poolTotal: number;
-  hiddenCount: number;
-  showingHidden: boolean;
-  activeTotal: number;
-  acknowledgedTotal: number;
-  facets: { categories: Array<{ value: RecommendationCategory; label: string; count: number }> };
-}
-
 export interface PipelineRunPage extends Page<BuildSummary> {
   poolTotal: number;
   hiddenCount: number;
@@ -518,7 +586,8 @@ export interface PipelineRunPage extends Page<BuildSummary> {
   facets: { results: FacetOption[] };
 }
 
-export interface TeamWorkPage extends Page<WorkItemSummary> {
+export interface TeamWorkPage extends Page<WorkItemGroup<WorkItemSummary>> {
+  ticketCount: number;
   poolTotal: number;
   facets: { types: FacetOption[]; states: FacetOption[]; priorities: FacetOption[]; assignees: FacetOption[] };
 }

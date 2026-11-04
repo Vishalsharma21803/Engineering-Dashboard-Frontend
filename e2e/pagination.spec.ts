@@ -25,42 +25,44 @@ async function signUpWithCredential(page: Page) {
   await expect(page).toHaveURL("/credentials");
 }
 
-const rows = (page: Page) => page.getByRole("table").getByRole("row");
+/** Ticket rows of My work (no ticket here has a story, so each is one group): one link each. */
+const rows = (page: Page) => page.getByRole("list", { name: "My work items" }).getByRole("link", { name: /^\d+ / });
 
-test("My work shows 10 tickets per page and survives tampered page numbers", async ({ page }) => {
+test("My work shows 10 groups per page and survives tampered page numbers", async ({ page }) => {
   await signUpWithCredential(page);
   await page.goto("/azure");
   const pager = page.getByRole("navigation", { name: "My work pages" });
 
-  await expect(pager.getByText("Showing 1–10 of 27")).toBeVisible();
-  await expect(rows(page)).toHaveCount(11);
+  await expect(pager.getByText("Page 1 of 3")).toBeVisible();
+  await expect(rows(page)).toHaveCount(10);
 
   await pager.getByRole("button", { name: "Next" }).click();
   await expect(page).toHaveURL(/[?&]page=2/);
-  await expect(pager.getByText("Showing 11–20 of 27")).toBeVisible();
+  await expect(pager.getByText("Page 2 of 3")).toBeVisible();
 
   await pager.getByRole("button", { name: "Page 3" }).click();
-  await expect(pager.getByText("Showing 21–27 of 27")).toBeVisible();
-  await expect(rows(page)).toHaveCount(8);
+  await expect(pager.getByText("Page 3 of 3")).toBeVisible();
+  await expect(rows(page)).toHaveCount(7);
 
   // A page that does not exist goes to the last page; nonsense goes to the first.
   const base = new URL(page.url());
   base.searchParams.set("page", "999");
   await page.goto(base.toString());
-  await expect(pager.getByText("Showing 21–27 of 27")).toBeVisible();
+  await expect(pager.getByText("Page 3 of 3")).toBeVisible();
   await expect(page).toHaveURL(/[?&]page=3(&|$)/);
 
   for (const tampered of ["abc", "-2", "0", "1.5", "%3Cscript%3E"]) {
     await page.goto(`${base.origin}${base.pathname}?page=${tampered}`);
-    await expect(pager.getByText("Showing 1–10 of 27")).toBeVisible();
+    await expect(pager.getByText("Page 1 of 3")).toBeVisible();
     await expect(page).not.toHaveURL(/[?&]page=/);
   }
 
   // Filtering goes back to page 1 and pages the filtered list.
   await pager.getByRole("button", { name: "Page 2" }).click();
   await expect(page).toHaveURL(/[?&]page=2/);
-  await choose(page.getByLabel("Type"), { label: "Type: Bug (1)" });
-  await expect(rows(page)).toHaveCount(2);
+  await page.getByRole("button", { name: /^Filter/ }).click();
+  await choose(page.getByLabel("Type"), { label: "Bug (1)" });
+  await expect(rows(page)).toHaveCount(1);
   await expect(page).not.toHaveURL(/[?&]page=/);
   await expect(pager).toHaveCount(0);
 });
@@ -76,11 +78,12 @@ test("Project overview and the team SOP report page their tickets", async ({ pag
 
   // Alpha: 101, 102, 103, 105, 106 + 23 = 28 tickets for the whole team.
   const team = page.getByRole("navigation", { name: "Team work item pages" });
-  await expect(team.getByText("Showing 1–10 of 28")).toBeVisible();
+  await expect(team.getByText("Page 1 of 3")).toBeVisible();
   await team.getByRole("button", { name: "Page 3" }).click();
-  await expect(team.getByText("Showing 21–28 of 28")).toBeVisible();
+  await expect(team.getByText("Page 3 of 3")).toBeVisible();
   await expect(page).toHaveURL(/[?&]page=3/);
 
+  await page.getByRole("tab", { name: "SOP report" }).click();
   await page.getByRole("button", { name: "Run report" }).click();
   await page.getByText(/^Tickets with gaps \(\d+\)$/).click();
   const gaps = page.getByRole("navigation", { name: "Tickets with gaps pages" });

@@ -13,7 +13,6 @@ import type {
   PullRequestDetail,
   PullRequestListFilters,
   PullRequestPage,
-  RecommendationPage,
   RepositorySummary,
   MyWorkPage,
   TeamWorkPage,
@@ -84,13 +83,6 @@ export async function listProjectPullRequests(credentialId: string, projectId: s
 }
 
 /* Dashboard lists: paged on the server from what the dashboard computed (snoozed/abandoned hidden first). */
-
-export async function listRecommendations(credentialId: string, projectId: string | undefined, input: { page: number; hidden: boolean; category: string }) {
-  const response = await apiRequest<{ recommendations: RecommendationPage }>(
-    azurePath(credentialId, "/dashboard/recommendations", { projectId, page: input.page, hidden: input.hidden, ...nonEmpty({ category: input.category }) })
-  );
-  return response.recommendations;
-}
 
 export async function listDashboardPullRequests(
   credentialId: string,
@@ -188,11 +180,20 @@ export async function listTeams(credentialId: string, projectId: string, page: n
 /** My work tickets: filtered and paged by the server. */
 export async function getMyWorkPage(
   credentialId: string,
-  input: { projectId: string | undefined; page: number; hidden: boolean; filters: WorkItemListFilters }
+  input: { projectId: string | undefined; page: number; hidden: boolean; filters: WorkItemListFilters; sprint: "current" | "all" | undefined; closed: boolean; attention: boolean; groupBy: "status" | "story" }
 ) {
   const { assignee: _assignee, ...filters } = input.filters;
   const response = await apiRequest<{ myWork: MyWorkPage }>(
-    azurePath(credentialId, "/my-work", { projectId: input.projectId, page: input.page, hidden: input.hidden, ...nonEmpty(filters) })
+    azurePath(credentialId, "/my-work", {
+      projectId: input.projectId,
+      page: input.page,
+      hidden: input.hidden,
+      sprint: input.sprint,
+      closed: input.closed || undefined,
+      attention: input.attention || undefined,
+      groupBy: input.groupBy === "story" ? "story" : undefined,
+      ...nonEmpty(filters),
+    })
   );
   return response.myWork;
 }

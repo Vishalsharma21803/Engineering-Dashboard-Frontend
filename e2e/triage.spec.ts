@@ -31,7 +31,6 @@ async function triage(page: Page, label: string, action: string) {
   await page.getByRole("dialog", { name: `Triage ${label}` }).getByRole("button", { name: action }).click();
 }
 
-const tile = (page: Page, label: string) => page.getByText(label, { exact: true }).locator("..");
 
 test.beforeEach(async ({ request }) => {
   await request.post(`${BACKEND}/__e2e/reset`);
@@ -44,44 +43,41 @@ test("snoozes, acknowledges and abandons dashboard items without touching Azure 
   await page.goto("/azure");
 
   // SectionCard: card > header row > title block > heading.
-  const prioritized = page.getByRole("heading", { name: "Prioritized actions" }).locator("xpath=ancestor::div[3]");
-  const failedRun = page.getByRole("link", { name: "alpha-ci #2026.501 failed" });
+  const section = (title: RegExp) => page.getByRole("heading", { name: title }).locator("xpath=ancestor::div[3]");
+  const myWork = section(/^My work/);
+  const pipelines = section(/^Pipeline runs/);
+  const failedRun = pipelines.getByRole("link", { name: /^alpha-ci #2026\.501/ });
   await expect(failedRun).toBeVisible();
-  await expect(tile(page, "Failing pipelines")).toContainText("1");
 
-  // Abandon a failing pipeline: gone from the priority list and the counts.
-  await triage(page, "alpha-ci #2026.501 failed", "Abandon · hide until restored");
+  // Abandon a failing pipeline: gone from its list. Notifications keep their own status, so it is still there.
+  await triage(page, "alpha-ci on main", "Abandon · hide until restored");
   await expect(failedRun).toHaveCount(0);
-  await expect(tile(page, "Failing pipelines")).toContainText("1 hidden");
+  await page.getByRole("button", { name: /^Notifications, \d+ unread$/ }).click();
+  await expect(page.getByRole("tabpanel", { name: /^Unread/ })).toContainText("alpha-ci #2026.501 failed");
+  await page.keyboard.press("Escape");
 
-  // Acknowledge: still listed, but in its own group below active work.
+  // Acknowledge a ticket: still listed in My work, with its mark.
   await triage(page, "#103 Crash on save", "Acknowledge · keep, move down");
-  const acknowledged = page.getByRole("region", { name: "Acknowledged" });
-  await expect(acknowledged.getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
+  const ticket = myWork.getByRole("listitem").filter({ hasText: "103 Crash on save" }).last();
+  await expect(ticket).toContainText("Acknowledged");
 
   // Snooze a pull request from its own section.
-  // The PR is listed under Pull requests and, as a review to act on, under Prioritized actions.
   const pr = page.getByRole("link", { name: "PR 1 Login flow", exact: true });
   await expect(pr.first()).toBeVisible();
   await triage(page, "PR 1 Login flow", "Snooze · tomorrow");
   await expect(pr).toHaveCount(0);
-  await expect(tile(page, "Active PRs")).toContainText("1 hidden");
 
   // Marks persist across reloads.
   await page.reload();
-  await expect(page.getByRole("region", { name: "Acknowledged" }).getByRole("link", { name: "#103 Crash on save" })).toBeVisible();
+  await expect(myWork.getByRole("listitem").filter({ hasText: "103 Crash on save" }).last()).toContainText("Acknowledged");
   await expect(failedRun).toHaveCount(0);
   await expect(pr).toHaveCount(0);
 
   // Restore the pipeline from the hidden view.
-  await prioritized.getByRole("button", { name: /Show snoozed & abandoned/ }).click();
-  await expect(prioritized.getByText("Abandoned", { exact: true }).first()).toBeVisible();
-  await triage(page, "alpha-ci #2026.501 failed", "Restore to my list");
-  await expect(failedRun).toHaveCount(0);
-  // The snoozed PR is still hidden, so switch back to the normal list.
-  await prioritized.getByRole("button", { name: "Hide snoozed & abandoned" }).click();
+  await pipelines.getByRole("button", { name: /Show snoozed & abandoned/ }).click();
+  await expect(pipelines.getByText("Abandoned", { exact: true }).first()).toBeVisible();
+  await triage(page, "alpha-ci on main", "Restore to my list");
   await expect(failedRun).toBeVisible();
-  await expect(tile(page, "Failing pipelines")).not.toContainText("hidden");
 
   expect(await azureWrites(request)).toEqual([]);
 });
@@ -90,16 +86,16 @@ test("abandoning a whole project hides all of its items until restored", async (
   await signUpWithCredential(page);
   await page.goto("/azure");
 
-  await expect(page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" })).toBeVisible();
+  await expect(page.getByRole("list", { name: "My work items" }).getByRole("link", { name: "102 Fix flaky test" })).toBeVisible();
   await triage(page, "#102 Fix flaky test", "Abandon project");
 
   await expect(page.getByText("Triaged projects").locator("..")).toContainText("Alpha · abandoned");
-  await expect(page.getByRole("link", { name: "#103 Crash on save" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "103 Crash on save" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "alpha-ci #2026.501 failed" })).toHaveCount(0);
-  await expect(page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" })).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "My work items" }).getByRole("link", { name: "102 Fix flaky test" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Restore project Alpha" }).click();
-  await expect(page.getByRole("link", { name: "#103 Crash on save" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "103 Crash on save" }).first()).toBeVisible();
   await expect(page.getByText("Triaged projects")).toHaveCount(0);
 
   expect(await azureWrites(request)).toEqual([]);

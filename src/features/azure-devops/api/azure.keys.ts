@@ -26,10 +26,14 @@ export const azureKeys = {
     ["azure", credentialId, "repositories", projectId] as const,
   repositoryPage: (credentialId: string, projectId: string) => ["azure", credentialId, "repository-page", projectId] as const,
   teams: (credentialId: string, projectId: string) => ["azure", credentialId, "teams", projectId] as const,
-  recommendations: (credentialId: string, projectId: string | undefined) => ["azure", credentialId, "recommendations", projectId ?? "all"] as const,
   dashboardPullRequests: (credentialId: string, projectId: string | undefined) =>
     ["azure", credentialId, "dashboard-pull-requests", projectId ?? "all"] as const,
   dashboardRuns: (credentialId: string, projectId: string | undefined) => ["azure", credentialId, "dashboard-runs", projectId ?? "all"] as const,
+};
+
+export const notificationKeys = {
+  all: ["notifications"] as const,
+  list: (credentialId: string, projectName: string | undefined) => ["notifications", credentialId, projectName ?? "all"] as const,
 };
 
 export const triageKeys = {

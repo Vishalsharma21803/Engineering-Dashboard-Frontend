@@ -9,13 +9,15 @@ interface PaginationProps {
   onChange: (page: number) => void;
   label?: string;
   disabled?: boolean;
+  /** Replaces "Showing 11–20 of 57" (e.g. "Page 2 of 3" when the rows are not one kind of thing). */
+  summary?: string;
 }
 
 const BUTTON =
   "inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40";
 
 /** "Showing 11–20 of 57" with Previous / page numbers / Next. Renders nothing for a single page. */
-export function Pagination({ page, totalPages, total, pageSize, onChange, label = "Pages", disabled = false }: PaginationProps) {
+export function Pagination({ page, totalPages, total, pageSize, onChange, label = "Pages", disabled = false, summary }: PaginationProps) {
   if (totalPages <= 1) {
     return null;
   }
@@ -26,7 +28,7 @@ export function Pagination({ page, totalPages, total, pageSize, onChange, label 
   return (
     <nav aria-label={label} className="flex flex-col items-center justify-between gap-2 pt-2 sm:flex-row">
       <p className="text-xs text-slate-500">
-        Showing {first}–{last} of {total}
+        {summary ?? `Showing ${first}–${last} of ${total}`}
       </p>
       <div className="flex items-center gap-1">
         <button

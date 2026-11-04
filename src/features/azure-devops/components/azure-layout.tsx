@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink, Outlet, useLocation, useMatch, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -7,6 +8,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { useCredentials } from "@/features/credentials/hooks/use-credentials";
 import { getCredentialDisplayName } from "@/features/credentials/utils/credential-display";
 import { cn } from "@/utils/cn";
+import { CommandPalette } from "./command-palette";
 import { useActions } from "../hooks/use-actions";
 import { useProjects } from "../hooks/use-projects";
 import {
@@ -119,73 +121,108 @@ export function AzureLayout() {
     navigate(value ? `${base}/projects/${encodeURIComponent(value)}` : base);
   }
 
+  const pages = [
+    { label: "My work", to: withProject(base), key: "m" },
+    { label: "Project overview", to: overviewProject ? `${base}/projects/${encodeURIComponent(overviewProject)}` : `${base}/projects`, key: "o" },
+    { label: "Approvals & audit", to: withProject(`${base}/actions`), key: "a" },
+    { label: "Time", to: "/time", key: "t" },
+    { label: "SOP rules", to: "/sop-rules", key: "s" },
+    { label: "Credentials", to: "/credentials", key: "c" },
+  ];
+
   return (
     <section className="flex w-full flex-col gap-6">
+      <CommandPalette credentialId={credentialId} pages={pages} />
       <div className="rounded-xl border border-slate-200 bg-surface shadow-sm">
-        <div className="flex flex-col gap-3 p-4 sm:gap-5 sm:p-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-[inset_0_1px_0_0_rgb(255_255_255/0.22),0_4px_14px_-4px_rgb(49_30_160/0.5)] sm:size-12">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" className="size-5 sm:size-6">
-                <path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Developer cockpit</h1>
-              <p className="mt-0.5 truncate text-xs text-slate-500 sm:text-sm">
-                {credential?.organizationUrl ?? (credentials.error ? "Organization could not be loaded" : "Loading organization...")}
-                {project ? ` · ${project.name}` : " · all projects"}
-              </p>
-            </div>
-          </div>
+        <h1 className="sr-only">
+          Azure DevOps · {credential ? getCredentialDisplayName(credential) : "organization"}
+          {project ? ` · ${project.name}` : ""}
+        </h1>
+        <div className="flex flex-col-reverse gap-x-4 gap-y-2 px-4 pt-2 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
+          <nav aria-label="Azure DevOps" className="relative flex gap-6 overflow-x-auto whitespace-nowrap">
+            <ActiveIndicator variant="underline" />
+            <NavLink to={withProject(base)} end className={tabClassName}>
+              My work
+            </NavLink>
+            <NavLink
+              to={overviewProject ? `${base}/projects/${encodeURIComponent(overviewProject)}` : `${base}/projects`}
+              end
+              className={() => tabClassName({ isActive: onOverview || onProjectsIndex })}
+            >
+              Project overview
+            </NavLink>
+            <NavLink to={withProject(`${base}/actions`)} className={tabClassName}>
+              <span>
+                Approvals<span className="sr-only sm:not-sr-only"> & audit</span>
+              </span>
+              {pendingCount > 0 ? (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
+                  {pendingCount}
+                </span>
+              ) : pending.error && !pending.data ? (
+                <Hint label="Pending approvals could not be loaded">
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-slate-300 px-1.5 text-xs font-semibold text-slate-700">
+                    ?<span className="sr-only"> pending approvals could not be loaded</span>
+                  </span>
+                </Hint>
+              ) : null}
+            </NavLink>
+          </nav>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            <div className="min-w-0 space-y-1">
-              <label htmlFor="credential-select" className="block text-xs font-medium text-slate-500">
-                Organization
-              </label>
-              <SelectField
-                id="credential-select"
-                className="font-medium sm:min-w-44"
-                value={credentialId}
-                onValueChange={(selected) => selectCredential(selected)}
-              >
-                {credentials.error && !credentials.data ? <option value={credentialId}>Organizations could not be loaded</option> : null}
-                {(credentials.data ?? []).map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {getCredentialDisplayName(candidate)}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
-
-            <div className="min-w-0 space-y-1">
-              <label htmlFor="project-select" className="block text-xs font-medium text-slate-500">
-                Project
-              </label>
-              <SelectField
-                id="project-select"
-                className="font-medium sm:min-w-44"
-                value={project?.id ?? ""}
-                onValueChange={(selected) => selectProject(selected)}
-                disabled={projects.isLoading}
-              >
-                {/* Project pages need a single project, so "All projects" is only offered on My work and Approvals. */}
-                <option value="" disabled={onProjectPage && !projects.isLoading}>
-                  {projects.isLoading
-                    ? "Loading projects..."
-                    : projects.error && !projects.data
-                      ? "Projects could not be loaded"
-                      : onProjectPage
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:flex-nowrap">
+            <button
+              type="button"
+              onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
+              className="inline-flex h-8 items-center gap-2 rounded-lg border border-slate-200 px-2.5 text-sm text-slate-500 outline-none transition-colors hover:bg-slate-50 hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              <Search aria-hidden="true" className="size-4" />
+              Search
+              <kbd className="rounded border border-slate-200 px-1 text-[11px] text-slate-500">⌘K</kbd>
+            </button>
+            <label htmlFor="credential-select" className="sr-only">
+              Organization
+            </label>
+            <SelectField
+              id="credential-select"
+              size="sm"
+              className="min-w-0 font-medium sm:w-44"
+              value={credentialId}
+              onValueChange={(selected) => selectCredential(selected)}
+            >
+              {credentials.error && !credentials.data ? <option value={credentialId}>Organizations could not be loaded</option> : null}
+              {(credentials.data ?? []).map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {getCredentialDisplayName(candidate)}
+                </option>
+              ))}
+            </SelectField>
+            <label htmlFor="project-select" className="sr-only">
+              Project
+            </label>
+            <SelectField
+              id="project-select"
+              size="sm"
+              className="min-w-0 font-medium sm:w-44"
+              value={project?.id ?? ""}
+              onValueChange={(selected) => selectProject(selected)}
+              disabled={projects.isLoading}
+            >
+              {/* Project pages need a single project, so "All projects" is only offered on My work and Approvals. */}
+              <option value="" disabled={onProjectPage && !projects.isLoading}>
+                {projects.isLoading
+                  ? "Loading projects..."
+                  : projects.error && !projects.data
+                    ? "Projects could not be loaded"
+                    : onProjectPage
                       ? "All projects (My work & Approvals only)"
                       : "All projects"}
+              </option>
+              {(projects.data?.projects ?? []).map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
                 </option>
-                {(projects.data?.projects ?? []).map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.name}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
+              ))}
+            </SelectField>
           </div>
         </div>
 
@@ -201,36 +238,6 @@ export function AzureLayout() {
             </button>
           </div>
         ) : null}
-
-        <nav aria-label="Azure DevOps" className="relative flex gap-6 overflow-x-auto whitespace-nowrap border-t border-slate-200 px-4 sm:px-5">
-          <ActiveIndicator variant="underline" />
-          <NavLink to={withProject(base)} end className={tabClassName}>
-            My work
-          </NavLink>
-          <NavLink
-            to={overviewProject ? `${base}/projects/${encodeURIComponent(overviewProject)}` : `${base}/projects`}
-            end
-            className={() => tabClassName({ isActive: onOverview || onProjectsIndex })}
-          >
-            Project overview
-          </NavLink>
-          <NavLink to={withProject(`${base}/actions`)} className={tabClassName}>
-            <span>
-              Approvals<span className="sr-only sm:not-sr-only"> & audit</span>
-            </span>
-            {pendingCount > 0 ? (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 text-xs font-semibold text-white">
-                {pendingCount}
-              </span>
-            ) : pending.error && !pending.data ? (
-              <Hint label="Pending approvals could not be loaded">
-                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-slate-300 px-1.5 text-xs font-semibold text-slate-700">
-                  ?<span className="sr-only"> pending approvals could not be loaded</span>
-                </span>
-              </Hint>
-            ) : null}
-          </NavLink>
-        </nav>
       </div>
 
       <Outlet />

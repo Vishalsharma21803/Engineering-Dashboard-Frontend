@@ -1,3 +1,6 @@
+import { Play, Square, TimerOff } from "lucide-react";
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { ApiError } from "@/lib/api-client";
@@ -11,13 +14,25 @@ interface TicketTimerButtonProps {
   ticket: { id: number; title: string; projectName: string };
   onPropose: (input: ProposeActionInput) => void;
   disabled?: boolean;
+  /** Icon only (list rows): the label stays as the button's accessible name and tooltip. */
+  compact?: boolean;
 }
 
 /**
  * Start or stop my Solidtime timer for a ticket. Both only propose the change;
  * the review dialog is where it is approved. A timer starts when Start was pressed.
  */
-export function TicketTimerButton({ connection, ticket, onPropose, disabled = false }: TicketTimerButtonProps) {
+export function TicketTimerButton({ connection, ticket, onPropose, disabled = false, compact = false }: TicketTimerButtonProps) {
+  const content = (label: string, icon: ReactNode) =>
+    compact ? (
+      <>
+        {icon}
+        <span className="sr-only">{label}</span>
+      </>
+    ) : (
+      label
+    );
+  const compactClass = compact ? "size-8 px-0" : undefined;
   const timer = useTimer(connection.credentialId);
   const catalog = useCatalog(connection.credentialId);
   const running = timer.data?.entry ?? null;
@@ -31,8 +46,8 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
     return (
       <Hint label={`Timer unavailable: ${reason}`}>
         <span tabIndex={0} className="inline-flex rounded-lg">
-          <Button size="sm" variant="secondary" disabled aria-label={`Timer unavailable: ${reason}`}>
-            Timer unavailable
+          <Button size="sm" variant="secondary" disabled aria-label={`Timer unavailable: ${reason}`} className={compactClass}>
+            {content("Timer unavailable", <TimerOff aria-hidden="true" className="size-4" />)}
           </Button>
         </span>
       </Hint>
@@ -45,6 +60,10 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
         size="sm"
         variant="danger"
         disabled={disabled}
+        className={compactClass}
+        // A running timer stays visible even where row actions only show on hover.
+        data-timer-running=""
+        title={compact ? "Stop timer…" : undefined}
         onClick={() =>
           onPropose({
             credentialId: connection.credentialId,
@@ -54,7 +73,7 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
           })
         }
       >
-        Stop timer…
+        {content("Stop timer…", <Square aria-hidden="true" className="size-3.5 fill-current" />)}
       </Button>
     );
   }
@@ -64,6 +83,7 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
       size="sm"
       variant="secondary"
       disabled={disabled || running !== null || timer.isLoading}
+      className={compactClass}
       title={running ? undefined : `Track time on #${ticket.id}`}
       onClick={() =>
         onPropose({
@@ -81,7 +101,7 @@ export function TicketTimerButton({ connection, ticket, onPropose, disabled = fa
         })
       }
     >
-      Start timer…
+      {content("Start timer…", <Play aria-hidden="true" className="size-3.5" />)}
     </Button>
   );
 

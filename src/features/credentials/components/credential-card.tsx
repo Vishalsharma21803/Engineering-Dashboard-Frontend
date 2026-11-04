@@ -7,6 +7,7 @@ import type { Credential } from "../types/credential.types";
 import { getCredentialDisplayName } from "../utils/credential-display";
 import { CredentialCardFrame, type CardNotice } from "./credential-card-frame";
 import { EditIcon, ShieldIcon, TrashIcon } from "./credential-icons";
+import { TokenPermissions } from "@/features/azure-devops/components/scopes-card";
 
 interface CredentialCardProps {
   credential: Credential;
@@ -57,6 +58,8 @@ export function CredentialCard({ credential, isValidating, validateDisabled, del
           </Button>
         </>
       }
-    />
+    >
+      {credential.lastValidationStatus === "VALID" ? <TokenPermissions credentialId={credential.id} /> : null}
+    </CredentialCardFrame>
   );
 }

@@ -7,7 +7,7 @@ import {
   proposeAction,
   rejectAction,
 } from "../api/action.api";
-import { actionKeys, azureKeys } from "../api/azure.keys";
+import { actionKeys, azureKeys, notificationKeys } from "../api/azure.keys";
 import type { ActionListFilter, ProposedAction } from "../types/action.types";
 import { retryUnlessClientError } from "../utils/query-retry";
 
@@ -40,6 +40,8 @@ export function useProposeAction() {
     mutationFn: proposeAction,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: actionKeys.all });
+      // Pending approvals are one of the notifications.
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
 }
@@ -52,6 +54,8 @@ export function useApproveAction() {
     mutationFn: (action: Pick<ProposedAction, "id" | "payloadHash">) => approveAction(action),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: actionKeys.all });
+      // Pending approvals are one of the notifications.
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
       void queryClient.invalidateQueries({ queryKey: azureKeys.all });
       // Approved Solidtime changes (timer, entries) show up in the time views.
       void queryClient.invalidateQueries({ queryKey: ["solidtime"] });
@@ -67,6 +71,8 @@ export function useRejectAction() {
       rejectAction(actionId, reason),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: actionKeys.all });
+      // Pending approvals are one of the notifications.
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.all });
     },
   });
 }

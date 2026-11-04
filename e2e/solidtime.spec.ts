@@ -43,7 +43,7 @@ test("connects Solidtime and tracks time on a ticket only through approval", asy
 
   // My work: each ticket has a timer; starting one only proposes it.
   await page.goto("/azure");
-  const row = page.getByRole("row", { name: /#101 Implement login/ });
+  const row = page.getByRole("list", { name: "My work items" }).getByRole("listitem").filter({ hasText: "101 Implement login" }).last();
   await row.getByRole("button", { name: "Start timer…" }).click();
   await expect(page.getByRole("dialog").getByText("Start a timer: #101 Implement login")).toBeVisible();
   expect((await (await request.get(`${BACKEND}/__e2e/solidtime`)).json()).entries).toEqual([]);
@@ -53,7 +53,7 @@ test("connects Solidtime and tracks time on a ticket only through approval", asy
   expect(stored).toEqual([expect.objectContaining({ description: "#101 Implement login", end: null })]);
 
   // The ticket page shows the time and stops the timer, again through approval.
-  await page.getByRole("table").getByRole("link", { name: "#101 Implement login" }).click();
+  await page.getByRole("list", { name: "My work items" }).getByRole("link", { name: "101 Implement login" }).click();
   await expect(page.getByRole("heading", { name: "Time" })).toBeVisible();
   await page.getByRole("button", { name: "Stop timer…" }).click();
   await approve(page);

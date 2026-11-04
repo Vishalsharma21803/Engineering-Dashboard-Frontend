@@ -7,7 +7,7 @@ import { DashboardPage } from "../pages/dashboard-page";
 import type { MyWorkPage } from "../types/azure.types";
 import type { TriageMark } from "../types/triage.types";
 import { buildSignalIndex, isHidden, resolveTriage, workItemKey } from "../utils/triage";
-import { CREDENTIAL_ID, dashboard, dashboardListBody, pageOf } from "./fixtures";
+import { CREDENTIAL_ID, attentionFor, dashboard, dashboardListBody, pageOf } from "./fixtures";
 
 const base = `/api/azure/${CREDENTIAL_ID}`;
 
@@ -25,17 +25,27 @@ function myWorkFor(marks: TriageMark[], hidden: boolean): MyWorkPage {
   const hiddenCount = items.filter((item) => isHiddenItem(item.id, item.projectName)).length;
   const showing = hidden && hiddenCount > 0;
   const pool = items.filter((item) => isHiddenItem(item.id, item.projectName) === showing);
+  // The header counts every open ticket that is not snoozed or abandoned.
+  const visible = items.filter((item) => !isHiddenItem(item.id, item.projectName));
+  const count = (category: string) => visible.filter((item) => item.stateCategory === category).length;
   const compliance = new Map((dashboard.sections.compliance.data ?? []).map((result) => [result.workItemId, result]));
 
   return {
-    items: pool.map((workItem) => ({ workItem, compliance: compliance.get(workItem.id) ?? null })),
+    items: pool.map((workItem) => ({ heading: null, section: null, progress: null, latest: null, headingRow: null, rows: [{ workItem, compliance: compliance.get(workItem.id) ?? null, attention: attentionFor(workItem.id) }] })),
     page: 1,
     pageSize: 10,
     total: pool.length,
     totalPages: 1,
+    groupBy: "status",
+    sections: [],
+    overview: { sprint: null, counts: { inProgress: count("InProgress"), todo: count("Proposed"), resolved: count("Resolved"), done: 0 }, remainingHours: 0 },
+    ticketCount: pool.length,
     poolTotal: pool.length,
     hiddenCount,
     showingHidden: showing,
+    sprint: { mode: "all", inSprint: 0, names: [] },
+    closed: { included: false, count: 0 },
+    attention: { only: false, count: 0 },
     facets: { types: [], states: [], priorities: [], sop: [] },
   };
 }
@@ -96,16 +106,16 @@ function setup(initial: TriageMark[] = []) {
   return writes;
 }
 
-const prioritized = () => screen.getByText("Prioritized actions").closest("div")!.parentElement!.parentElement!;
+const myWork = () => screen.getByRole("heading", { name: /^My work/ }).closest("div")!.parentElement!.parentElement!;
 
 describe("dashboard triage", () => {
-  it("abandons a prioritized item in Cockpit only and lets it be restored", async () => {
+  it("abandons a ticket in Cockpit only and lets it be restored", async () => {
     const writes = setup();
 
     await userEvent.click(await screen.findByRole("button", { name: "Triage #103 Crash on save" }));
     await userEvent.click(screen.getByRole("button", { name: "Abandon · hide until restored" }));
 
-    await waitFor(() => expect(screen.queryByRole("link", { name: "#103 Crash on save" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("link", { name: "103 Crash on save" })).not.toBeInTheDocument());
     expect(writes).toEqual([
       {
         method: "PUT",
@@ -120,16 +130,16 @@ describe("dashboard triage", () => {
     ]);
     expect(writes.some((write) => write.url.startsWith("/api/azure") || write.url.startsWith("/api/actions"))).toBe(false);
 
-    await userEvent.click(within(prioritized()).getByRole("button", { name: "Show snoozed & abandoned (1)" }));
-    expect(within(prioritized()).getByText("Abandoned")).toBeInTheDocument();
+    await userEvent.click(await within(myWork()).findByRole("button", { name: "Show snoozed & abandoned (1)" }));
+    expect(await within(myWork()).findByText("Abandoned")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Triage #103 Crash on save" }));
     await userEvent.click(screen.getByRole("button", { name: "Restore to my list" }));
 
     await waitFor(() => expect(writes.at(-1)?.method).toBe("DELETE"));
     // The last hidden item came back, so the list returns to the normal view by itself.
-    expect(await screen.findByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
-    expect(within(prioritized()).queryByRole("button", { name: /snoozed & abandoned/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "103 Crash on save" })).toBeInTheDocument();
+    expect(within(myWork()).queryByRole("button", { name: /snoozed & abandoned/ })).not.toBeInTheDocument();
   });
 
   it("snoozes with an end date and hides the item from counts", async () => {
@@ -138,42 +148,40 @@ describe("dashboard triage", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Triage #102 Fix flaky test" }));
     await userEvent.click(screen.getByRole("button", { name: "Snooze · tomorrow" }));
 
-    await waitFor(() => expect(screen.getByText("All your open work items are snoozed or abandoned.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("link", { name: "102 Fix flaky test" })).not.toBeInTheDocument());
     const put = writes.find((write) => write.method === "PUT")?.body as { snoozedUntil: string } | undefined;
     expect(put).toMatchObject({ itemKey: "wi:102", status: "SNOOZED" });
     expect(Date.parse(put?.snoozedUntil ?? "")).toBeGreaterThan(Date.now());
 
-    const openTile = screen.getByText("Open work items").parentElement!;
-    expect(openTile).toHaveTextContent("0");
-    expect(openTile).toHaveTextContent("1 hidden");
+    // Snoozed tickets leave the counts.
+    await waitFor(() => expect(screen.getByRole("region", { name: "Sprint overview" })).toHaveTextContent("1 ticket assigned to you"));
   });
 
   it("keeps acknowledged items visible but resurfaces them when a new problem appears", async () => {
     setup([mark("wi:103", "ACKNOWLEDGED", { signals: [] })]);
 
-    const link = await screen.findByRole("link", { name: "#103 Crash on save" });
+    const link = await screen.findByRole("link", { name: "103 Crash on save" });
     expect(within(link.closest("li")!).getByText("New since acknowledged")).toBeInTheDocument();
   });
 
-  it("groups acknowledged items below active ones", async () => {
+  it("keeps acknowledged tickets in My work with their mark", async () => {
     setup([mark("wi:103", "ACKNOWLEDGED", { signals: ["SOP:NOT_CLOSED_AFTER_MERGE"] })]);
 
-    const acknowledged = await screen.findByRole("region", { name: "Acknowledged" });
-    expect(within(acknowledged).getByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
-    expect(within(acknowledged).getByText("Acknowledged")).toBeInTheDocument();
+    const link = await within(await screen.findByRole("list", { name: "My work items" })).findByRole("link", { name: "103 Crash on save" });
+    expect(within(link.closest("li")!).getByText("Acknowledged")).toBeInTheDocument();
   });
 
   it("hides a whole abandoned project and restores it from the project strip", async () => {
     const projectMark = mark("project:alpha", "ABANDONED");
     const writes = setup([projectMark]);
 
-    expect(await screen.findByText("All your open work items are snoozed or abandoned.")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "#103 Crash on save" })).not.toBeInTheDocument();
+    expect(await screen.findByText("All your open tickets are snoozed or abandoned.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "103 Crash on save" })).not.toBeInTheDocument();
     expect(screen.getByText("Triaged projects").parentElement).toHaveTextContent("Alpha · abandoned");
 
     await userEvent.click(screen.getByRole("button", { name: "Restore project Alpha" }));
 
-    expect(await screen.findByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "103 Crash on save" })).toBeInTheDocument();
     expect(writes).toEqual([{ method: "DELETE", url: `/api/triage/${projectMark.id}`, body: null }]);
   });
 
@@ -194,8 +202,8 @@ describe("dashboard triage", () => {
 
     expect(await screen.findByText(/could not be loaded \(.+\), so everything is shown/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
-    // The prioritized list arrives from its own (server-paged) request.
-    expect(await screen.findByRole("link", { name: "#103 Crash on save" })).toBeInTheDocument();
+    // My work arrives from its own (server-paged) request.
+    expect(await screen.findByRole("link", { name: "103 Crash on save" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Triage #103 Crash on save" })).toBeDisabled();
   });
 });

@@ -104,7 +104,7 @@ test("rules are tried on a real ticket and shown on the work item page", async (
 
   // The work item page explains the gap with the rule id and title.
   await page.goto("/azure");
-  await page.getByRole("table").getByRole("link", { name: "#102 Fix flaky test" }).click();
+  await page.getByRole("list", { name: "My work items" }).getByRole("link", { name: "102 Fix flaky test" }).click();
   await expect(page.getByText("Estimate exists")).toBeVisible();
   await expect(page.getByText("No original estimate (hours).")).toBeVisible();
 
@@ -153,6 +153,7 @@ test("the team SOP report uses the default rules for everyone in the project", a
   await expect(page).toHaveURL(/\/projects\//);
   await choose(page.getByLabel("Project"), { label: "Alpha" });
   await expect(page.getByRole("heading", { name: "Alpha", exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "SOP report" }).click();
   await expect(page.getByText(/No saved reports yet/)).toBeVisible();
   await page.getByRole("button", { name: "Run report" }).click();
 
@@ -187,9 +188,10 @@ test("projects are set up from Azure and each developer chooses theirs; new tick
 
   // New ticket #106 has no estimate but is not flagged; active #102 is.
   await page.goto("/azure");
-  const table = page.getByRole("table");
-  await expect(table.getByRole("row", { name: /#102 Fix flaky test/ })).toContainText("T-01");
-  await expect(table.getByRole("row", { name: /#106 Waiting on vendor/ })).toContainText("SOP OK");
+  const table = page.getByRole("list", { name: "My work items" });
+  // A gap shows in plain words; a passing ticket shows nothing.
+  await expect(table.getByRole("listitem").filter({ hasText: "102 Fix flaky test" }).last()).toContainText("No original estimate (hours)");
+  await expect(table.getByRole("listitem").filter({ hasText: "106 Waiting on vendor" }).last()).not.toContainText("estimate");
 
   await page.goto("/sop-rules?tab=projects");
   const projects = page.getByRole("table", { name: "SOP projects" });
@@ -207,7 +209,8 @@ test("projects are set up from Azure and each developer chooses theirs; new tick
   await projects.getByRole("checkbox", { name: "Check Alpha for me" }).uncheck();
   await expect(projects.getByRole("checkbox", { name: "Check Alpha for me" })).not.toBeChecked();
   await page.goto("/azure");
-  await expect(page.getByRole("table").getByRole("row", { name: /#102 Fix flaky test/ })).toContainText("SOP off");
+  // Switched off: no SOP gap on the row any more.
+  await expect(page.getByRole("list", { name: "My work items" }).getByRole("listitem").filter({ hasText: "102 Fix flaky test" }).last()).not.toContainText("No original estimate");
 
   const response = await request.get(`${BACKEND}/__e2e/requests`);
   const { requests } = (await response.json()) as { requests: Array<{ isWrite: boolean }> };
