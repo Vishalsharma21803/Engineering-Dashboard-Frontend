@@ -1,7 +1,7 @@
 export type Theme = "light" | "dark";
 
 /** Remembered per browser; without a choice the system setting is followed. */
-export const THEME_STORAGE_KEY = "cockpit-theme";
+export const THEME_STORAGE_KEY = "relay-theme";
 
 function storedTheme(): Theme | null {
   try {

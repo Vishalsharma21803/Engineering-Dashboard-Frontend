@@ -10,7 +10,7 @@ interface SegmentedProps<T extends string> {
   className?: string;
 }
 
-/** A two-or-three-way switch (one pressed button in a group): the one toggle style used across Cockpit. */
+/** A two-or-three-way switch (one pressed button in a group): the one toggle style used across Relay. */
 export function Segmented<T extends string>({ label, value, options, onChange, size = "md", className }: SegmentedProps<T>) {
   return (
     <div role="group" aria-label={label} className={cn("inline-flex w-fit rounded-lg bg-slate-100 p-0.5", className)}>

@@ -47,11 +47,11 @@ describe("RegisterPage", () => {
         method: "POST",
         path: "/api/auth/register",
         status: 403,
-        body: { message: "Sign-up is by invitation only. Ask the Cockpit owner to add your email.", reason: "SIGNUP_NOT_ALLOWED" },
+        body: { message: "Sign-up is by invitation only. Ask the Relay owner to add your email.", reason: "SIGNUP_NOT_ALLOWED" },
       },
     ]);
     await register();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-up is by invitation only. Ask the Cockpit owner to add your email.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-up is by invitation only. Ask the Relay owner to add your email.");
   });
 });

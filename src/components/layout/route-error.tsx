@@ -76,9 +76,9 @@ export function RouteError({ fullPage = false }: RouteErrorProps) {
     <section role="alert" className={cn("flex w-full items-center justify-center py-12", fullPage && "min-h-screen px-4")}>
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>{chunkFailed ? "A new version of Cockpit is available" : title}</CardTitle>
+          <CardTitle>{chunkFailed ? "A new version of Relay is available" : title}</CardTitle>
           <CardDescription>
-            {chunkFailed ? "Part of this page could not be loaded, usually because Cockpit was updated. Reload to get the new version." : message}
+            {chunkFailed ? "Part of this page could not be loaded, usually because Relay was updated. Reload to get the new version." : message}
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex flex-wrap gap-2">

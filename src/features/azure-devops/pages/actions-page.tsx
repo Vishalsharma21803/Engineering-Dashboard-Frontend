@@ -63,14 +63,14 @@ function ListPager({ label, page, disabled, onChange }: { label: string; page: P
   ) : null;
 }
 
-/** embedded: rendered inside the cockpit layout, which already shows the page header. */
+/** embedded: rendered inside the Relay layout, which already shows the page header. */
 export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
   const { credentialId } = useParams();
   const [searchParams] = useSearchParams();
   const projects = useProjects(credentialId ?? "");
   const [reviewing, setReviewing] = useState<ProposedAction | null>(null);
 
-  // Inside the cockpit, show only the selected organization (and project, if one is chosen).
+  // Inside Relay, show only the selected organization (and project, if one is chosen).
   const projectParam = embedded ? searchParams.get("project") : null;
   const project = projectParam
     ? projects.data?.projects.find((candidate) => candidate.id === projectParam || candidate.name === projectParam) ?? {
@@ -108,7 +108,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
               Showing changes for <span className="font-medium text-slate-900">{project.name}</span>. Choose “All projects” in the header to see every project.{" "}
             </>
           ) : null}
-          Every change Cockpit makes to Azure DevOps is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
+          Every change Relay makes to Azure DevOps is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
         </p>
       ) : (
         <div>
@@ -121,7 +121,7 @@ export function ActionsPage({ embedded = false }: { embedded?: boolean }) {
           </Link>
           <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-950">Approvals & audit</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Every change Cockpit makes to Azure DevOps or Solidtime is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
+            Every change Relay makes to Azure DevOps or Solidtime is proposed first and runs only after you approve it. Pending proposals expire after 15 minutes.
           </p>
         </div>
       )}

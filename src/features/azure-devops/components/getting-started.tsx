@@ -4,7 +4,7 @@ import { useState } from "react";
 import { modKey } from "@/utils/platform";
 import { readStored, writeStored } from "../utils/stored";
 
-const KEY = "cockpit:tips-dismissed";
+const KEY = "relay:tips-dismissed";
 
 const TIPS = [
   { title: "Your sprint at a glance", text: "The bar shows how much of your work is finished; the tick is today. Hours left are compared with the working hours you have left." },

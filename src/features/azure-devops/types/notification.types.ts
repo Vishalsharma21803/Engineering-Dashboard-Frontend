@@ -1,7 +1,7 @@
 export type NotificationKind = "pullRequest" | "pipeline" | "approvals" | "timeDay" | "timer" | "timeUntracked" | "closedTicket";
 export type NotificationStatus = "UNREAD" | "READ" | "ABANDONED";
 
-export interface CockpitNotification {
+export interface RelayNotification {
   id: string;
   key: string;
   kind: NotificationKind;

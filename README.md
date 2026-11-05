@@ -1,6 +1,6 @@
-# Engineer Cockpit — Frontend
+# Relay — Frontend
 
-React + Vite frontend for Engineer Cockpit.
+React + Vite frontend for Relay.
 
 ## Stack
 

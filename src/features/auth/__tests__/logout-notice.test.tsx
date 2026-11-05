@@ -31,7 +31,7 @@ function renderSignedIn() {
 
 describe("sign-out", () => {
   it("says so when the server could not end the session", async () => {
-    const message = "Signed out on this device, but Cockpit could not end the session on the server. Copies of it stay valid until they expire (within 24 hours).";
+    const message = "Signed out on this device, but Relay could not end the session on the server. Copies of it stay valid until they expire (within 24 hours).";
     mockBackend([
       { path: "/api/auth/me", body: { user } },
       { method: "POST", path: "/api/auth/logout", body: { message, reason: "SESSION_NOT_REVOKED" } },

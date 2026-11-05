@@ -12,7 +12,7 @@ import {
   type NotificationSaved,
   type NotificationSaveFailure,
 } from "../hooks/use-notifications";
-import type { CockpitNotification, NotificationKind, NotificationStatus } from "../types/notification.types";
+import type { RelayNotification, NotificationKind, NotificationStatus } from "../types/notification.types";
 import { describeError } from "../utils/error-message";
 import { formatRelative, pluralizeText } from "../utils/format";
 
@@ -34,7 +34,7 @@ const KIND_ICONS: Record<NotificationKind, { icon: LucideIcon; tone: string }> =
 };
 
 /** The page Open goes to, or null for a failed pipeline (it scrolls to Pipelines on this page). */
-function linkOf(notification: CockpitNotification, credentialId: string): string | null {
+function linkOf(notification: RelayNotification, credentialId: string): string | null {
   const base = `/azure/${encodeURIComponent(credentialId)}`;
   const { target } = notification;
   const project = encodeURIComponent(target.projectName ?? "");
@@ -233,7 +233,7 @@ export function NotificationsMenu({ credentialId, projectName, dashboardToken, o
   );
 }
 
-function NotificationRow({ notification, credentialId, busy, onStatus, onOpen }: { notification: CockpitNotification; credentialId: string; busy: boolean; onStatus: (status: NotificationStatus) => void; onOpen: () => void }) {
+function NotificationRow({ notification, credentialId, busy, onStatus, onOpen }: { notification: RelayNotification; credentialId: string; busy: boolean; onStatus: (status: NotificationStatus) => void; onOpen: () => void }) {
   const { icon: Icon, tone } = KIND_ICONS[notification.kind] ?? KIND_ICONS.closedTicket;
   const to = linkOf(notification, credentialId);
   const action = "rounded px-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60";

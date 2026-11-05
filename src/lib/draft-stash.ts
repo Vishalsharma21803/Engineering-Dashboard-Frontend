@@ -1,9 +1,9 @@
 /*
  * Unsaved edits kept in sessionStorage so a session that expires mid-edit does not lose
- * them. Keys are scoped by user id (`cockpit:unsaved:{userId}:{name}`), so another person
+ * them. Keys are scoped by user id (`relay:unsaved:{userId}:{name}`), so another person
  * signing in on the same tab never sees them; sign-out drops them all.
  */
-const PREFIX = "cockpit:unsaved:";
+const PREFIX = "relay:unsaved:";
 
 /** Bumped on sign-out: edits typed before it are not written afterwards (a pending debounced write, a flush on unmount). */
 let signOutCount = 0;

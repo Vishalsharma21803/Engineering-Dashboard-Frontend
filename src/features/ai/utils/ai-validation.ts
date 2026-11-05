@@ -10,16 +10,16 @@ export function validationNotice(provider: AiProvider, result: ValidateAiCredent
   }
 
   if (provider === "CLAUDE") {
-    return { tone: "success", text: `Key works. Models available: ${String(result.details.modelsAvailable || "none of Cockpit's models")}.` };
+    return { tone: "success", text: `Key works. Models available: ${String(result.details.modelsAvailable || "none of Relay's models")}.` };
   }
 
   if (provider === "OPENCODE") {
     const free =
       result.details.freeModelsUsable === true
-        ? "Free models can be used from Cockpit."
+        ? "Free models can be used from Relay."
         : result.details.freeModelsUsable === false
           ? "OpenCode allows its free models only inside the OpenCode app, so choose a paid OpenCode model (needs credit)."
-          : "Could not tell whether free models work from Cockpit.";
+          : "Could not tell whether free models work from Relay.";
     return { tone: "success", text: `Key works. ${free}` };
   }
 

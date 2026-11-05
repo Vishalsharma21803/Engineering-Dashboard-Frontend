@@ -52,7 +52,7 @@ function isKnownReason(reason: string | null): boolean {
 
 /** Fixed wording for reasons where the server's text may be missing or too terse. */
 const REASON_TEXT: Record<string, string> = {
-  SIGNUP_NOT_ALLOWED: "Sign-up is by invitation only. Ask the Cockpit owner to add your email.",
+  SIGNUP_NOT_ALLOWED: "Sign-up is by invitation only. Ask the Relay owner to add your email.",
   PROJECT_SETUP_NOT_YOURS: "Only the person who set up this project or an SOP owner can change it.",
   SERVER_RESTARTING: "The server is restarting. Try again in a moment.",
   ROUTE_NOT_FOUND: "The server does not know this request. The app may be out of date; reload the page.",
@@ -61,7 +61,7 @@ const REASON_TEXT: Record<string, string> = {
   EMAIL_ALREADY_REGISTERED: "Email is already registered. Sign in instead.",
   CREDENTIAL_ALREADY_EXISTS: "A credential with these details already exists.",
   CREDENTIAL_UNREADABLE: "The stored credential could not be read. Enter its secret again.",
-  SERVER_MISCONFIGURED: "The server is not configured correctly. Ask the Cockpit owner to check its settings.",
+  SERVER_MISCONFIGURED: "The server is not configured correctly. Ask the Relay owner to check its settings.",
 };
 
 export const NETWORK_ERROR_TEXT = "Unable to reach the server. Check your connection.";

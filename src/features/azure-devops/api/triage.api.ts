@@ -1,7 +1,7 @@
 import { apiRequest } from "@/lib/api-client";
 import type { TriageMark, UpsertTriageInput } from "../types/triage.types";
 
-/** Triage is stored in Cockpit only; none of these calls change Azure DevOps. */
+/** Triage is stored in Relay only; none of these calls change Azure DevOps. */
 export async function listTriage(credentialId: string, signal?: AbortSignal) {
   const response = await apiRequest<{ marks: TriageMark[] }>(
     `/api/triage?credentialId=${encodeURIComponent(credentialId)}`,

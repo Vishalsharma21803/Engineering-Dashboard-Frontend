@@ -429,7 +429,7 @@ describe("ThemeToggle", () => {
     renderWithProviders(<ThemeToggle />);
     await userEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(window.localStorage.getItem("cockpit-theme")).toBe("dark");
+    expect(window.localStorage.getItem("relay-theme")).toBe("dark");
     await userEvent.click(screen.getByRole("button", { name: "Switch to light mode" }));
     expect(document.documentElement.dataset.theme).toBe("light");
   });

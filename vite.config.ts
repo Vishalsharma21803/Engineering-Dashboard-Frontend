@@ -15,6 +15,11 @@ export default defineConfig({
     port: 5180,
     strictPort: true,
     allowedHosts: [".trycloudflare.com", ".ngrok-free.app", ".ngrok-free.dev", ".ngrok.app"],
+    // Pages load lazily (routes/lazy-pages.tsx): prepare them at start-up so the first visit to an
+    // area does not wait for the dev server to compile it (it made the first e2e visit time out).
+    warmup: {
+      clientFiles: ["./src/pages/*.tsx", "./src/features/*/pages/*.tsx", "./src/features/azure-devops/components/azure-layout.tsx"],
+    },
     proxy: {
       "/api": {
         target: "http://localhost:4000",

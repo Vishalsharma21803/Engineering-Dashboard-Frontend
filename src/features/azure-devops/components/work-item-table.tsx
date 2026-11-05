@@ -61,8 +61,8 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, triage, t
   const { page, setPage } = pageParam;
   const [showHidden, setShowHidden] = useState(false);
   const toFirstPage = () => setPage(1, { replace: true });
-  const list = useListFilters(toFirstPage, `cockpit:my-work-filters:${credentialId}`);
-  const viewKey = `cockpit:my-work-view:${credentialId}`;
+  const list = useListFilters(toFirstPage, `relay:my-work-filters:${credentialId}`);
+  const viewKey = `relay:my-work-view:${credentialId}`;
   const [view, setViewState] = useState<ListView>(() => readStored<ListView>(viewKey, { sprint: undefined, closed: false }));
   const setView = (next: ListView) => {
     setViewState(next);
@@ -223,7 +223,7 @@ export function MyWorkTable({ credentialId, projectId, dashboardToken, triage, t
               label="My work items"
               groups={groups}
               context={context}
-              collapsedKey={`cockpit:collapsed:${credentialId}`}
+              collapsedKey={`relay:collapsed:${credentialId}`}
               byProject={!projectId && (multipleProjects || new Set(groups.map(groupProject)).size > 1)}
               sectionCounts={new Map(data.sections.map((section) => [section.key, section.count]))}
               // The "Done recently" switch sits where done tickets start, or at the very end of the list (last page) when they are folded.
@@ -338,7 +338,7 @@ export function TeamWorkTable({ credentialId, projectId, scope, myId }: TeamWork
         </div>
         <Updating active={query.isPlaceholderData}>
           {data.total > 0 ? (
-            <GroupedTickets label="Team work items" groups={groups} context={context} collapsedKey={`cockpit:team-collapsed:${credentialId}`} />
+            <GroupedTickets label="Team work items" groups={groups} context={context} collapsedKey={`relay:team-collapsed:${credentialId}`} />
           ) : (
             <EmptyState>No work items match these filters. Clear them in Filter.</EmptyState>
           )}

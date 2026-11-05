@@ -109,7 +109,7 @@ function setup(initial: TriageMark[] = []) {
 const myWork = () => screen.getByRole("heading", { name: /^My work/ }).closest("div")!.parentElement!.parentElement!;
 
 describe("dashboard triage", () => {
-  it("abandons a ticket in Cockpit only and lets it be restored", async () => {
+  it("abandons a ticket in Relay only and lets it be restored", async () => {
     const writes = setup();
 
     await userEvent.click(await screen.findByRole("button", { name: "Triage #103 Crash on save" }));

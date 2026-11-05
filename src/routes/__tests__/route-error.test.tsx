@@ -13,7 +13,7 @@ function Boom(): never {
 }
 
 function ChunkBoom(): never {
-  throw new TypeError("Failed to fetch dynamically imported module: https://cockpit.example/assets/dashboard-page-1a2b.js");
+  throw new TypeError("Failed to fetch dynamically imported module: https://relay.example/assets/dashboard-page-1a2b.js");
 }
 
 /** Vite's own error when a page's stylesheet is gone after a deploy. */
@@ -22,10 +22,10 @@ function CssChunkBoom(): never {
 }
 
 /** Stands in for AzureLayout: a header that must survive a crash in the page under it. */
-function CockpitLayout() {
+function AppLayout() {
   return (
     <div>
-      <p>Cockpit header</p>
+      <p>Relay header</p>
       <Outlet />
     </div>
   );
@@ -46,7 +46,7 @@ function renderAt(path: string, layout: ReactElement = <RootLayout />) {
               { path: "/css-chunk", element: <CssChunkBoom /> },
               {
                 path: "/azure",
-                element: <CockpitLayout />,
+                element: <AppLayout />,
                 children: [{ errorElement: <RouteError />, children: [{ index: true, element: <Boom /> }] }],
               },
             ],
@@ -88,18 +88,18 @@ describe("RouteError", () => {
     expect(screen.getByRole("button", { name: "Copy details" })).toBeInTheDocument();
   });
 
-  it("keeps the cockpit header when a page under it crashes", async () => {
+  it("keeps the Relay header when a page under it crashes", async () => {
     renderAt("/azure");
 
     expect(await screen.findByText("This page crashed")).toBeInTheDocument();
-    expect(screen.getByText("Cockpit header")).toBeInTheDocument();
+    expect(screen.getByText("Relay header")).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
   });
 
   it("offers Reload when a page's code could not be loaded after an update", async () => {
     renderAt("/chunk");
 
-    expect(await screen.findByText("A new version of Cockpit is available")).toBeInTheDocument();
+    expect(await screen.findByText("A new version of Relay is available")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe("RouteError", () => {
   it("offers Reload when a page's stylesheet could not be loaded after an update", async () => {
     renderAt("/css-chunk");
 
-    expect(await screen.findByText("A new version of Cockpit is available")).toBeInTheDocument();
+    expect(await screen.findByText("A new version of Relay is available")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
   });
 

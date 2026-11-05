@@ -6,14 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Engineer Cockpit — a workspace for Azure DevOps projects, work items, repositories, pull requests, and pipelines."
+      content="Relay — your engineering workspace: Azure DevOps work, Solidtime time and SOP checks in one place. Nothing is written until you approve it."
     />
     <meta name="theme-color" content="#f8fafc" />
-    <title>Engineer Cockpit</title>
+    <title>Relay</title>
     <script>
       (function () {
         var theme = null;
-        try { theme = localStorage.getItem("cockpit-theme"); } catch (error) {}
+        try { theme = localStorage.getItem("relay-theme") || localStorage.getItem("cockpit-theme"); } catch (error) {}
         if (theme !== "light" && theme !== "dark") {
           theme = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         }

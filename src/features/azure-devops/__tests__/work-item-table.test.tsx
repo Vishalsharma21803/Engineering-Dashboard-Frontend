@@ -172,7 +172,7 @@ describe("MyWorkTable", () => {
     // A story folds away, and stays folded (remembered in this browser).
     await userEvent.click(within(list).getByRole("button", { name: "Collapse #50 Checkout flow" }));
     expect(within(list).queryByRole("list", { name: "Under #50" })).not.toBeInTheDocument();
-    expect(JSON.parse(window.localStorage.getItem("cockpit:collapsed:c") ?? "[]")).toEqual([50]);
+    expect(JSON.parse(window.localStorage.getItem("relay:collapsed:c") ?? "[]")).toEqual([50]);
   });
 
   it("shows what a ticket needs as small tags: every SOP gap in one tag, time reminders included", async () => {
@@ -245,7 +245,7 @@ describe("MyWorkTable", () => {
     await userEvent.click(doneToggle);
     await waitFor(() => expect(requested().some((params) => params.get("closed") === "1")).toBe(true));
     // Remembered for the next visit.
-    expect(JSON.parse(window.localStorage.getItem("cockpit:my-work-view:c") ?? "{}")).toEqual({ sprint: "all", closed: true });
+    expect(JSON.parse(window.localStorage.getItem("relay:my-work-view:c") ?? "{}")).toEqual({ sprint: "all", closed: true });
   });
 
   it("moves between tickets with J and K", async () => {

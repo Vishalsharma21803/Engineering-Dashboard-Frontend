@@ -306,7 +306,7 @@ test("keeps the selected project across tabs and filters lists", async ({ page }
   await expect(page.getByText("Showing changes for Alpha")).toBeVisible();
   await expect(projectSelect).toHaveAttribute("data-value", /aaaaaaaa/);
 
-  // Still Alpha after leaving the cockpit and coming back
+  // Still Alpha after leaving Relay and coming back
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Credentials" }).click();
   await page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Azure DevOps", exact: true }).click();
   await expect(page).toHaveURL(/\?project=aaaaaaaa/);

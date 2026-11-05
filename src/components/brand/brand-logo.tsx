@@ -25,7 +25,7 @@ export function BrandLogo({
             inverted ? "text-white" : "text-slate-950"
           )}
         >
-          Engineer Cockpit
+          Relay
         </span>
         {showSubtitle ? (
           <span
@@ -34,7 +34,7 @@ export function BrandLogo({
               inverted ? "text-slate-400" : "text-slate-500"
             )}
           >
-            Azure DevOps workspace
+            Engineering workspace
           </span>
         ) : null}
       </span>

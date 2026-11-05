@@ -372,81 +372,195 @@
   }
 }
 
-/* ------------------------------------------------ Sign-in cockpit preview */
+/* ------------------------------------------------ Sign-in flow */
 
-@keyframes cp-row-in {
-  from {
-    opacity: 0;
-    transform: translateX(-10px);
-  }
+/*
+ * One 9 s story, one source every 3 s: a pulse runs from the source into the hub (1.3 s), the
+ * hub rings, its caption reads for ~1.5 s, then a pulse runs on to "You approve", which lights.
+ * Without motion: the lines and the first caption stay, nothing moves.
+ */
+.relay-flow .fl-track {
+  stroke: rgb(255 255 255 / 0.12);
+  stroke-width: 1.5;
 }
 
-/* The focus steps down the queue, one action at a time, then starts over. */
-@keyframes cp-focus {
-  0%,
-  20% {
-    transform: translateY(0);
+.relay-flow .fl-pulse {
+  stroke: rgb(165 180 252);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 12 200;
+  stroke-dashoffset: 12;
+  opacity: 0;
+}
+
+.relay-flow .fl-ring,
+.relay-flow .fl-caption {
+  opacity: 0;
+}
+
+.relay-flow .fl-caption-still {
+  opacity: 1;
+}
+
+@keyframes fl-in {
+  0% {
+    stroke-dashoffset: 12;
+    opacity: 1;
   }
-  25%,
-  45% {
-    transform: translateY(3.5rem);
+  14% {
+    stroke-dashoffset: -100;
+    opacity: 1;
   }
-  50%,
-  70% {
-    transform: translateY(7rem);
-  }
-  75%,
-  95% {
-    transform: translateY(10.5rem);
-  }
+  15%,
   100% {
+    stroke-dashoffset: -100;
+    opacity: 0;
+  }
+}
+
+@keyframes fl-out {
+  0% {
+    stroke-dashoffset: 12;
+    opacity: 1;
+  }
+  28% {
+    stroke-dashoffset: -100;
+    opacity: 1;
+  }
+  30%,
+  100% {
+    stroke-dashoffset: -100;
+    opacity: 0;
+  }
+}
+
+@keyframes fl-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  45%,
+  100% {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+@keyframes fl-caption {
+  0%,
+  13% {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(4px);
+  }
+  17%,
+  30% {
+    opacity: 1;
     transform: translateY(0);
+    filter: blur(0);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+    filter: blur(2px);
   }
 }
 
-@keyframes cp-grow-y {
-  from {
-    transform: scaleY(0);
+/* The source whose work is on its way stays lit until it arrives. */
+@keyframes fl-source {
+  0%,
+  12% {
+    background-color: rgb(99 102 241 / 0.4);
+    color: rgb(255 255 255);
+  }
+  20%,
+  100% {
+    background-color: rgb(255 255 255 / 0.06);
+    color: rgb(203 213 225);
   }
 }
 
-@keyframes cp-grow-x {
-  from {
-    transform: scaleX(0);
+@keyframes fl-approve {
+  0% {
+    background-color: rgb(16 185 129 / 0.35);
+    color: rgb(167 243 208);
   }
-}
-
-@keyframes cp-breathe {
-  50% {
-    opacity: 0.35;
+  40%,
+  100% {
+    background-color: rgb(255 255 255 / 0.06);
+    color: rgb(203 213 225);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .cockpit-preview {
+  .relay-flow {
     animation: rise-in 0.9s var(--ease-out-expo) 0.1s backwards;
   }
 
-  .cp-row {
-    animation: cp-row-in 0.7s var(--ease-out-expo) backwards;
+  .relay-flow .fl-pulse-in {
+    animation: fl-in 9s cubic-bezier(0.45, 0, 0.25, 1) infinite;
   }
 
-  .cp-focus {
-    animation: cp-focus 10s var(--ease-out-expo) 1.4s infinite;
+  .relay-flow .fl-pulse-out {
+    animation: fl-out 3s cubic-bezier(0.45, 0, 0.25, 1) 1.3s infinite;
   }
 
-  .cp-run {
-    transform-origin: bottom;
-    animation: cp-grow-y 0.6s var(--ease-out-expo) backwards;
+  .relay-flow .fl-ring {
+    animation: fl-ring 3s var(--ease-out-expo) 1.26s infinite;
   }
 
-  .cp-running,
-  .cp-live {
-    animation: cp-breathe 1.6s ease-in-out infinite;
+  .relay-flow .fl-caption {
+    animation: fl-caption 9s var(--ease-out-expo) infinite;
   }
 
-  .cp-gauge {
-    animation: cp-grow-x 1.4s var(--ease-out-expo) 0.9s backwards;
+  .relay-flow .fl-caption-still {
+    opacity: 0;
+  }
+
+  .relay-flow .fl-source {
+    animation: fl-source 9s ease-out infinite;
+  }
+
+  .relay-flow .fl-approve {
+    animation: fl-approve 3s ease-out 2.1s infinite;
+  }
+}
+
+/* ------------------------------------------------ Sign-in card */
+
+@keyframes auth-shake {
+  15%,
+  85% {
+    transform: translateX(-2px);
+  }
+  30%,
+  70% {
+    transform: translateX(4px);
+  }
+  45% {
+    transform: translateX(-5px);
+  }
+  58% {
+    transform: translateX(5px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The card's three parts arrive in reading order: heading, form, then the footer link. */
+  .auth-stagger > * {
+    animation: rise-in 0.55s var(--ease-out-expo) backwards;
+  }
+  .auth-stagger > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .auth-stagger > :nth-child(3) {
+    animation-delay: 120ms;
+  }
+
+  /* A refused sign-in shakes the card once (see useShake). */
+  .auth-shake {
+    animation: auth-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
   }
 }
 

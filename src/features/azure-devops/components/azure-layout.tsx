@@ -231,7 +231,7 @@ export function AzureLayout() {
 
         {(projects.error && !projects.data) || (credentials.error && !credentials.data) ? (
           <div role="alert" className="flex flex-wrap items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 sm:px-5">
-            Could not load your {credentials.error && !credentials.data ? "organizations" : "projects"} from {credentials.error && !credentials.data ? "Cockpit" : "Azure DevOps"}.
+            Could not load your {credentials.error && !credentials.data ? "organizations" : "projects"} from {credentials.error && !credentials.data ? "Relay" : "Azure DevOps"}.
             <button
               type="button"
               className="font-medium underline disabled:opacity-60"
@@ -244,7 +244,7 @@ export function AzureLayout() {
         ) : null}
       </div>
 
-      {/* The cockpit header stays while a page loads. */}
+      {/* The Relay header stays while a page loads. */}
       <Suspense fallback={<PageLoader fullScreen={false} />}>
         <Outlet />
       </Suspense>

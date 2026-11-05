@@ -9,7 +9,7 @@ import { RouteError } from "@/components/layout/route-error";
 import { AuthContext } from "@/features/auth/context/auth-context";
 
 const LoadedPage = lazy(() => Promise.resolve({ default: () => <h1>Loaded page</h1> }));
-const MissingPage = lazy(() => Promise.reject(new TypeError("Failed to fetch dynamically imported module: https://cockpit.example/assets/time-page-9z.js")));
+const MissingPage = lazy(() => Promise.reject(new TypeError("Failed to fetch dynamically imported module: https://relay.example/assets/time-page-9z.js")));
 
 function renderAt(path: string) {
   const router = createMemoryRouter(
@@ -59,7 +59,7 @@ describe("lazily loaded pages", () => {
   it("offer Reload when the page's file cannot be loaded (after a deploy), keeping the navigation", async () => {
     renderAt("/missing");
 
-    expect(await screen.findByText("A new version of Cockpit is available")).toBeInTheDocument();
+    expect(await screen.findByText("A new version of Relay is available")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
   });

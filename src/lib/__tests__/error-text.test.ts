@@ -20,7 +20,7 @@ describe("errorMessage", () => {
   });
 
   it("falls back to fixed wording when a known reason comes without a message", () => {
-    expect(errorMessage(new ApiError(403, "", [], "SIGNUP_NOT_ALLOWED"), "x")).toBe("Sign-up is by invitation only. Ask the Cockpit owner to add your email.");
+    expect(errorMessage(new ApiError(403, "", [], "SIGNUP_NOT_ALLOWED"), "x")).toBe("Sign-up is by invitation only. Ask the Relay owner to add your email.");
   });
 
   it("explains network failures and keeps timeout texts", () => {

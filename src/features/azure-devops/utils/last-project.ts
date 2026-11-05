@@ -1,5 +1,5 @@
 /**
- * Per-browser memory of the cockpit context so the organization and
+ * Per-browser memory of the Relay context so the organization and
  * project chosen in the header stick across tabs and visits.
  */
 const SELECTED_PROJECT = "azure:selected-project:";

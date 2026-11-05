@@ -28,7 +28,7 @@ import {
 
 /*
  * Error boundaries: each layout has a pathless child route with an errorElement, so a
- * crashing page is replaced by RouteError while the layout (navigation, cockpit header)
+ * crashing page is replaced by RouteError while the layout (navigation, Relay header)
  * stays. The top-level errorElements catch crashes in the layouts themselves.
  */
 export const router = createBrowserRouter([

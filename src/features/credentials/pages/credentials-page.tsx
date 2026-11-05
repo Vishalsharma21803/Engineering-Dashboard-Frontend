@@ -274,7 +274,7 @@ export function CredentialsPage() {
           <h2 id="azure-title" className="text-xl font-semibold tracking-tight text-slate-950">
             Azure DevOps
           </h2>
-          <p className="mt-1 text-sm text-slate-600">Organizations Cockpit reads your work items, pull requests and pipelines from.</p>
+          <p className="mt-1 text-sm text-slate-600">Organizations Relay reads your work items, pull requests and pipelines from.</p>
         </div>
         {isError && credentials ? (
           // A failed background refresh keeps the last list on screen.

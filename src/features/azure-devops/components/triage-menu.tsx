@@ -74,7 +74,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** Snooze / acknowledge / abandon an item or its whole project. Cockpit-only. */
+/** Snooze / acknowledge / abandon an item or its whole project. Relay-only. */
 export function TriageMenu({ triage, itemKey, projectName, label, resolved }: TriageMenuProps) {
   const [open, setOpen] = useState(false);
   const [customDate, setCustomDate] = useState("");
@@ -184,7 +184,7 @@ export function TriageMenu({ triage, itemKey, projectName, label, resolved }: Tr
         ) : null}
 
         <p className="px-2.5 pb-1 pt-2 text-xs leading-4 text-slate-500">
-          Only changes your Cockpit view. Nothing is changed in Azure DevOps.
+          Only changes your Relay view. Nothing is changed in Azure DevOps.
         </p>
       </PopoverContent>
     </Popover>

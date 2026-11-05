@@ -38,7 +38,7 @@ describe("ActionsPage", () => {
     renderWithProviders(<ActionsPage />, { path: "/actions", route: "/actions?from=time" });
 
     expect(screen.getByRole("link", { name: "Back to Time" })).toHaveAttribute("href", "/time");
-    expect(screen.getByText(/Every change Cockpit makes to Azure DevOps or Solidtime is proposed first/)).toBeInTheDocument();
+    expect(screen.getByText(/Every change Relay makes to Azure DevOps or Solidtime is proposed first/)).toBeInTheDocument();
     expect((await screen.findAllByText("Succeeded")).length).toBeGreaterThan(0);
     expect(screen.queryByText("SUCCEEDED")).not.toBeInTheDocument();
   });

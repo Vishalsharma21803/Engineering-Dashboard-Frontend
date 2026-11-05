@@ -1,6 +1,6 @@
 export type TriageStatus = "SNOOZED" | "ACKNOWLEDGED" | "ABANDONED";
 
-/** Personal dashboard mark stored in Cockpit only; never written to Azure DevOps. */
+/** Personal dashboard mark stored in Relay only; never written to Azure DevOps. */
 export interface TriageMark {
   id: string;
   credentialId: string;

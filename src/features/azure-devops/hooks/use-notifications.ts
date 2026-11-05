@@ -6,7 +6,7 @@ import { pushGlobalNotice, sameSession, stampSession, type SessionStamp } from "
 
 import { notificationKeys } from "../api/azure.keys";
 import { listNotifications, readAllNotifications, setNotificationStatus } from "../api/notification.api";
-import type { CockpitNotification, NotificationStatus } from "../types/notification.types";
+import type { RelayNotification, NotificationStatus } from "../types/notification.types";
 import { retryUnlessClientError } from "../utils/query-retry";
 
 /**
@@ -36,13 +36,13 @@ export type NotificationSaveFailure = (input: { id: string | null; status: Notif
  */
 export type NotificationSaved = (input: { id: string | null; markedRead: string[] }) => void;
 
-type Snapshot = Array<[QueryKey, CockpitNotification[] | undefined]>;
+type Snapshot = Array<[QueryKey, RelayNotification[] | undefined]>;
 
 /** Puts back only the rows this save changed, to the status each had before; other saves keep theirs. */
-function rollBack(queryClient: QueryClient, before: Snapshot, changed: (row: CockpitNotification) => boolean) {
+function rollBack(queryClient: QueryClient, before: Snapshot, changed: (row: RelayNotification) => boolean) {
   for (const [key, rows] of before) {
     const previous = new Map((rows ?? []).filter(changed).map((row) => [row.id, row.status]));
-    queryClient.setQueryData<CockpitNotification[]>(key, (current) =>
+    queryClient.setQueryData<RelayNotification[]>(key, (current) =>
       current?.map((row) => {
         const status = previous.get(row.id);
         return status === undefined ? row : { ...row, status };
@@ -78,8 +78,8 @@ export function useNotificationStatus(credentialId: string, onFailure?: Notifica
     onMutate: async ({ id, status }) => {
       const stamp = stampSession();
       await queryClient.cancelQueries(scope);
-      const before = queryClient.getQueriesData<CockpitNotification[]>(scope);
-      queryClient.setQueriesData<CockpitNotification[]>(scope, (rows) => rows?.map((row) => (row.id === id ? { ...row, status } : row)));
+      const before = queryClient.getQueriesData<RelayNotification[]>(scope);
+      queryClient.setQueriesData<RelayNotification[]>(scope, (rows) => rows?.map((row) => (row.id === id ? { ...row, status } : row)));
       return { before, ...stamp };
     },
     onError: (error, { id, status }, context) => {
@@ -118,8 +118,8 @@ export function useReadAllNotifications(credentialId: string, projectName: strin
     onMutate: async () => {
       const stamp = stampSession();
       await queryClient.cancelQueries(scope);
-      const before = queryClient.getQueriesData<CockpitNotification[]>(scope);
-      queryClient.setQueriesData<CockpitNotification[]>(scope, (rows) => rows?.map((row) => (row.status === "UNREAD" ? { ...row, status: "READ" } : row)));
+      const before = queryClient.getQueriesData<RelayNotification[]>(scope);
+      queryClient.setQueriesData<RelayNotification[]>(scope, (rows) => rows?.map((row) => (row.status === "UNREAD" ? { ...row, status: "READ" } : row)));
       return { before, ...stamp };
     },
     onError: (error, _input, context) => {

@@ -9,10 +9,10 @@ import { dismissGlobalNotice, getGlobalNotices } from "@/lib/global-errors";
 import { renderWithProviders } from "@/test/render";
 import { NotificationsMenu } from "../components/notifications-menu";
 import { useNotificationStatus } from "../hooks/use-notifications";
-import type { CockpitNotification } from "../types/notification.types";
+import type { RelayNotification } from "../types/notification.types";
 
 const at = "2026-11-03T08:00:00Z";
-const notification = (overrides: Partial<CockpitNotification>): CockpitNotification => ({
+const notification = (overrides: Partial<RelayNotification>): RelayNotification => ({
   id: "n",
   key: "k",
   kind: "timeDay",
@@ -35,7 +35,7 @@ const rows = [
 
 /** A small stateful backend: saved statuses come back on the next read, like the real one. */
 function setup(
-  served: CockpitNotification[] = rows,
+  served: RelayNotification[] = rows,
   options: { failList?: boolean; failSave?: boolean | ((id: string) => boolean); failListAfter?: number } = {}
 ) {
   let reads = 0;
@@ -241,7 +241,7 @@ describe("useNotificationStatus", () => {
     };
   }
 
-  const statusOf = (client: QueryClient, id: string) => client.getQueryData<CockpitNotification[]>(list)?.find((row) => row.id === id)?.status;
+  const statusOf = (client: QueryClient, id: string) => client.getQueryData<RelayNotification[]>(list)?.find((row) => row.id === id)?.status;
 
   afterEach(() => {
     for (const notice of getGlobalNotices()) dismissGlobalNotice(notice.id);

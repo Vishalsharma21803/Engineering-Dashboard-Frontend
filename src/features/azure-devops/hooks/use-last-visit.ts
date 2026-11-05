@@ -25,7 +25,7 @@ function writeSession(key: string, value: number | null): void {
  * to a ticket and back keeps the dots); the next session compares with now.
  */
 export function useLastVisit(credentialId: string): number | null {
-  const key = `cockpit:last-visit:${credentialId}`;
+  const key = `relay:last-visit:${credentialId}`;
   const [previous] = useState(() => {
     const session = readSession(key);
     return session !== undefined ? session : readStored<number | null>(key, null);
