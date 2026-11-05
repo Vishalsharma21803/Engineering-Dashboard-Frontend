@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/error-text";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { StatusNotice } from "@/components/ui/status-notice";
 import type { ProposeActionInput } from "@/features/azure-devops/types/action.types";
+import { useNow } from "../hooks/use-now";
 import { useCatalog, useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection } from "../types/solidtime.types";
 import { formatDuration } from "../utils/time";
@@ -17,14 +18,8 @@ export function TimerBar({ connection, onPropose, isProposing }: { connection: S
   const catalog = useCatalog(connection.credentialId);
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [now, setNow] = useState(() => Date.now());
   const running = timer.data?.entry ?? null;
-
-  useEffect(() => {
-    if (!running) return undefined;
-    const handle = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(handle);
-  }, [running]);
+  const now = useNow(running !== null);
 
   if (running) {
     return (

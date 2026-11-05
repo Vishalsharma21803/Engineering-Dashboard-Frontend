@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { focusManager } from "@tanstack/react-query";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthContext } from "@/features/auth/context/auth-context";
 import { mockBackend, renderWithProviders } from "@/test/render";
@@ -8,6 +9,7 @@ import { SolidtimeConnectionsSection } from "../components/solidtime-connections
 import { TicketTimerButton } from "../components/ticket-timer-button";
 import { TimerBar } from "../components/timer-bar";
 import { TimesheetTab } from "../components/timesheet-tab";
+import { forgetFreshReads } from "../api/solidtime.api";
 import { DraftTab } from "../components/draft-tab";
 import { TicketTimeLookup } from "../components/ticket-time-lookup";
 import { TicketTimePanel } from "../components/ticket-time-panel";
@@ -313,6 +315,122 @@ describe("TimesheetTab", () => {
     const form = screen.getByRole("form", { name: "Edit time entry" });
     expect(within(form).getByLabelText("Start")).toHaveValue(`${day}T09:00`);
     expect(within(form).getByText("Times are in UTC, your Solidtime time zone.")).toBeInTheDocument();
+  });
+});
+
+describe("TimesheetTab and the running timer", () => {
+  beforeEach(() => forgetFreshReads());
+  const day = localDay(undefined, "UTC");
+  const from = weekStart(day);
+  const page = <T,>(items: T[]) => ({ items, total: items.length, page: 1, pageSize: 10, totalPages: 1 });
+  // Started an hour ago; the server counted 10 min when it read the sheet (a sheet read a while back).
+  const start = new Date(Date.now() - 3_600_000).toISOString();
+  const runningEntry = { id: "run", start, end: null, seconds: 600, description: "#101 Implement login", projectId: null, projectName: null, taskId: null, tags: [], billable: false, running: true, tickets: [{ id: 101, title: "Implement login" }] };
+  const sheet = (running: boolean) => ({
+    timesheet: {
+      from,
+      to: shiftDay(from, 6),
+      timeZone: "UTC",
+      totalSeconds: running ? 600 : 0,
+      days: Array.from({ length: 7 }, (_, index) => ({ day: shiftDay(from, index), seconds: running && shiftDay(from, index) === localDay(new Date(start), "UTC") ? 600 : 0 })),
+      byTicket: page(running ? [{ ticketId: 101, title: "Implement login", seconds: 600 }] : []),
+      unlinkedSeconds: 0,
+      entries: page(running ? [runningEntry] : []),
+      running: running ? { id: "run", start, day: localDay(new Date(start), "UTC"), seconds: 600, ticketIds: [101] } : null,
+      ticketsChecked: true,
+      truncated: false,
+    },
+  });
+  const timerOn = { timer: { entry: { id: "run", start, end: null, description: "#101 Implement login", organization_id: connection.organizationId }, inThisOrganization: true, tickets: [] } };
+  const sheetReads = (calls: Array<{ url: string }>) => calls.filter((call) => call.url.includes("/timesheet"));
+
+  it("keeps counting a running timer between reads, without asking Solidtime again", async () => {
+    const calls = mockBackend([{ path: `${base}/timesheet`, body: sheet(true) }, { path: `${base}/timer`, body: timerOn }, { path: `${base}/catalog`, body: catalog }]);
+    renderWithProviders(<TimesheetTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+
+    // An hour so far, not the 10 min the sheet was read with.
+    const entries = await screen.findByRole("list", { name: "Time entries" });
+    await waitFor(() => expect(within(entries).getByText("1h 00m")).toBeInTheDocument());
+    expect(sheetReads(calls)).toHaveLength(1);
+  });
+
+  it("reads the sheet again, fresh, when the timer was stopped in Solidtime, and only once", async () => {
+    const calls = mockBackend([{ path: `${base}/timesheet`, body: sheet(true) }, { path: `${base}/timer`, body: { timer: null } }, { path: `${base}/catalog`, body: catalog }]);
+    renderWithProviders(<TimesheetTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+
+    await waitFor(() => expect(sheetReads(calls)).toHaveLength(2));
+    expect(sheetReads(calls)[1]?.url).toContain("refresh=1");
+    // Solidtime still says "running" in the list: no loop; the next timer check may try again.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(sheetReads(calls)).toHaveLength(2);
+    // Held where the check found it stopped (an hour in), not dropped back to the 10 min the sheet was read with.
+    expect(within(screen.getByRole("list", { name: "Time entries" })).getByText("1h 00m")).toBeInTheDocument();
+  });
+
+  it("checks the timer when I click back into the window, and reads the sheet fresh (once) when one was started meanwhile", async () => {
+    mockBackend([{ path: `${base}/timesheet`, body: sheet(false) }, { path: `${base}/timer`, body: { timer: null } }, { path: `${base}/catalog`, body: catalog }]);
+    renderWithProviders(<TimesheetTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+    expect(await screen.findByText("No time on this day.")).toBeInTheDocument();
+
+    // Started in Solidtime while I was on another tab.
+    const calls = mockBackend([{ path: `${base}/timesheet`, body: sheet(true) }, { path: `${base}/timer`, body: timerOn }, { path: `${base}/catalog`, body: catalog }]);
+    // Back to the window (only the timer is checked; nothing else is re-read on focus in the app).
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+    });
+
+    await waitFor(() => expect(calls.some((call) => call.url.includes("/timer"))).toBe(true));
+    expect(calls.find((call) => call.url.includes("/timer"))?.url).toContain("refresh=1");
+    await waitFor(() => expect(sheetReads(calls).some((call) => call.url.includes("refresh=1"))).toBe(true));
+    const entries = await screen.findByRole("list", { name: "Time entries" }, { timeout: 3000 });
+    expect(within(entries).getByText("1h 00m")).toBeInTheDocument();
+    // One read for the change, not one per part of the page that noticed it.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(sheetReads(calls)).toHaveLength(1);
+  });
+
+  it("checks the timer when the tab becomes visible again, and reads nothing else when it did not change", async () => {
+    mockBackend([{ path: `${base}/timesheet`, body: sheet(false) }, { path: `${base}/timer`, body: { timer: null } }, { path: `${base}/catalog`, body: catalog }]);
+    renderWithProviders(<TimesheetTab connection={connection} onPropose={vi.fn()} isProposing={false} today={day} />);
+    expect(await screen.findByText("No time on this day.")).toBeInTheDocument();
+
+    const calls = mockBackend([{ path: `${base}/timesheet`, body: sheet(false) }, { path: `${base}/timer`, body: { timer: null } }, { path: `${base}/catalog`, body: catalog }]);
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+    await waitFor(() => expect(calls.filter((call) => call.url.includes("/timer"))).toHaveLength(1));
+    // Nothing changed: no fresh read of the sheet (the test client's own focus re-read is plain).
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(sheetReads(calls).filter((call) => call.url.includes("refresh=1"))).toHaveLength(0);
+    act(() => focusManager.setFocused(undefined));
+  });
+
+  it("refreshes from Solidtime on the Time page and says when it last checked", async () => {
+    mockBackend([
+      { path: "/api/solidtime/connections", body: { connections: [connection] } },
+      { path: `${base}/profile`, body: { profile: { name: "Dev", timeZone: "UTC" } } },
+      { path: `${base}/timer`, body: { timer: null } },
+      { path: `${base}/catalog`, body: catalog },
+      { path: `${base}/timesheet`, body: sheet(false) },
+      { path: "/api/actions", body: { actions: [], total: 0, page: 1, pageSize: 10, totalPages: 0 } },
+    ]);
+    renderWithProviders(<TimePage />, { path: "/time/:credentialId", route: `/time/${connection.credentialId}` });
+    expect(await screen.findByText("Checked just now")).toBeInTheDocument();
+    expect(await screen.findByText("No time on this day.")).toBeInTheDocument();
+
+    const calls = mockBackend([
+      { path: "/api/solidtime/connections", body: { connections: [connection] } },
+      { path: `${base}/profile`, body: { profile: { name: "Dev", timeZone: "UTC" } } },
+      { path: `${base}/timer`, body: { timer: null } },
+      { path: `${base}/catalog`, body: catalog },
+      { path: `${base}/timesheet`, body: sheet(false) },
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled());
+    expect(sheetReads(calls)[0]?.url).toContain("refresh=1");
+    expect(calls.find((call) => call.url.includes("/timer"))?.url).toContain("refresh=1");
+    expect(calls.some((call) => call.url.includes("/draft"))).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,9 +15,12 @@ import type { ProposeActionInput } from "@/features/azure-devops/types/action.ty
 import { retryUnlessClientError } from "@/features/azure-devops/utils/query-retry";
 import { usePageParam, useSearchParamsUpdate, useSyncServedPage } from "@/hooks/use-page-param";
 import { cn } from "@/utils/cn";
-import { getTimesheet } from "../api/solidtime.api";
+import { getTimesheet, readFreshSoon } from "../api/solidtime.api";
 import { solidtimeKeys } from "../api/solidtime.keys";
+import { useNow } from "../hooks/use-now";
+import { useTimer } from "../hooks/use-solidtime";
 import type { SolidtimeConnection, TimesheetEntry } from "../types/solidtime.types";
+import { countsRunningTimer, liveTimesheet, sheetDisagreesWithTimer } from "../utils/live-timesheet";
 import { formatDayLabel, formatDuration, shiftDay, weekStart, zonedClock } from "../utils/time";
 import { EntryForm } from "./entry-form";
 
@@ -35,6 +38,7 @@ type View = "entries" | "tickets";
 
 function EntryRow({
   entry,
+  seconds,
   timeZone,
   withDay,
   editing,
@@ -44,6 +48,8 @@ function EntryRow({
   children,
 }: {
   entry: TimesheetEntry;
+  /** Its time so far: a running entry's keeps counting. */
+  seconds: number;
   timeZone: string;
   withDay: boolean;
   editing: boolean;
@@ -57,7 +63,7 @@ function EntryRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 gap-4">
           <div className="w-24 shrink-0">
-            <p className="text-lg font-semibold tabular-nums text-slate-950">{formatDuration(entry.seconds)}</p>
+            <p className="text-lg font-semibold tabular-nums text-slate-950">{formatDuration(seconds)}</p>
             <p className="text-xs tabular-nums text-slate-500">
               {zonedClock(entry.start, timeZone)} – {entry.end ? zonedClock(entry.end, timeZone) : "now"}
             </p>
@@ -144,6 +150,23 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
     retry: retryUnlessClientError,
   });
   const stale = sheet.isPlaceholderData;
+  // The running timer counts on here between reads; the timer check keeps the sheet honest.
+  const timer = useTimer(connection.credentialId);
+  const { refetch: refetchSheet, isFetching: sheetLoading } = sheet;
+  const disagrees = Boolean(sheet.data && !stale && sheetDisagreesWithTimer(sheet.data, timer.data));
+  // Read fresh once per timer check: if Solidtime still disagrees, the next check (not a loop) tries again.
+  // A read already under way (after a timer change or an approval) is waited for first; it usually settles it.
+  const reloadedAt = useRef(0);
+  const timerCheckedAt = timer.dataUpdatedAt;
+  useEffect(() => {
+    if (!disagrees || sheetLoading || timerCheckedAt <= reloadedAt.current) return;
+    reloadedAt.current = Date.now();
+    readFreshSoon(connection.credentialId);
+    // Joins a fresh read the timer change started in this same render, instead of sending a second one.
+    void refetchSheet({ cancelRefetch: false });
+  }, [disagrees, sheetLoading, timerCheckedAt, connection.credentialId, refetchSheet]);
+  const now = useNow(Boolean(sheet.data && countsRunningTimer(sheet.data, timer.data)));
+  const live = sheet.data ? liveTimesheet(sheet.data, timer.data, now, timer.dataUpdatedAt) : null;
   const served = sheet.data && !stale ? sheet.data : undefined;
   useSyncServedPage(entriesPage, served?.entries.page);
   useSyncServedPage(ticketPage, served?.byTicket.page);
@@ -222,8 +245,8 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
         <Updating active={stale} label={`Loading ${rangeLabel}…`} className="flex flex-col gap-4">
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <StatTile label={mode === "week" ? "Tracked this week" : "Tracked this day"} value={formatDuration(sheet.data.totalSeconds)} hint={`time zone ${sheet.data.timeZone}`} />
-              <StatTile label="Not linked to a ticket" value={formatDuration(sheet.data.unlinkedSeconds)} />
+              <StatTile label={mode === "week" ? "Tracked this week" : "Tracked this day"} value={formatDuration(live?.totalSeconds ?? sheet.data.totalSeconds)} hint={`time zone ${sheet.data.timeZone}`} />
+              <StatTile label="Not linked to a ticket" value={formatDuration(live?.unlinkedSeconds ?? sheet.data.unlinkedSeconds)} />
               <StatTile label="Tickets" value={sheet.data.byTicket.total} />
               <StatTile label="Target" value={`${connection.dailyTargetHours} h`} hint="per working day" />
             </div>
@@ -237,7 +260,8 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
                   </Button>
                 </div>
                 <ul aria-label="Time per day" className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                  {sheet.data.days.map((day) => {
+                  {sheet.data.days.map((sheetDay) => {
+                    const day = { day: sheetDay.day, seconds: live?.daySeconds(sheetDay) ?? sheetDay.seconds };
                     const hours = day.seconds / 3600;
                     const reached = hours >= connection.dailyTargetHours;
                     const picked = day.day === listDay;
@@ -301,6 +325,7 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
                         <EntryRow
                           key={entry.id}
                           entry={entry}
+                          seconds={live?.entrySeconds(entry) ?? entry.seconds}
                           timeZone={timeZone}
                           withDay={mode === "week" && listDay === null}
                           editing={isEditing}
@@ -338,7 +363,7 @@ export function TimesheetTab({ connection, onPropose, isProposing, today }: TabP
                         <span className="min-w-0 truncate text-slate-800">
                           <span className="font-medium text-slate-950">#{ticket.ticketId}</span> {ticket.title}
                         </span>
-                        <span className="shrink-0 font-semibold tabular-nums text-slate-950">{formatDuration(ticket.seconds)}</span>
+                        <span className="shrink-0 font-semibold tabular-nums text-slate-950">{formatDuration(live?.ticketSeconds(ticket) ?? ticket.seconds)}</span>
                       </li>
                     ))}
                   </ul>

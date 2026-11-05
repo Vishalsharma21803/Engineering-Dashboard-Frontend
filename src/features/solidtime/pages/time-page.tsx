@@ -1,8 +1,11 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { ActiveIndicator } from "@/components/ui/active-indicator";
 import { Button } from "@/components/ui/button";
 import { buttonClassName } from "@/components/ui/button-styles";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUrlTab } from "@/hooks/use-url-tab";
 import { ActionReviewDialog } from "@/features/azure-devops/components/action-review-dialog";
@@ -17,8 +20,9 @@ import { TimerBar } from "../components/timer-bar";
 import { TimesheetTab } from "../components/timesheet-tab";
 import { UnlinkedTab } from "../components/unlinked-tab";
 import { VerifyTab } from "../components/verify-tab";
-import { useSolidtimeConnections, useSolidtimeProfile } from "../hooks/use-solidtime";
-import { localDay } from "../utils/time";
+import { useNow } from "../hooks/use-now";
+import { refreshSolidtime, useSolidtimeConnections, useSolidtimeProfile, useTimer } from "../hooks/use-solidtime";
+import { checkedLabel, localDay } from "../utils/time";
 
 const TABS = [
   { id: "timesheet", label: "Timesheet" },
@@ -32,6 +36,34 @@ const TABS = [
 type Tab = (typeof TABS)[number]["id"];
 
 const isTab = (value: string | null): value is Tab => TABS.some((item) => item.id === value);
+
+/** When Solidtime was last asked about my timer, and a way to read everything again from it. */
+function SyncControls({ credentialId }: { credentialId: string }) {
+  const queryClient = useQueryClient();
+  const timer = useTimer(credentialId);
+  const [refreshing, setRefreshing] = useState(false);
+  const now = useNow(true, 30_000);
+  const checkedAt = timer.dataUpdatedAt;
+
+  const refresh = () => {
+    setRefreshing(true);
+    void refreshSolidtime(queryClient, credentialId).finally(() => setRefreshing(false));
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {checkedAt > 0 ? (
+        <span className="text-xs text-slate-500" title={`Solidtime was last asked about your timer at ${new Date(checkedAt).toLocaleTimeString()}`}>
+          {timer.isFetching && !refreshing ? "Checking…" : checkedLabel(checkedAt, Math.max(now, checkedAt))}
+        </span>
+      ) : null}
+      <Button size="sm" variant="secondary" disabled={refreshing} onClick={refresh}>
+        {refreshing ? <Spinner className="size-4" /> : null}
+        {refreshing ? "Refreshing…" : "Refresh"}
+      </Button>
+    </div>
+  );
+}
 
 /** /time: opens the first Solidtime connection, or explains how to add one. */
 export function TimeIndexPage() {
@@ -99,15 +131,18 @@ export function TimePage() {
           <p className="mt-1 text-sm font-medium text-slate-700">Solidtime · {connection.organizationName}</p>
           <p className="mt-1 text-sm text-slate-600">Every change to Solidtime is proposed first and runs only after you approve it.</p>
         </div>
-        {(pending.data?.total ?? 0) > 0 ? (
-          <Link to="/actions?from=time" className={buttonClassName({ size: "sm", variant: "secondary" })}>
-            {pending.data?.total} awaiting approval
-          </Link>
-        ) : pending.error && !pending.data ? (
-          <Link to="/actions?from=time" className={buttonClassName({ size: "sm", variant: "secondary" })}>
-            Approvals could not be checked
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <SyncControls credentialId={connection.credentialId} />
+          {(pending.data?.total ?? 0) > 0 ? (
+            <Link to="/actions?from=time" className={buttonClassName({ size: "sm", variant: "secondary" })}>
+              {pending.data?.total} awaiting approval
+            </Link>
+          ) : pending.error && !pending.data ? (
+            <Link to="/actions?from=time" className={buttonClassName({ size: "sm", variant: "secondary" })}>
+              Approvals could not be checked
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <TimerBar {...props} />

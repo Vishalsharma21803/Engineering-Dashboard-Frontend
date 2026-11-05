@@ -85,3 +85,11 @@ export function toZonedInput(iso: string, timeZone: string): string {
 export function fromZonedInput(value: string, timeZone: string): string | null {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) ? zonedInstant(value.slice(0, 10), value.slice(11, 16), timeZone) : null;
 }
+
+/** "Checked just now", "Checked 4 min ago", or the time for anything older than an hour. */
+export function checkedLabel(checkedAt: number, now: number): string {
+  const minutes = Math.floor((now - checkedAt) / 60_000);
+  if (minutes < 1) return "Checked just now";
+  if (minutes < 60) return `Checked ${minutes} min ago`;
+  return `Checked at ${new Date(checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+}

@@ -106,6 +106,8 @@ export interface Timesheet {
   byTicket: Page<{ ticketId: number; title: string; seconds: number }>;
   unlinkedSeconds: number;
   entries: Page<TimesheetEntry>;
+  /** My running timer if it is in this period: counted above up to the moment the sheet was read. */
+  running: { id: string; start: string; day: string; seconds: number; ticketIds: number[] } | null;
   ticketsChecked: boolean;
   truncated: boolean;
 }
