@@ -141,8 +141,9 @@ export function AzureLayout() {
           {project ? ` · ${project.name}` : ""}
         </h1>
         <div className="flex flex-col-reverse gap-x-4 gap-y-2 px-4 pt-2 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-          {/* overflow-y-hidden: with overflow-x-auto the tabs' -mb-px would otherwise add a 1px vertical scrollbar. */}
-          <nav aria-label="Azure DevOps" className="relative flex gap-6 overflow-x-auto overflow-y-hidden whitespace-nowrap">
+          {/* Scrolls sideways only on phones; from sm up its three tabs always fit, so it never shows a scrollbar
+              (the tabs' -mb-px or a sub-pixel underline would otherwise make it scroll by 1px). */}
+          <nav aria-label="Azure DevOps" className="relative flex gap-6 overflow-x-auto overflow-y-hidden whitespace-nowrap sm:overflow-x-hidden">
             <ActiveIndicator variant="underline" />
             <NavLink to={withProject(base)} end className={tabClassName}>
               My work

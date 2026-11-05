@@ -32,12 +32,19 @@ export function ActiveIndicator({ variant, className }: ActiveIndicatorProps) {
         return;
       }
 
-      indicator.style.width = `${active.offsetWidth}px`;
+      // Exact (fractional) box, not offsetLeft/offsetWidth: those round, and on the last tab the
+      // rounded-up width ran up to 1px past the end of a scrollable tab bar, giving it a scrollbar.
+      const box = container.getBoundingClientRect();
+      const rect = active.getBoundingClientRect();
+      const left = rect.left - box.left - container.clientLeft + container.scrollLeft;
+      const top = rect.top - box.top - container.clientTop + container.scrollTop;
+
+      indicator.style.width = `${rect.width}px`;
       if (variant === "pill") {
-        indicator.style.height = `${active.offsetHeight}px`;
-        indicator.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+        indicator.style.height = `${rect.height}px`;
+        indicator.style.transform = `translate(${left}px, ${top}px)`;
       } else {
-        indicator.style.transform = `translateX(${active.offsetLeft}px)`;
+        indicator.style.transform = `translateX(${left}px)`;
       }
       indicator.style.opacity = "1";
     };
