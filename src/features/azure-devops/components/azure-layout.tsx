@@ -141,7 +141,8 @@ export function AzureLayout() {
           {project ? ` · ${project.name}` : ""}
         </h1>
         <div className="flex flex-col-reverse gap-x-4 gap-y-2 px-4 pt-2 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-          <nav aria-label="Azure DevOps" className="relative flex gap-6 overflow-x-auto whitespace-nowrap">
+          {/* overflow-y-hidden: with overflow-x-auto the tabs' -mb-px would otherwise add a 1px vertical scrollbar. */}
+          <nav aria-label="Azure DevOps" className="relative flex gap-6 overflow-x-auto overflow-y-hidden whitespace-nowrap">
             <ActiveIndicator variant="underline" />
             <NavLink to={withProject(base)} end className={tabClassName}>
               My work
